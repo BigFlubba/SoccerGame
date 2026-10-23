@@ -72,7 +72,11 @@ export function createMatchScene(art: GameArt, difficulty: Difficulty, seed: num
         pause = r.m;
         if (r.chosen === 'RESTART') return restart();
         if (r.chosen === 'QUIT') return createTitleScene(art, difficulty);
-        if (r.chosen === 'RESUME' || r.back || (!r.chosen && input.pressed.has('pause'))) pause = null;
+        if (r.chosen === 'RESUME' || r.back || (!r.chosen && input.pressed.has('pause'))) {
+          pause = null;
+          // Buttons held while the menu closes (B is also "back") need a fresh press to act in play.
+          world.home.held = { shoot: input.held.has('shoot'), chip: input.held.has('chip') };
+        }
         return null;
       }
       if (fullTime) {

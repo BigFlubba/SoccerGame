@@ -48,6 +48,24 @@ describe('match scene', () => {
     expect(s.world.home.state).not.toBe('kicking');
   });
 
+  it('backing out of the pause menu with B does not start a slide', () => {
+    const s = live();
+    s.world.ball.x = 100;
+    s.update(frame(['pause']), STEP);
+    s.update(frame(['back', 'chip']), STEP);
+    expect(s.paused).toBe(false);
+    for (let i = 0; i < 5; i++) s.update(frame([], ['back', 'chip']), STEP);
+    expect(s.world.home.state).toBe('ground');
+  });
+
+  it('backing out of the pause menu with B does not start a chip', () => {
+    const s = live();
+    s.update(frame(['pause']), STEP);
+    s.update(frame(['back', 'chip']), STEP);
+    for (let i = 0; i < 5; i++) s.update(frame([], ['back', 'chip']), STEP);
+    expect(s.world.home.state).toBe('ground');
+  });
+
   it('restart from the pause menu returns a fresh 0-0 match', () => {
     const s = live();
     s.world.match.score.home = 2;
