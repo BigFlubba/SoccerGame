@@ -1,10 +1,11 @@
 import { createInput, type InputFrame } from '../engine/input';
 import { createStepper, startLoop } from '../engine/loop';
 import { createScreen } from '../engine/screen';
-import { DIFFICULTY, type Difficulty } from '../game/ai';
+import { loadSettings, saveSettings, type KeyValueStore } from '../meta/settings';
 import { loadGameArt } from './art';
+import type { GameContext } from './context';
 import type { Scene } from './scene';
-import { createTitleScene } from './titleScene';
+import { createPressStartScene } from './titleScene';
 
 const NONE: ReadonlySet<never> = new Set();
 
@@ -14,18 +15,29 @@ function carry(pending: InputFrame | null, next: InputFrame): InputFrame {
   return { ...next, pressed: new Set([...pending.pressed, ...next.pressed]), released: new Set([...pending.released, ...next.released]) };
 }
 
-/** `?difficulty=easy|hard` overrides the default for playtesting. */
-export function difficultyFrom(search: string): Difficulty {
-  const d = new URLSearchParams(search).get('difficulty');
-  return d && d in DIFFICULTY ? (d as Difficulty) : 'normal';
+/** localStorage, or nothing if the browser refuses access to it (some private modes throw). */
+function browserStore(): KeyValueStore | null {
+  try {
+    return window.localStorage;
+  } catch {
+    return null;
+  }
 }
 
-/** Boots the game: title screen first, a fixed 60 Hz simulation, drawn every animation frame. */
+/** Boots the game: Press Start first, a fixed 60 Hz simulation, drawn every animation frame. */
 export function startGame(canvas: HTMLCanvasElement): void {
   const screen = createScreen(canvas);
   const input = createInput(window);
-  const art = loadGameArt();
-  let scene: Scene = createTitleScene(art, difficultyFrom(location.search));
+  const store = browserStore();
+  const ctx: GameContext = {
+    art: loadGameArt(),
+    settings: loadSettings(store),
+    save(s) {
+      ctx.settings = s;
+      saveSettings(store, s);
+    },
+  };
+  let scene: Scene = createPressStartScene(ctx);
   let latest = input.poll();
   let pending: InputFrame | null = null;
   let nowS = 0;

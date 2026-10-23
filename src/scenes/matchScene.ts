@@ -1,17 +1,17 @@
 import { MASTER } from '../art/colors';
 import type { InputFrame } from '../engine/input';
 import { BASE_W } from '../engine/viewport';
-import { DIFFICULTY, createBrain, think, type Difficulty } from '../game/ai';
+import { DIFFICULTY, createBrain, think } from '../game/ai';
 import { updateCamera, type Camera } from '../game/camera';
 import { HUMAN_AIM_ERROR_DEG, type Aim } from '../game/kick';
 import { cancelCharge, type PlayerIntent } from '../game/player';
 import { BASE_STATS } from '../game/stats';
 import { createWorld, stepWorld, type World } from '../game/world';
-import type { GameArt } from './art';
+import type { GameContext } from './context';
 import { drawMenu, stepMenu, type MenuState } from './menu';
 import { drawMatch, type MatchHud } from './matchView';
 import type { Scene } from './scene';
-import { createTitleScene } from './titleScene';
+import { createPressStartScene } from './titleScene';
 
 export interface MatchScene extends Scene {
   readonly world: World;
@@ -43,8 +43,9 @@ function harrisonIntent(input: InputFrame): PlayerIntent {
 }
 
 /** A 90-second match against Max, with pause and full-time menus. */
-export function createMatchScene(art: GameArt, difficulty: Difficulty, seed: number): MatchScene {
-  const profile = DIFFICULTY[difficulty];
+export function createMatchScene(ctx: GameContext, seed: number): MatchScene {
+  const { art } = ctx;
+  const profile = DIFFICULTY[ctx.settings.difficulty];
   const world = createWorld(BASE_STATS, BASE_STATS, seed, { home: HUMAN_AIM_ERROR_DEG, away: profile.aimErrorDeg });
   const brain = createBrain(profile);
   const cam: Camera = { x: world.ball.x - BASE_W / 2 };
@@ -58,9 +59,10 @@ export function createMatchScene(art: GameArt, difficulty: Difficulty, seed: num
     // A held charge is dropped, not fired, so pausing can't shoot.
     cancelCharge(world.home);
   };
-  const restart = () => createMatchScene(art, difficulty, seed + 1);
+  const restart = () => createMatchScene(ctx, seed + 1);
 
   return {
+    kind: 'match',
     world,
     get paused() {
       return pause !== null;
@@ -73,7 +75,7 @@ export function createMatchScene(art: GameArt, difficulty: Difficulty, seed: num
         const r = stepMenu(pause, input);
         pause = r.m;
         if (r.chosen === 'RESTART') return restart();
-        if (r.chosen === 'QUIT') return createTitleScene(art, difficulty);
+        if (r.chosen === 'QUIT') return createPressStartScene(ctx);
         if (r.chosen === 'RESUME' || r.back || (!r.chosen && input.pressed.has('pause'))) {
           pause = null;
           // Buttons held while the menu closes (B is also "back") need a fresh press to act in play.
@@ -85,7 +87,7 @@ export function createMatchScene(art: GameArt, difficulty: Difficulty, seed: num
         const r = stepMenu(fullTime, input);
         fullTime = r.m;
         if (r.chosen === 'PLAY AGAIN') return restart();
-        if (r.chosen === 'TITLE') return createTitleScene(art, difficulty);
+        if (r.chosen === 'TITLE') return createPressStartScene(ctx);
       } else if (input.pressed.has('pause') && world.match.phase !== 'fullTime') {
         openPause();
         return null;

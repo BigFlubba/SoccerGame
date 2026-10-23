@@ -1,7 +1,7 @@
 import { plantLeg, type ArmPose, type HeadFacing, type LegPose, type Pose } from './pose';
 import { HARRISON_BODY, standingHipHeight, type BodyProportions } from './proportions';
 
-export type AnimName = 'idle' | 'run' | 'jump' | 'shoot' | 'powerUp' | 'sprint' | 'chip' | 'header' | 'volley' | 'slide' | 'fall';
+export type AnimName = 'idle' | 'run' | 'jump' | 'shoot' | 'powerUp' | 'sprint' | 'chip' | 'header' | 'volley' | 'slide' | 'fall' | 'juggle';
 
 /** Shoot frame held while a shot charges. */
 export const SHOOT_CHARGE_FRAME = 1;
@@ -202,6 +202,19 @@ export function clipsFor(body: BodyProportions): Record<AnimName, AnimationClip>
         k({ x: -2, hip: -7, torso: 55, near: { hip: 20, knee: 110, ankle: 170 }, far: { hip: 10, knee: 100, ankle: 170 }, nearArm: [-45, 0], farArm: [-50, 0] }),
         k({ hip: -8, torso: 10, near: { plant: 6 }, far: { hip: 0, knee: 90, ankle: 0 }, nearArm: [10, 30], farArm: [-10, 30] }),
         idleKey(0, 2, 0),
+      ],
+    },
+    juggle: {
+      name: 'juggle',
+      frameCount: 4,
+      fps: 8,
+      loop: true,
+      // Keepy-uppies on the far foot: the near knee comes up, the foot flicks up under the ball, drops, and sets.
+      keys: [
+        k({ hip: 0, torso: -3, head: { dx: 1 }, near: { hip: 45, knee: 80, ankle: 10 }, far: { plant: -1 }, nearArm: [-30, 30], farArm: [35, 30] }),
+        k({ hip: 0, torso: -5, head: { dx: 1 }, near: { hip: 70, knee: 35, ankle: 0 }, far: { plant: -1 }, nearArm: [-40, 30], farArm: [45, 30] }),
+        k({ hip: 0, torso: -3, head: { dx: 1 }, near: { hip: 30, knee: 50, ankle: 15 }, far: { plant: -1 }, nearArm: [-30, 30], farArm: [35, 30] }),
+        k({ hip: 0, torso: 0, near: { plant: 3 }, far: { plant: -1 }, nearArm: [-15, 25], farArm: [20, 25] }),
       ],
     },
   };

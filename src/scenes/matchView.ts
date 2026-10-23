@@ -43,7 +43,7 @@ function screen(cam: Camera, x: number, y: number): { x: number; y: number } {
   return { x: Math.round(p.sx), y: Math.round(p.sy) };
 }
 
-function drawLayers(g: CanvasRenderingContext2D, cam: Camera, art: GameArt): void {
+export function drawLayers(g: CanvasRenderingContext2D, cam: Camera, art: GameArt): void {
   // The far sky is narrower than its scroll range, so it tiles.
   const far = art.layers.far;
   const farX = -(Math.round(cam.x * PARALLAX.far) % far.width);

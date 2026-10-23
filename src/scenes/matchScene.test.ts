@@ -1,14 +1,16 @@
 import { describe, expect, it } from 'vitest';
 import type { GameArt } from './art';
+import type { GameContext } from './context';
 import { createMatchScene, type MatchScene } from './matchScene';
 import { frame } from './testInput';
 
 const STEP = 1 / 60;
 /** update() never touches the art, so tests can run without a DOM. */
 const NO_ART = {} as GameArt;
+const CTX: GameContext = { art: NO_ART, settings: { version: 1, difficulty: 'normal' }, save: () => {} };
 
 function live(): MatchScene {
-  const s = createMatchScene(NO_ART, 'normal', 1);
+  const s = createMatchScene(CTX, 1);
   s.world.match.phase = 'playing';
   return s;
 }

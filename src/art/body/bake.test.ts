@@ -29,7 +29,26 @@ describe('bakeAll', () => {
       volley: 4,
       slide: 4,
       fall: 5,
+      juggle: 4,
     });
+  });
+
+  it('bakes the juggle clip with 4 frames: a looping keepy-uppie at 8 fps', () => {
+    expect(baked.juggle.frames.length).toBe(4);
+    expect([CLIPS.juggle.fps, CLIPS.juggle.loop]).toEqual([8, true]);
+  });
+
+  it('juggling keeps the standing sole on the anchor row as the set frames come round', () => {
+    for (const i of [0, 3]) {
+      const b = opaqueBounds(baked.juggle.frames[i]!)!;
+      expect(b.y + b.h - 1, `juggle frame ${i}`).toBe(54);
+    }
+  });
+
+  it('juggling lifts the near foot highest on the second frame', () => {
+    const toe = (i: number) => samplePoses(CLIPS.juggle)[i]!.nearLeg;
+    expect(toe(1).hip).toBeGreaterThan(toe(0).hip);
+    expect(toe(1).hip).toBeGreaterThan(toe(3).hip);
   });
 
   it('bakes the new clips with spec frame counts', () => {
