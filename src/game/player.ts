@@ -58,6 +58,8 @@ export interface Player {
   /** Last tick's held buttons, so a press is only seen on its first tick. */
   held: { shoot: boolean; chip: boolean };
   slideCooldown: number;
+  /** Time until he can take another dribble touch. */
+  touchCooldown: number;
   /** Seconds on the current looping animation. */
   animT: number;
 }
@@ -108,6 +110,7 @@ export function createPlayer(team: 'home' | 'away', stats: Stats, x: number, fac
     aim: 'level',
     held: { shoot: false, chip: false },
     slideCooldown: 0,
+    touchCooldown: 0,
     animT: 0,
   };
 }
@@ -219,6 +222,7 @@ export function stepPlayer(p: Player, intent: PlayerIntent, dt: number, field: F
   p.aim = intent.aim;
   p.stateT += dt;
   p.slideCooldown = Math.max(0, p.slideCooldown - dt);
+  p.touchCooldown = Math.max(0, p.touchCooldown - dt);
 
   if (p.state === 'ground') {
     if (intent.jump) {
