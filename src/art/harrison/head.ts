@@ -1,13 +1,10 @@
+import type { HeadSprite } from '../body/head';
 import type { HeadFacing } from '../body/pose';
 import { ART_LEGEND } from '../colors';
-import { parseGrid, type IndexedImage } from '../indexedImage';
+import { parseGrid } from '../indexedImage';
 import type { Point } from '../raster';
 
-/** A head image plus the pixel that sits on the body's neck joint. */
-export interface HeadSprite {
-  image: IndexedImage;
-  neck: Point;
-}
+export type { HeadSprite } from '../body/head';
 
 function head(rows: readonly string[], neck: Point): HeadSprite {
   return { image: parseGrid(rows, ART_LEGEND), neck };

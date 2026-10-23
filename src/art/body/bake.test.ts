@@ -6,7 +6,7 @@ import { opaqueBounds } from '../raster';
 import { CLIPS } from './animations';
 import { bakeAll, frameIndexAt, samplePoses } from './bake';
 import { flipX } from '../indexedImage';
-import { ANCHOR, FRAME_W, mirrorPose } from './pose';
+import { ANCHOR, FRAME_W, lerpPose, mirrorPose } from './pose';
 import { HARRISON_BODY, standingHipHeight } from './proportions';
 
 const KITS = ['home', 'away'] as const;
@@ -23,7 +23,28 @@ describe('bakeAll', () => {
       jump: 3,
       shoot: 5,
       powerUp: 4,
+      sprint: 8,
+      chip: 4,
+      header: 3,
+      volley: 4,
+      slide: 4,
+      fall: 5,
     });
+  });
+
+  it('bakes the new clips with spec frame counts', () => {
+    expect([baked.sprint, baked.chip, baked.header, baked.volley, baked.slide, baked.fall].map(c => c.frames.length)).toEqual([
+      8, 4, 3, 4, 4, 5,
+    ]);
+  });
+
+  it('grounded clips keep the sole on the anchor row', () => {
+    for (const clip of [baked.chip, baked.slide]) {
+      for (const f of clip.frames) {
+        const b = opaqueBounds(f)!;
+        expect(b.y + b.h - 1, `${clip.name} sole + outline row`).toBe(54);
+      }
+    }
   });
 
   it('keeps a 1 px transparent margin on every frame (no clipping), including power heads', () => {
@@ -111,6 +132,16 @@ describe('samplePoses', () => {
     const poses = samplePoses(CLIPS.run);
     expect(poses[4]).toEqual(mirrorPose(poses[0]!));
     expect(poses[7]).toEqual(mirrorPose(poses[3]!));
+  });
+
+  it('mirrorHalf rejects odd frame counts', () => {
+    expect(() => samplePoses({ ...CLIPS.run, frameCount: 7 })).toThrow(/even/);
+  });
+
+  it('mirrorHalf interpolates toward the mirrored first key', () => {
+    const clip = { ...CLIPS.run, frameCount: 16 };
+    const poses = samplePoses(clip);
+    expect(poses[7]!.nearLeg.hip).toBeCloseTo(lerpPose(clip.keys[3]!, mirrorPose(clip.keys[0]!), 0.5).nearLeg.hip);
   });
 
   it('interpolates between keys, wrapping for loops', () => {

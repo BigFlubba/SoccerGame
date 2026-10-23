@@ -1,4 +1,4 @@
-import type { HeadSprite } from '../harrison/head';
+import type { HeadSprite } from './head';
 import type { IndexedImage } from '../indexedImage';
 import { clipsFor, type AnimationClip, type AnimName } from './animations';
 import { drawFigure } from './drawFigure';
@@ -14,15 +14,19 @@ export interface BakedClip {
 
 /** Evenly samples a clip's keys into one pose per frame (see the plan's sampling rules). */
 export function samplePoses(clip: AnimationClip): Pose[] {
-  const { keys, loop } = clip;
-  const n = clip.mirrorHalf ? clip.frameCount / 2 : clip.frameCount;
+  const { keys, loop, mirrorHalf } = clip;
+  if (mirrorHalf && clip.frameCount % 2 !== 0) throw new Error(`${clip.name}: mirrorHalf needs an even frameCount, got ${clip.frameCount}`);
+  const n = mirrorHalf ? clip.frameCount / 2 : clip.frameCount;
   const k = keys.length;
+  // A half cycle flows into the mirrored first key, a plain loop back into the first key.
+  const wrapKey = mirrorHalf ? mirrorPose(keys[0]!) : keys[0]!;
+  const keyAt = (i: number) => (i >= k ? wrapKey : keys[i]!);
   const half = Array.from({ length: n }, (_, i) => {
-    const u = clip.mirrorHalf || loop ? (i * k) / n : n === 1 ? 0 : (i * (k - 1)) / (n - 1);
+    const u = mirrorHalf || loop ? (i * k) / n : n === 1 ? 0 : (i * (k - 1)) / (n - 1);
     const lo = Math.floor(u);
-    return lerpPose(keys[lo % k]!, keys[Math.ceil(u) % k]!, u - lo);
+    return lerpPose(keyAt(lo), keyAt(Math.ceil(u)), u - lo);
   });
-  return clip.mirrorHalf ? [...half, ...half.map(mirrorPose)] : half;
+  return mirrorHalf ? [...half, ...half.map(mirrorPose)] : half;
 }
 
 export function bakeClip(clip: AnimationClip, body: BodyProportions, heads: Record<HeadFacing, HeadSprite>): BakedClip {

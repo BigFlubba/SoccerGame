@@ -1,5 +1,5 @@
 import { C } from '../colors';
-import type { HeadSprite } from '../harrison/head';
+import type { HeadSprite } from './head';
 import { IndexedImage, blit } from '../indexedImage';
 import { addOutline, drawSegment, fillPolygon, type Point } from '../raster';
 import { FRAME_H, FRAME_W, solvePose, type HeadFacing, type Pose } from './pose';

@@ -1,7 +1,14 @@
 import { plantLeg, type ArmPose, type HeadFacing, type LegPose, type Pose } from './pose';
 import { HARRISON_BODY, standingHipHeight, type BodyProportions } from './proportions';
 
-export type AnimName = 'idle' | 'run' | 'jump' | 'shoot' | 'powerUp';
+export type AnimName = 'idle' | 'run' | 'jump' | 'shoot' | 'powerUp' | 'sprint' | 'chip' | 'header' | 'volley' | 'slide' | 'fall';
+
+/** Shoot frame held while a shot charges. */
+export const SHOOT_CHARGE_FRAME = 1;
+/** Shoot frame where the boot meets the ball. */
+export const SHOOT_STRIKE_FRAME = 2;
+/** Slide frame held for as long as he slides. */
+export const SLIDE_HOLD_FRAME = 2;
 
 export interface AnimationClip {
   name: AnimName;
@@ -48,6 +55,9 @@ function key(body: BodyProportions, s: KeySpec): Pose {
 // Run half-cycle: the near leg strikes, takes the weight, passes under and pushes off
 // while the far leg recovers and reaches forward. Arms swing opposite the legs.
 const RUN_TORSO = 12;
+const SPRINT_TORSO = 20;
+/** Airborne clips lift the hip like the jump's rise frame. */
+const AIR_HIP = 3;
 
 /** Every clip, with planted feet solved for `body`. Hip offsets are relative to standing height. */
 export function clipsFor(body: BodyProportions): Record<AnimName, AnimationClip> {
@@ -114,6 +124,85 @@ export function clipsFor(body: BodyProportions): Record<AnimName, AnimationClip>
       loop: true,
       // Wide low stance, chest out, fists at the hips, trembling with power.
       keys: [powerKey(-1, -4), powerKey(1, -5), powerKey(-1, -4), powerKey(1, -5)],
+    },
+    sprint: {
+      name: 'sprint',
+      frameCount: 8,
+      fps: 16,
+      loop: true,
+      mirrorHalf: true,
+      // The run's half-cycle, leaning in harder with a longer stride and bigger arm pump.
+      keys: [
+        k({ hip: -2, torso: SPRINT_TORSO, near: { plant: 9, ankle: -10 }, far: { hip: -35, knee: 75, ankle: 30 }, nearArm: [-55, 80], farArm: [60, 90] }),
+        k({ hip: -3, torso: SPRINT_TORSO, near: { plant: 3 }, far: { hip: -5, knee: 105, ankle: 35 }, nearArm: [-30, 80], farArm: [35, 85] }),
+        k({ hip: -2, torso: SPRINT_TORSO, near: { plant: -6 }, far: { hip: 35, knee: 100, ankle: 30 }, nearArm: [5, 80], farArm: [-5, 80] }),
+        k({ hip: -1, torso: SPRINT_TORSO, near: { hip: -35, knee: 35, ankle: 30 }, far: { hip: 50, knee: 55, ankle: 0 }, nearArm: [40, 85], farArm: [-35, 80] }),
+      ],
+    },
+    chip: {
+      name: 'chip',
+      frameCount: 4,
+      fps: 15,
+      loop: false,
+      // A short scoop: the near foot swings low and through with the toes up, under the ball.
+      keys: [
+        k({ hip: -1, torso: -10, near: { hip: -30, knee: 60, ankle: 10 }, far: { plant: -1 }, nearArm: [-40, 20], farArm: [50, 20] }),
+        k({ hip: -1, torso: -15, near: { hip: 15, knee: 45, ankle: -20 }, far: { plant: -2 }, nearArm: [-30, 25], farArm: [40, 25] }),
+        k({ hip: -1, torso: -15, near: { hip: 35, knee: 10, ankle: -20 }, far: { plant: -2 }, nearArm: [-25, 20], farArm: [70, 20] }),
+        k({ hip: -1, torso: 0, near: { plant: 3 }, far: { plant: -1 }, nearArm: [-10, 20], farArm: [10, 20] }),
+      ],
+    },
+    header: {
+      name: 'header',
+      frameCount: 3,
+      fps: 12,
+      loop: false,
+      // Airborne lunge: lean back, snap the head through the ball, follow through. Arms out.
+      keys: [
+        k({ hip: AIR_HIP, torso: -20, near: { hip: 20, knee: 70, ankle: 30 }, far: { hip: -10, knee: 60, ankle: 30 }, nearArm: [-60, 30], farArm: [-50, 30] }),
+        k({ hip: AIR_HIP, torso: 15, head: { dx: 1 }, near: { hip: 5, knee: 40, ankle: 30 }, far: { hip: -15, knee: 50, ankle: 30 }, nearArm: [-80, 20], farArm: [-70, 20] }),
+        k({ hip: AIR_HIP, torso: 25, near: { hip: 0, knee: 30, ankle: 30 }, far: { hip: -20, knee: 40, ankle: 30 }, nearArm: [-60, 20], farArm: [-50, 20] }),
+      ],
+    },
+    volley: {
+      name: 'volley',
+      frameCount: 4,
+      fps: 15,
+      loop: false,
+      // Airborne strike: near leg cocked, whipped through, followed through, tucked to land.
+      keys: [
+        k({ hip: AIR_HIP, torso: -5, near: { hip: -20, knee: 80, ankle: 30 }, far: { hip: 10, knee: 60, ankle: 30 }, nearArm: [-50, 20], farArm: [60, 20] }),
+        k({ hip: AIR_HIP, torso: -15, near: { hip: 70, knee: 5, ankle: 20 }, far: { hip: -10, knee: 50, ankle: 30 }, nearArm: [-40, 20], farArm: [80, 20] }),
+        k({ hip: AIR_HIP, torso: -20, near: { hip: 85, knee: 10, ankle: 20 }, far: { hip: -15, knee: 40, ankle: 30 }, nearArm: [-30, 20], farArm: [100, 20] }),
+        k({ hip: AIR_HIP, torso: 5, near: { hip: 40, knee: 70, ankle: 20 }, far: { hip: 10, knee: 60, ankle: 30 }, nearArm: [60, 20], farArm: [40, 20] }),
+      ],
+    },
+    slide: {
+      name: 'slide',
+      frameCount: 4,
+      fps: 12,
+      loop: false,
+      // Drop low and slide, near leg stretched out at the ball, far leg tucked under.
+      keys: [
+        k({ x: -2, hip: -5, torso: -10, near: { plant: 6 }, far: { plant: -3 }, nearArm: [-40, 30], farArm: [-20, 30] }),
+        k({ x: -2, hip: -10, torso: -30, near: { hip: 70, knee: 10, ankle: -20 }, far: { plant: -5 }, nearArm: [-30, 20], farArm: [-20, 20] }),
+        k({ x: -2, hip: -12, torso: -40, near: { hip: 80, knee: 0, ankle: -30 }, far: { plant: 0 }, nearArm: [-20, 20], farArm: [-10, 20] }),
+        k({ x: -2, hip: -8, torso: -20, near: { plant: 8 }, far: { plant: -4 }, nearArm: [-30, 20], farArm: [-20, 20] }),
+      ],
+    },
+    fall: {
+      name: 'fall',
+      frameCount: 5,
+      fps: 10,
+      loop: false,
+      // Stumble forward, land flat, push up, kneel, stand.
+      keys: [
+        k({ hip: -2, torso: 40, near: { plant: 5 }, far: { hip: -40, knee: 50, ankle: 30 }, nearArm: [60, 20], farArm: [40, 20] }),
+        k({ x: -1, hip: -13, torso: 80, near: { hip: -80, knee: 5, ankle: 0 }, far: { hip: -88, knee: 0, ankle: 0 }, nearArm: [-50, 70], farArm: [-40, 70] }),
+        k({ x: -2, hip: -7, torso: 55, near: { hip: 20, knee: 110, ankle: 170 }, far: { hip: 10, knee: 100, ankle: 170 }, nearArm: [-45, 0], farArm: [-50, 0] }),
+        k({ hip: -8, torso: 10, near: { plant: 6 }, far: { hip: 0, knee: 90, ankle: 0 }, nearArm: [10, 30], farArm: [-10, 30] }),
+        idleKey(0, 2, 0),
+      ],
     },
   };
 }
