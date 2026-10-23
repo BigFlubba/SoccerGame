@@ -18,7 +18,7 @@ const HAIR: Record<PowerForm, Record<HairSlots, MasterColor>> = {
   base: { HairShadow: 'hairShadow', Hair: 'hair', HairLight: 'hairLight', HairTip: 'hairTip' },
   golden: GOLDEN_HAIR,
   storm: GOLDEN_HAIR,
-  ultra: { HairShadow: 'gray', Hair: 'electric', HairLight: 'electricLight', HairTip: 'auraWhite' },
+  ultra: { HairShadow: 'violet', Hair: 'electric', HairLight: 'electricLight', HairTip: 'auraWhite' },
 };
 
 export function harrisonLook(kit: KitId = 'home', form: PowerForm = 'base'): LookColors {

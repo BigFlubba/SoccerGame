@@ -93,6 +93,23 @@ export function solvePose(pose: Pose, body: BodyProportions): Joints {
   };
 }
 
+/**
+ * Two-bone IK: the leg angles that put the ankle on the ground at `footX`
+ * (relative to ANCHOR.x) for a hip at (`hipX`, `hipHeight`). The knee bends
+ * forward; an out-of-reach foot gets a straight leg pointed at it.
+ */
+export function plantLeg(body: BodyProportions, hipX: number, hipHeight: number, footX: number, ankle = 0): LegPose {
+  const dx = footX - hipX;
+  const dy = hipHeight - body.ankleHeight;
+  const reach = body.thigh + body.shin;
+  const d = Math.min(Math.hypot(dx, dy), reach);
+  const toTarget = Math.atan2(dx, dy);
+  const clampCos = (v: number) => Math.max(-1, Math.min(1, v));
+  const atHip = Math.acos(clampCos((body.thigh ** 2 + d ** 2 - body.shin ** 2) / (2 * body.thigh * d)));
+  const atKnee = Math.acos(clampCos((body.thigh ** 2 + body.shin ** 2 - d ** 2) / (2 * body.thigh * body.shin)));
+  return { hip: (toTarget + atHip) / RAD, knee: (Math.PI - atKnee) / RAD, ankle };
+}
+
 const lerp = (a: number, b: number, t: number) => a + (b - a) * t;
 
 export function lerpPose(a: Pose, b: Pose, t: number): Pose {

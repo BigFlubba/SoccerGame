@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { lerpPose, mirrorPose, solvePose, standingPose } from './pose';
+import { lerpPose, mirrorPose, plantLeg, solvePose, standingPose } from './pose';
 import { HARRISON_BODY } from './proportions';
 
 const B = HARRISON_BODY;
@@ -37,6 +37,30 @@ describe('solvePose', () => {
     const p = standingPose(B);
     p.torso = 30;
     expect(solvePose(p, B).neck.x).toBeGreaterThan(24);
+  });
+});
+
+describe('plantLeg', () => {
+  it('puts the ankle on the ground at the requested x', () => {
+    const p = standingPose(B);
+    p.hipHeight = 15;
+    p.x = 1;
+    p.nearLeg = plantLeg(B, p.x, p.hipHeight, 5);
+    const ankle = solvePose(p, B).nearLeg.ankle;
+    expect(ankle.x).toBeCloseTo(24 + 5);
+    expect(ankle.y).toBeCloseTo(53 - B.ankleHeight);
+  });
+
+  it('bends the knee forward, not backward', () => {
+    const p = standingPose(B);
+    p.hipHeight = 14;
+    p.nearLeg = plantLeg(B, 0, 14, 0);
+    const j = solvePose(p, B);
+    expect(j.nearLeg.knee.x).toBeGreaterThan(j.hip.x);
+  });
+
+  it('straightens the leg when the foot is out of reach', () => {
+    expect(plantLeg(B, 0, 30, 0).knee).toBeCloseTo(0);
   });
 });
 

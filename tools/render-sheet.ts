@@ -3,6 +3,7 @@
  * Run with `npm run sheet`.
  */
 import { mkdirSync, writeFileSync } from 'node:fs';
+import { bakeAll } from '../src/art/body/bake';
 import { drawFigure } from '../src/art/body/drawFigure';
 import { standingPose } from '../src/art/body/pose';
 import { HARRISON_BODY } from '../src/art/body/proportions';
@@ -42,7 +43,15 @@ function item(img: IndexedImage, kit: KitId = 'home', form: PowerForm = 'base', 
 }
 
 const standing = standingPose(HARRISON_BODY);
+const baked = bakeAll(HARRISON_BODY, HARRISON_HEADS);
+const powered = bakeAll(HARRISON_BODY, HARRISON_POWER_HEADS);
+const clipRows = (kit: KitId) => Object.values(baked).map(clip => clip.frames.map(f => item(f, kit)));
+
 const rows: SheetItem[][] = [
+  ...clipRows('home'),
+  powered.powerUp.frames.map(f => item(f, 'home', 'golden')),
+  powered.powerUp.frames.map(f => item(f, 'home', 'ultra')),
+  ...clipRows('away'),
   [
     item(drawFigure(standing, HARRISON_BODY, HARRISON_HEADS), 'home'),
     item(drawFigure(standing, HARRISON_BODY, HARRISON_HEADS), 'away'),
