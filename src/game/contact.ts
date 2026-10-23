@@ -1,11 +1,12 @@
 import { BALL_R } from '../art/ball';
 import type { Rng } from '../engine/random';
 import { BALL_REST_Y, type Ball } from './ball';
+import { POST_R } from './constants';
 import { roofSpan, type Field } from './field';
 import { aimLine, chip, header, shot, volley } from './kick';
-import { PLAYER_W, knockDown, type Player } from './player';
+import { PLAYER_R, knockDown, type Player } from './player';
 import { touchPush } from './stats';
-import { ballIn, bodyBox, footZone, headZone, slideZone, touchZone } from './zones';
+import { ballIn, ballInBody, footZone, headZone, slideZone, touchPoint } from './zones';
 
 export interface ContactEvents {
   touched: boolean;
@@ -28,8 +29,10 @@ const PINNED_POP_VY = 160;
 /** Clears both players' heads (PLAYER_H) with room to spare. */
 const SQUEEZE_POP_VY = 300;
 const SQUEEZE_SQUIRT_VX = 60;
-/** How close counts as touching a wall. */
-const TOUCH_EPS = 0.5;
+/** A ball within this of his touch point (in x and z) meets his foot as he runs. */
+const TOUCH_RADIUS = 7;
+/** A ball that crossed into his body this recently came in from where it crossed. */
+const FRESH_ENTRY_S = 0.02;
 
 function hit(ball: Ball, k: { vx: number; vy: number; vz: number; spin: number }): void {
   ball.vx = k.vx;
@@ -48,9 +51,10 @@ function slide(p: Player, opponent: Player, ball: Ball, ev: ContactEvents): void
     ev.tackledBall = true;
     return;
   }
-  const feet = bodyBox(opponent);
   const onGround = opponent.y === 0 && opponent.state !== 'air';
-  if (onGround && opponent.state !== 'fallen' && feet.x0 <= reach.x1 && feet.x1 >= reach.x0) {
+  const feetX = opponent.x + PLAYER_R >= reach.x0 && opponent.x - PLAYER_R <= reach.x1;
+  const feetZ = opponent.z + PLAYER_R >= reach.z0 && opponent.z - PLAYER_R <= reach.z1;
+  if (onGround && opponent.state !== 'fallen' && feetX && feetZ) {
     knockDown(opponent);
     p.kick.active = false;
     ev.trippedOpponent = true;
@@ -89,63 +93,116 @@ function headBall(p: Player, ball: Ball, field: Field, ev: ContactEvents): void 
   ev.kicked = 'header';
 }
 
-/** Running into a ball on the ground knocks it ahead of him with a small touch. */
+/** Running into a ball on the ground knocks it on along his run with a small touch. */
 function dribble(p: Player, ball: Ball, ev: ContactEvents): void {
-  const running = p.vx * p.facing > DRIBBLE_MIN_SPEED;
-  if (p.state !== 'ground' || !running || p.touchCooldown > 0 || !ballIn(touchZone(p), ball, BALL_R)) return;
-  ball.vx = p.vx + p.facing * touchPush(p.stats);
+  const at = touchPoint(p);
+  if (p.state !== 'ground' || !at || p.touchCooldown > 0 || ball.y > BALL_REST_Y) return;
+  if (Math.hypot(ball.x - at.x, ball.z - at.z) > TOUCH_RADIUS) return;
+  const speed = Math.hypot(p.vx, p.vz);
+  const push = touchPush(p.stats) / speed;
+  ball.vx = p.vx * (1 + push);
+  ball.vz = p.vz * (1 + push);
   p.touchCooldown = TOUCH_COOLDOWN_S;
   ev.touched = true;
 }
 
-/**
- * His body is solid: a ball running into him bounces back off the side it
- * came from, unless that would put it back up on a net roof.
- */
-function block(p: Player, ball: Ball, field: Field): void {
-  if (!ballIn(bodyBox(p), ball, BALL_R)) return;
-  const side = ball.x === p.x ? -p.facing : Math.sign(ball.x - p.x);
-  const closing = (ball.vx - p.vx) * side < 0;
-  const x = p.x + side * (PLAYER_W / 2 + BALL_R);
-  if (!closing || onRoof({ x, y: ball.y }, field)) return;
-  ball.x = x;
-  ball.vx = p.vx - BODY_RESTITUTION * (ball.vx - p.vx);
+const clamp = (v: number, lo: number, hi: number): number => Math.min(Math.max(v, lo), hi);
+
+/** Whether moving the ball's centre from `from` to `to` (at height y) would pass through a goal's netting or a post. */
+function throughGoal(field: Field, y: number, from: { x: number; z: number }, to: { x: number; z: number }): boolean {
+  return field.goals.some(g => {
+    if (y >= g.barY + g.barThick + BALL_R) return false;
+    const posts = [g.z0, g.z1].some(z => Math.hypot(to.x - g.lineX, to.z - z) < BALL_R + POST_R);
+    if (posts || y >= g.barY) return posts;
+    const [x0, x1] = roofSpan(field, g);
+    const crossesSide = [g.z0, g.z1].some(z => {
+      if (Math.sign(from.z - z) === Math.sign(to.z - z)) return false;
+      const x = from.x + ((z - from.z) / (to.z - from.z)) * (to.x - from.x);
+      return x >= x0 - BALL_R - POST_R && x <= x1 + BALL_R + POST_R;
+    });
+    const crossesBack = Math.sign(from.x - g.backX) !== Math.sign(to.x - g.backX) && to.z >= g.z0 - BALL_R && to.z <= g.z1 + BALL_R;
+    return crossesSide || crossesBack;
+  });
 }
 
-/** A ball wedged between his body and a fence or the back of a net pops up so it can't stay stuck. */
-function unpin(p: Player, ball: Ball, field: Field): void {
-  if (ball.vy > 0 || !ballIn(bodyBox(p), ball, BALL_R)) return;
-  const atFence = ball.x - BALL_R <= field.fenceL + TOUCH_EPS || ball.x + BALL_R >= field.fenceR - TOUCH_EPS;
-  const atNet = field.goals.some(
-    g => ball.y < g.barY && (g.side === 'right' ? ball.x + BALL_R >= g.backX - TOUCH_EPS : ball.x - BALL_R <= g.backX + TOUCH_EPS),
-  );
-  if (atFence || atNet) ball.vy = PINNED_POP_VY;
+/** Whether the ball's centre may be moved to (x, z): inside the walls, not up on a net roof, and not through a goal's netting or posts. */
+function canPlace(ball: Ball, x: number, z: number, field: Field): boolean {
+  const inside = x === clamp(x, field.fenceL + BALL_R, field.fenceR - BALL_R) && z === clamp(z, BALL_R, field.depth - BALL_R);
+  return inside && !onRoof({ x, y: ball.y, z }, field) && !throughGoal(field, ball.y, ball, { x, z });
+}
+
+function placeBall(ball: Ball, x: number, z: number, field: Field): void {
+  if (!canPlace(ball, x, z, field)) return;
+  ball.x = x;
+  ball.z = z;
+}
+
+/**
+ * The outward normal of his body where the ball came in: from where it
+ * crossed his outline if that was this tick (so even a hard shot that got
+ * past his middle bounces back the way it came), otherwise straight out
+ * from his middle.
+ */
+function bodyNormal(p: Player, ball: Ball): { nx: number; nz: number } {
+  const reach = PLAYER_R + BALL_R;
+  const [cx, cz] = [ball.x - p.x, ball.z - p.z];
+  const [wx, wz] = [ball.vx - p.vx, ball.vz - p.vz];
+  const w2 = wx * wx + wz * wz;
+  if (w2 > 0) {
+    const cw = cx * wx + cz * wz;
+    const t = (cw + Math.sqrt(Math.max(0, cw * cw - w2 * (cx * cx + cz * cz - reach * reach)))) / w2;
+    if (t <= FRESH_ENTRY_S) return { nx: (cx - t * wx) / reach, nz: (cz - t * wz) / reach };
+  }
+  const d = Math.hypot(cx, cz);
+  return d > 0 ? { nx: cx / d, nz: cz / d } : { nx: -p.facing, nz: 0 };
+}
+
+/**
+ * His body is solid: a ball running into him bounces back off the side it
+ * came from. A ball wedged between his body and a wall, a net or a post
+ * pops up so it can't stay stuck.
+ */
+function block(p: Player, ball: Ball, field: Field): void {
+  if (!ballInBody(p, ball, BALL_R)) return;
+  const { nx, nz } = bodyNormal(p, ball);
+  const reach = PLAYER_R + BALL_R;
+  const [x, z] = [p.x + nx * reach, p.z + nz * reach];
+  if (!canPlace(ball, x, z, field)) {
+    if (!onRoof(ball, field) && ball.vy <= 0) ball.vy = PINNED_POP_VY;
+    return;
+  }
+  const closing = (ball.vx - p.vx) * nx + (ball.vz - p.vz) * nz;
+  if (closing >= 0) return;
+  [ball.x, ball.z] = [x, z];
+  ball.vx -= (1 + BODY_RESTITUTION) * closing * nx;
+  ball.vz -= (1 + BODY_RESTITUTION) * closing * nz;
 }
 
 /**
  * A ball sitting on a net roof, or rolling over its edge, is on top of the
  * goal, out of reach of the players' bodies under it.
  */
-function onRoof(ball: { x: number; y: number }, field: Field): boolean {
+function onRoof(ball: { x: number; y: number; z: number }, field: Field): boolean {
   return field.goals.some(g => {
     const [x0, x1] = roofSpan(field, g);
-    return ball.x >= x0 - BALL_R && ball.x <= x1 + BALL_R && ball.y >= g.barY + g.barThick;
+    const over = ball.x >= x0 - BALL_R && ball.x <= x1 + BALL_R && ball.z >= g.z0 - BALL_R && ball.z <= g.z1 + BALL_R;
+    return over && ball.y >= g.barY + g.barThick;
   });
 }
 
-const squeezed = (p: Player, opponent: Player, ball: Ball): boolean =>
-  ballIn(bodyBox(p), ball, BALL_R) && ballIn(bodyBox(opponent), ball, BALL_R);
+const squeezed = (p: Player, opponent: Player, ball: Ball): boolean => ballInBody(p, ball, BALL_R) && ballInBody(opponent, ball, BALL_R);
 
 /**
  * A 50/50: a ball squeezed between both players on the ground pops up over
  * their heads midway between them and squirts out to a random side, so
  * neither body shoves it through the other and neither side always wins.
  */
-function squirt(p: Player, opponent: Player, ball: Ball, rng: Rng): void {
+function squirt(p: Player, opponent: Player, ball: Ball, rng: Rng, field: Field): void {
   if (ball.vy > 0 || ball.y > BALL_REST_Y) return;
-  ball.x = (p.x + opponent.x) / 2;
+  placeBall(ball, (p.x + opponent.x) / 2, (p.z + opponent.z) / 2, field);
   ball.vy = SQUEEZE_POP_VY;
   ball.vx = (p.vx + opponent.vx) / 2 + (rng() < 0.5 ? -1 : 1) * SQUEEZE_SQUIRT_VX;
+  ball.vz = (p.vz + opponent.vz) / 2;
 }
 
 /** Everything player `p` does to the ball (and to the opponent's feet) this tick. */
@@ -158,9 +215,8 @@ export function resolveContacts(p: Player, opponent: Player, ball: Ball, aimErro
   if (!squeezed(p, opponent, ball)) {
     dribble(p, ball, ev);
     block(p, ball, field);
-    unpin(p, ball, field);
   }
   // Also catches a block that pushed the ball out into the other player.
-  if (squeezed(p, opponent, ball)) squirt(p, opponent, ball, rng);
+  if (squeezed(p, opponent, ball)) squirt(p, opponent, ball, rng, field);
   return ev;
 }

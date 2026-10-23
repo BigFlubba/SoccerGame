@@ -71,8 +71,7 @@ export interface Player {
   animT: number;
 }
 
-export const PLAYER_W = 8,
-  PLAYER_H = 40;
+export const PLAYER_H = 40;
 /** Body radius on the ground plane. */
 export const PLAYER_R = 5;
 export const FALL_TIME = 0.9;

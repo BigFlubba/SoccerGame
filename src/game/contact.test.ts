@@ -1,13 +1,17 @@
+import { BALL_R } from '../art/ball';
 import { describe, expect, it } from 'vitest';
 import { seeded } from '../engine/random';
 import { BALL_REST_Y, stepBall, type Ball } from './ball';
 import { resolveContacts } from './contact';
-import { BACKYARD, type Field } from './field';
-import { aimLine, header, shot } from './kick';
-import { NO_INTENT, createPlayer, stepPlayer, type Kick, type Player } from './player';
+import { BACKYARD, goalScored } from './field';
+import { POST_INSET, aimLine, header, shot } from './kick';
+import { NO_INTENT, PLAYER_R, createPlayer, stepPlayer, type Kick, type Player } from './player';
 import { BASE_STATS, touchPush } from './stats';
+import { REACH_Z, touchPoint } from './zones';
 
 const STEP = 1 / 60;
+/** Touched about 14 px ahead, a base-control touch then rolls the ball on by up to 60²/(2·160) ≈ 11 px. */
+const DRIBBLE_RANGE = 26;
 const ball = (p: Partial<Ball>): Ball => ({ x: 320, y: BALL_REST_Y, z: BACKYARD.depth / 2, vx: 0, vy: 0, vz: 0, spin: 0, spinAngle: 0, ...p });
 const kick = (k: Partial<Kick>): Kick => ({ kind: 'shot', charge: 0.6, overchargeS: 0, aim: 'straight', active: true, ...k });
 
@@ -177,25 +181,51 @@ describe('resolveContacts: headers and tackles', () => {
 
 describe('resolveContacts: pinned ball', () => {
   it('a ball pinned between a player and the fence pops free', () => {
-    // In the Backyard the nets cover the fences at ground level, so use a pitch whose goals stand clear of them.
-    const open: Field = {
-      ...BACKYARD,
-      goals: [
-        { ...BACKYARD.goals[0], lineX: 60, backX: 44 },
-        { ...BACKYARD.goals[1], lineX: 580, backX: 596 },
-      ],
-    };
-    const { p, opp } = setup(628);
-    const b = ball({ x: 633 });
-    resolveContacts(p, opp, b, 4, seeded(5), open);
+    const { p, opp } = setup(BACKYARD.fenceR - PLAYER_R);
+    p.z = 8;
+    p.vx = 40;
+    const b = ball({ x: BACKYARD.fenceR - BALL_R, z: 8 });
+    contact(p, opp, b);
     expect(b.vy).toBe(160);
   });
 
-  it('a ball resting on the net roof is out of reach of a body under the bar', () => {
+  it('a body push never puts the ball outside the field', () => {
+    for (const [px, pz, bx, bz] of [
+      [BACKYARD.fenceR - PLAYER_R, PLAYER_R, BACKYARD.fenceR - BALL_R, BALL_R],
+      [BACKYARD.fenceL + PLAYER_R, BACKYARD.depth - PLAYER_R, BACKYARD.fenceL + BALL_R + 1, BACKYARD.depth - BALL_R],
+      [300, PLAYER_R, 302, BALL_R],
+    ] as const) {
+      const { p, opp } = setup(px);
+      p.z = pz;
+      [p.vx, p.vz] = [Math.sign(bx - px) * 90, Math.sign(bz - pz) * 90];
+      const b = ball({ x: bx, z: bz, vx: -p.vx, vz: -p.vz });
+      contact(p, opp, b);
+      expect(b.x).toBeGreaterThanOrEqual(BACKYARD.fenceL + BALL_R);
+      expect(b.x).toBeLessThanOrEqual(BACKYARD.fenceR - BALL_R);
+      expect(b.z).toBeGreaterThanOrEqual(BALL_R);
+      expect(b.z).toBeLessThanOrEqual(BACKYARD.depth - BALL_R);
+    }
+  });
+
+  it('a body never pushes the ball through the side netting into the goal', () => {
+    const { p, opp } = setup(620);
+    p.z = 18 - PLAYER_R - PLAYER_R;
+    p.vz = 90;
+    const b = ball({ x: 620, z: 18 - BALL_R });
+    for (let t = 0; t < 120; t++) {
+      contact(p, opp, b);
+      stepBall(b, STEP, BACKYARD);
+      expect(goalScored(BACKYARD, b)).toBeNull();
+      expect(b.z).toBeLessThanOrEqual(18 - BALL_R + 1e-6);
+    }
+  });
+
+  it('a ball resting on the net roof is out of reach of a body beside the goal', () => {
     const { p, opp } = setup(618);
-    const b = ball({ x: 620, y: 33, vx: -20 });
+    p.z = 13;
+    const b = ball({ x: 620, y: 33, z: 20, vx: -20 });
     contact(p, opp, b);
-    expect([b.x, b.vx, b.vy]).toEqual([620, -20, 0]);
+    expect([b.x, b.z, b.vx, b.vy]).toEqual([620, 20, -20, 0]);
   });
 
   it('a ball squeezed between two players pops up over their heads and squirts out sideways', () => {
@@ -206,11 +236,98 @@ describe('resolveContacts: pinned ball', () => {
     expect((b.vy * b.vy) / (2 * 900)).toBeGreaterThan(40);
     expect(b.vx).not.toBe(0);
   });
+});
 
-  it('a ball pinned against the back of the net pops free', () => {
-    const { p, opp } = setup(619);
-    const b = ball({ x: 625 });
+describe('resolveContacts: depth', () => {
+  it('touches a ball up to REACH_Z off his line', () => {
+    const { p, opp } = setup();
+    p.vx = 95;
+    const b = ball({ x: 307, z: p.z + 6 });
+    expect(contact(p, opp, b).touched).toBe(true);
+    expect(b.vx).toBeGreaterThan(95);
+  });
+
+  it('misses a ball beyond REACH_Z', () => {
+    const { p, opp } = setup();
+    p.vx = 95;
+    const b = ball({ x: 307, z: p.z + REACH_Z + BALL_R + 1 });
+    expect(contact(p, opp, b).touched).toBe(false);
+    expect(b.vx).toBe(0);
+  });
+
+  it('kicks reach REACH_Z either side of his line', () => {
+    const { p, opp } = setup();
+    p.state = 'kicking';
+    p.kick = kick({});
+    expect(contact(p, opp, ball({ x: 308, z: p.z - REACH_Z })).kicked).toBe('shot');
+    p.kick = kick({});
+    expect(contact(p, opp, ball({ x: 308, z: p.z - REACH_Z - BALL_R - 1 })).kicked).toBeNull();
+  });
+
+  it('dribbles on a diagonal and keeps the ball', () => {
+    for (const [x, z, dx, dz] of [
+      [100, 5, 1, 0.7],
+      [500, 59, -1, -0.7],
+    ] as const) {
+      const p = createPlayer('home', BASE_STATS, x, dx > 0 ? 1 : -1, z);
+      const opp = createPlayer('away', BASE_STATS, 320, -1, 60);
+      const run = { ...NO_INTENT, moveX: dx, moveZ: dz };
+      for (let i = 0; i < 8; i++) stepPlayer(p, run, STEP, BACKYARD, false);
+      const tp = touchPoint(p)!;
+      const b = ball({ x: tp.x, z: tp.z });
+      const len = Math.hypot(dx, dz);
+      let touches = 0;
+      // The pitch is only 64 deep: this diagonal reaches the far side in under a second.
+      for (let t = 0; t < 0.6 / STEP; t++) {
+        stepPlayer(p, run, STEP, BACKYARD, false);
+        stepBall(b, STEP, BACKYARD);
+        if (resolveContacts(p, opp, b, 4, seeded(5), BACKYARD).touched) touches++;
+        const [ox, oz] = [b.x - p.x, b.z - p.z];
+        // As close as Plan 2's dribble: touched within about 14 px ahead, then rolled on by the touch.
+        expect(Math.hypot(ox, oz), `run (${dx}, ${dz}) tick ${t}`).toBeLessThanOrEqual(DRIBBLE_RANGE);
+        expect(Math.abs(ox * dz - oz * dx) / len, `off his line, tick ${t}`).toBeLessThanOrEqual(REACH_Z);
+      }
+      expect(touches).toBeGreaterThanOrEqual(1);
+    }
+  });
+
+  it('a shot aimed far heads for the far post', () => {
+    const { p, opp } = setup();
+    p.state = 'kicking';
+    p.kick = kick({ charge: 0.88, aim: 'far' });
+    const b = ball({ x: 308 });
     contact(p, opp, b);
-    expect(b.vy).toBe(160);
+    expect(b.vz).toBeGreaterThan(0);
+    const arrival = b.z + (b.vz / b.vx) * (612 - b.x);
+    expect(arrival).toBeCloseTo(46 - POST_INSET);
+  });
+
+  it('a header aimed near heads for the near post', () => {
+    const { p, opp } = setup();
+    p.state = 'air';
+    p.y = 10;
+    p.aim = 'near';
+    const b = ball({ x: 303, y: 47, vx: -50, vy: -100 });
+    contact(p, opp, b);
+    expect(b.vz).toBeLessThan(0);
+  });
+
+  it('the body blocks a ball rolling in on a diagonal and never lets it through', () => {
+    for (const [x, z, vx, vz] of [
+      [260, 12, 200, 100],
+      [340, 52, -200, -100],
+      [300, 0 + BALL_R, 0, 180],
+      [230, 32, 700, 0],
+    ] as const) {
+      const { p, opp } = setup();
+      const b = ball({ x, z, vx, vz });
+      const incoming = [vx, vz];
+      for (let t = 0; t < 60; t++) {
+        stepBall(b, STEP, BACKYARD);
+        contact(p, opp, b);
+        expect(Math.hypot(b.x - p.x, b.z - p.z), `from (${x}, ${z}) tick ${t}`).toBeGreaterThanOrEqual(PLAYER_R + BALL_R - 1e-6);
+      }
+      expect((b.x - p.x) * incoming[0]! + (b.z - p.z) * incoming[1]!).toBeLessThan(0);
+    }
   });
 });
