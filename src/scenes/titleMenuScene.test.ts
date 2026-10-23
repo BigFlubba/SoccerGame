@@ -57,6 +57,16 @@ describe('title menu', () => {
     expect(back!.update(frame(['confirm']), STEP)?.kind).toBe('help');
   });
 
+  it('OPTIONS opens Options, and B there comes back to the title menu on OPTIONS', () => {
+    const s = createTitleMenuScene(context());
+    s.update(frame(['down']), STEP);
+    const options = s.update(frame(['confirm']), STEP);
+    expect(options?.kind).toBe('options');
+    const back = options!.update(frame(['back']), STEP);
+    expect(back?.kind).toBe('titleMenu');
+    expect(back!.update(frame(['confirm']), STEP)?.kind).toBe('options');
+  });
+
   it('up and down move the choice, wrapping', () => {
     const s = createTitleMenuScene(context());
     s.update(frame(['up']), STEP);

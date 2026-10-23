@@ -1,7 +1,7 @@
 import { MASTER } from '../art/colors';
 import type { InputFrame } from '../engine/input';
 import { BASE_W } from '../engine/viewport';
-import { DIFFICULTY, createBrain, think } from '../game/ai';
+import { DIFFICULTY, createBrain, think, type Difficulty } from '../game/ai';
 import { updateCamera, type Camera } from '../game/camera';
 import { HUMAN_AIM_ERROR_DEG, type Aim } from '../game/kick';
 import { cancelCharge, type PlayerIntent } from '../game/player';
@@ -11,14 +11,18 @@ import type { GameContext } from './context';
 import { drawMenu, stepMenu, type MenuState } from './menu';
 import { drawMatch, type MatchHud } from './matchView';
 import type { Scene } from './scene';
+import { createHelpScene } from './helpScene';
+import { createOptionsScene } from './optionsScene';
 import { createPressStartScene } from './titleScene';
 
 export interface MatchScene extends Scene {
   readonly world: World;
   readonly paused: boolean;
+  /** Max's difficulty right now: a change in Options mid-match applies at once. */
+  readonly difficulty: Difficulty;
 }
 
-const PAUSE_ITEMS = ['RESUME', 'RESTART', 'QUIT'] as const;
+export const PAUSE_ITEMS = ['RESUME', 'RESTART', 'HELP', 'OPTIONS', 'QUIT TO TITLE'] as const;
 const FULL_TIME_ITEMS = ['PLAY AGAIN', 'TITLE'] as const;
 /** The FULL TIME banner shows this long before the result and menu. */
 const RESULT_DELAY_S = 1.5;
@@ -45,7 +49,8 @@ function harrisonIntent(input: InputFrame): PlayerIntent {
 /** A 90-second match against Max, with pause and full-time menus. */
 export function createMatchScene(ctx: GameContext, seed: number): MatchScene {
   const { art } = ctx;
-  const profile = DIFFICULTY[ctx.settings.difficulty];
+  let difficulty = ctx.settings.difficulty;
+  const profile = DIFFICULTY[difficulty];
   const world = createWorld(BASE_STATS, BASE_STATS, seed, { home: HUMAN_AIM_ERROR_DEG, away: profile.aimErrorDeg });
   const brain = createBrain(profile);
   const cam: Camera = { x: world.ball.x - BASE_W / 2 };
@@ -60,12 +65,22 @@ export function createMatchScene(ctx: GameContext, seed: number): MatchScene {
     cancelCharge(world.home);
   };
   const restart = () => createMatchScene(ctx, seed + 1);
+  /** Help and Options come back to this match, still paused, with any new difficulty applied to Max. */
+  const backHere = (): Scene => {
+    difficulty = ctx.settings.difficulty;
+    brain.profile = DIFFICULTY[difficulty];
+    world.aimErrorDeg.away = brain.profile.aimErrorDeg;
+    return scene;
+  };
 
-  return {
+  const scene: MatchScene = {
     kind: 'match',
     world,
     get paused() {
       return pause !== null;
+    },
+    get difficulty() {
+      return difficulty;
     },
     onHidden() {
       if (!pause && world.match.phase !== 'fullTime') openPause();
@@ -75,7 +90,9 @@ export function createMatchScene(ctx: GameContext, seed: number): MatchScene {
         const r = stepMenu(pause, input);
         pause = r.m;
         if (r.chosen === 'RESTART') return restart();
-        if (r.chosen === 'QUIT') return createPressStartScene(ctx);
+        if (r.chosen === 'HELP') return createHelpScene(ctx, backHere);
+        if (r.chosen === 'OPTIONS') return createOptionsScene(ctx, backHere);
+        if (r.chosen === 'QUIT TO TITLE') return createPressStartScene(ctx);
         if (r.chosen === 'RESUME' || r.back || (!r.chosen && input.pressed.has('pause'))) {
           pause = null;
           // Buttons held while the menu closes (B is also "back") need a fresh press to act in play.
@@ -119,4 +136,5 @@ export function createMatchScene(ctx: GameContext, seed: number): MatchScene {
       }
     },
   };
+  return scene;
 }

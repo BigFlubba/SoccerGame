@@ -4,6 +4,7 @@ import type { GameContext } from './context';
 import { createHelpScene } from './helpScene';
 import { createMatchScene } from './matchScene';
 import { drawMenu, stepMenu, type MenuState } from './menu';
+import { createOptionsScene } from './optionsScene';
 import type { Scene } from './scene';
 import { createPressStartScene } from './titleScene';
 
@@ -25,6 +26,7 @@ export function createTitleMenuScene(ctx: GameContext, index = 0): Scene {
       if (r.back) return createPressStartScene(ctx);
       if (r.chosen === 'START GAME') return createMatchScene(ctx, newSeed());
       if (r.chosen === 'HELP') return createHelpScene(ctx, () => createTitleMenuScene(ctx, menu.index));
+      if (r.chosen === 'OPTIONS') return createOptionsScene(ctx, () => createTitleMenuScene(ctx, menu.index));
       return null;
     },
     draw(g, nowS) {

@@ -1,7 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import type { GameArt } from './art';
 import type { GameContext } from './context';
-import { createMatchScene, type MatchScene } from './matchScene';
+import { DIFFICULTY } from '../game/ai';
+import type { Settings } from '../meta/settings';
+import { PAUSE_ITEMS, createMatchScene, type MatchScene } from './matchScene';
+import type { Scene } from './scene';
 import { frame } from './testInput';
 
 const STEP = 1 / 60;
@@ -111,5 +114,80 @@ describe('match scene', () => {
     run(s, 2);
     const next = s.update(frame(['confirm']), STEP) as MatchScene | null;
     expect(next?.world.match.phase).toBe('kickoff');
+  });
+
+  it('pause menu lists RESUME, RESTART, HELP, OPTIONS, QUIT TO TITLE', () => {
+    expect(PAUSE_ITEMS).toEqual(['RESUME', 'RESTART', 'HELP', 'OPTIONS', 'QUIT TO TITLE']);
+  });
+});
+
+describe('match scene: pause menu screens', () => {
+  /** Opens the pause menu and picks `item`; returns whatever scene that leads to. */
+  function pick(s: MatchScene, item: (typeof PAUSE_ITEMS)[number]): Scene | null {
+    s.update(frame(['pause']), STEP);
+    for (let i = 0; i < PAUSE_ITEMS.indexOf(item); i++) s.update(frame(['down']), STEP);
+    return s.update(frame(['confirm']), STEP);
+  }
+
+  function liveWith(ctx: GameContext): MatchScene {
+    const s = createMatchScene(ctx, 1);
+    s.world.match.phase = 'playing';
+    return s;
+  }
+
+  it('help from pause returns to the paused match', () => {
+    const s = live();
+    const clock = s.world.match.clockS;
+    const help = pick(s, 'HELP');
+    expect(help?.kind).toBe('help');
+    for (let i = 0; i < 30; i++) help!.update(frame([]), STEP);
+    expect(help!.update(frame(['back']), STEP)).toBe(s);
+    expect(s.paused).toBe(true);
+    expect(s.world.match.clockS).toBe(clock);
+  });
+
+  it('options from pause returns to the paused match', () => {
+    const s = live();
+    const options = pick(s, 'OPTIONS');
+    expect(options?.kind).toBe('options');
+    expect(options!.update(frame(['back']), STEP)).toBe(s);
+    expect(s.paused).toBe(true);
+  });
+
+  it('a difficulty change from pause applies to the current match', () => {
+    const settings: Settings = { version: 1, difficulty: 'normal' };
+    const ctx: GameContext = { art: NO_ART, settings, save: next => void (ctx.settings = next) };
+    const s = liveWith(ctx);
+    const options = pick(s, 'OPTIONS')!;
+    options.update(frame(['right']), STEP);
+    options.update(frame(['back']), STEP);
+    expect(ctx.settings.difficulty).toBe('hard');
+    expect(s.world.aimErrorDeg.away).toBe(DIFFICULTY.hard.aimErrorDeg);
+    expect(s.difficulty).toBe('hard');
+  });
+
+  it('backing out of Help with B and resuming does not slide or chip', () => {
+    const s = live();
+    const help = pick(s, 'HELP')!;
+    expect(help.update(frame(['back'], ['chip']), STEP)).toBe(s);
+    s.update(frame([], ['back', 'chip']), STEP);
+    s.update(frame(['pause'], ['back', 'chip']), STEP);
+    expect(s.paused).toBe(false);
+    run(s, 0.5, ['back', 'chip']);
+    expect(s.world.home.state).toBe('ground');
+  });
+
+  it('backing out of Options with B, then B again to resume, does not slide', () => {
+    const s = live();
+    const options = pick(s, 'OPTIONS')!;
+    options.update(frame(['back'], ['chip']), STEP);
+    s.update(frame(['back'], ['chip']), STEP);
+    expect(s.paused).toBe(false);
+    run(s, 0.5, ['back', 'chip']);
+    expect(s.world.home.state).toBe('ground');
+  });
+
+  it('quit to title opens the Press Start screen', () => {
+    expect(pick(live(), 'QUIT TO TITLE')?.kind).toBe('pressStart');
   });
 });
