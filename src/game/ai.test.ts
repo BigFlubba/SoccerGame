@@ -3,7 +3,7 @@ import { DIFFICULTY, createBrain, think, type AiProfile } from './ai';
 import { BALL_REST_Y } from './ball';
 import { NO_INTENT, type Player } from './player';
 import type { Aim } from './kick';
-import { BASE_STATS } from './stats';
+import { BASE_STATS, STAT_NAMES, type StatName, type Stats } from './stats';
 import { createWorld, stepWorld, type World } from './world';
 
 const STEP = 1 / 60;
@@ -230,43 +230,62 @@ describe('think', () => {
     }
   });
 
-  it.each(['easy', 'normal', 'hard'] as const)(
-    'a whole AI-vs-AI match on %s: result, no NaN, both sides score, the ball never rests unreached for over 5 s, and nobody stands still for over 10 s in play',
-    difficulty => {
-      const goals = { home: 0, away: 0 };
-      for (const seed of [21, 22, 23]) {
-        const w = createWorld(BASE_STATS, BASE_STATS, seed, { home: DIFFICULTY[difficulty].aimErrorDeg, away: DIFFICULTY[difficulty].aimErrorDeg });
-        const home = createBrain(DIFFICULTY[difficulty]);
-        const away = createBrain(DIFFICULTY[difficulty]);
-        const still = new Map<Player, { x: number; z: number; s: number }>();
-        let unreachedS = 0;
-        for (let t = 0; w.match.phase !== 'fullTime' && t < 60 * 200; t++) {
-          stepWorld(w, think(home, w, w.home, w.away, STEP), think(away, w, w.away, w.home, STEP), STEP);
-          for (const v of [w.ball.x, w.ball.y, w.ball.z, w.home.x, w.home.z, w.away.x, w.away.z]) expect(Number.isFinite(v)).toBe(true);
-          if (w.match.phase !== 'playing') {
-            unreachedS = 0;
-            still.clear();
-            continue;
-          }
-          const resting = Math.hypot(w.ball.vx, w.ball.vz) < 1 && w.ball.y <= BALL_REST_Y + 0.5;
-          const near = [w.home, w.away].some(p => Math.hypot(p.x - w.ball.x, p.z - w.ball.z) < 16);
-          unreachedS = resting && !near ? unreachedS + STEP : 0;
-          expect(unreachedS, `seed ${seed}: ball resting unreached at (${w.ball.x.toFixed(1)}, ${w.ball.z.toFixed(1)})`).toBeLessThanOrEqual(5);
-          for (const p of [w.home, w.away]) {
-            const a = still.get(p);
-            if (!a || Math.hypot(p.x - a.x, p.z - a.z) > 2) still.set(p, { x: p.x, z: p.z, s: 0 });
-            else a.s += STEP;
-            expect(still.get(p)!.s, `seed ${seed}: ${p.team} stuck at (${p.x.toFixed(1)}, ${p.z.toFixed(1)})`).toBeLessThanOrEqual(10);
-          }
+  /**
+   * Plays whole AI-vs-AI matches and checks every guarantee: a result, no NaN, the ball never
+   * resting unreached for over 5 s, and nobody standing still for over 10 s in play. With
+   * `bothScore`, each side must also score at least once across the seeds.
+   */
+  function wholeMatches(difficulty: 'easy' | 'normal' | 'hard', homeStats: Stats, awayStats: Stats, seeds: readonly number[], bothScore: boolean): void {
+    const goals = { home: 0, away: 0 };
+    for (const seed of seeds) {
+      const w = createWorld({ ...homeStats }, { ...awayStats }, seed, { home: DIFFICULTY[difficulty].aimErrorDeg, away: DIFFICULTY[difficulty].aimErrorDeg });
+      const home = createBrain(DIFFICULTY[difficulty]);
+      const away = createBrain(DIFFICULTY[difficulty]);
+      const still = new Map<Player, { x: number; z: number; s: number }>();
+      let unreachedS = 0;
+      for (let t = 0; w.match.phase !== 'fullTime' && t < 60 * 200; t++) {
+        stepWorld(w, think(home, w, w.home, w.away, STEP), think(away, w, w.away, w.home, STEP), STEP);
+        for (const v of [w.ball.x, w.ball.y, w.ball.z, w.home.x, w.home.z, w.away.x, w.away.z]) expect(Number.isFinite(v)).toBe(true);
+        if (w.match.phase !== 'playing') {
+          unreachedS = 0;
+          still.clear();
+          continue;
         }
-        expect(w.match.result).not.toBeNull();
-        goals.home += w.match.score.home;
-        goals.away += w.match.score.away;
+        const resting = Math.hypot(w.ball.vx, w.ball.vz) < 1 && w.ball.y <= BALL_REST_Y + 0.5;
+        const near = [w.home, w.away].some(p => Math.hypot(p.x - w.ball.x, p.z - w.ball.z) < 16);
+        unreachedS = resting && !near ? unreachedS + STEP : 0;
+        expect(unreachedS, `seed ${seed}: ball resting unreached at (${w.ball.x.toFixed(1)}, ${w.ball.z.toFixed(1)})`).toBeLessThanOrEqual(5);
+        for (const p of [w.home, w.away]) {
+          const a = still.get(p);
+          if (!a || Math.hypot(p.x - a.x, p.z - a.z) > 2) still.set(p, { x: p.x, z: p.z, s: 0 });
+          else a.s += STEP;
+          expect(still.get(p)!.s, `seed ${seed}: ${p.team} stuck at (${p.x.toFixed(1)}, ${p.z.toFixed(1)})`).toBeLessThanOrEqual(10);
+        }
       }
+      expect(w.match.result, `seed ${seed}`).not.toBeNull();
+      goals.home += w.match.score.home;
+      goals.away += w.match.score.away;
+    }
+    if (bothScore) {
       expect(goals.home).toBeGreaterThan(0);
       expect(goals.away).toBeGreaterThan(0);
-    },
+    }
+  }
+
+  const allAt = (n: number): Stats => Object.fromEntries(STAT_NAMES.map(k => [k, n])) as Record<StatName, number>;
+
+  it.each(['easy', 'normal', 'hard'] as const)(
+    'a whole AI-vs-AI match on %s: result, no NaN, both sides score, the ball never rests unreached for over 5 s, and nobody stands still for over 10 s in play',
+    difficulty => wholeMatches(difficulty, BASE_STATS, BASE_STATS, [21, 22, 23], true),
   );
+
+  it.each([
+    [10, 10],
+    [10, 1],
+    [1, 10],
+  ] as const)('a whole AI-vs-AI match at stats %s vs %s on normal keeps every guarantee', (home, away) => {
+    wholeMatches('normal', allAt(home), allAt(away), [31, 32, 33], home === 10 && away === 10);
+  });
 
   it('reaches a ball beside its own side netting past a still Harrison at the goal\u2019s front corner', () => {
     for (const [difficulty, mx, mz] of [

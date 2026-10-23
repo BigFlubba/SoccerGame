@@ -8,14 +8,18 @@ export interface Stats {
   control: number;
 }
 
+export type StatName = keyof Stats;
+
+export const STAT_NAMES: readonly StatName[] = ['speed', 'power', 'jump', 'control'];
+
 export const BASE_STATS: Stats = { speed: 1, power: 1, jump: 1, control: 1 };
 
-const MIN_LEVEL = 1;
-const MAX_LEVEL = 10;
+export const MIN_STAT_LEVEL = 1,
+  MAX_STAT_LEVEL = 10;
 
 /** Linear from `atMin` at level 1 to `atMax` at level 10, with the level clamped. */
 function curve(level: number, atMin: number, atMax: number): number {
-  const t = (Math.min(Math.max(level, MIN_LEVEL), MAX_LEVEL) - MIN_LEVEL) / (MAX_LEVEL - MIN_LEVEL);
+  const t = (Math.min(Math.max(level, MIN_STAT_LEVEL), MAX_STAT_LEVEL) - MIN_STAT_LEVEL) / (MAX_STAT_LEVEL - MIN_STAT_LEVEL);
   return atMin + (atMax - atMin) * t;
 }
 
