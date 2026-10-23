@@ -1,5 +1,10 @@
 # Harrison's Road to the Cup — Design
 
+> **Amended 2026-10-23** after Harrison's first playtest by
+> `2026-10-23-depth-and-menus-design.md`. It adds a depth band with solid
+> players, near/far-post aiming, and a title screen, Help and Options, and it
+> shifts the build order by one step. Where they disagree, the amendment wins.
+
 Working title. Harrison gets to pick the final name.
 
 ## Intent
