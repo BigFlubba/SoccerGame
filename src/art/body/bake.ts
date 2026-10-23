@@ -40,7 +40,8 @@ export function bakeAll(body: BodyProportions, heads: Record<HeadFacing, HeadSpr
   return Object.fromEntries(entries) as Record<AnimName, BakedClip>;
 }
 
+/** Always a valid index: negative time (rAF timestamps can trail performance.now()) shows the first frame. */
 export function frameIndexAt(clip: Pick<BakedClip, 'frames' | 'fps' | 'loop'>, timeMs: number): number {
-  const i = Math.floor((timeMs * clip.fps) / 1000);
+  const i = Math.max(0, Math.floor((timeMs * clip.fps) / 1000));
   return clip.loop ? i % clip.frames.length : Math.min(i, clip.frames.length - 1);
 }

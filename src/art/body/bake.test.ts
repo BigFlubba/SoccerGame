@@ -128,4 +128,11 @@ describe('frameIndexAt', () => {
     expect(frameIndexAt(baked.run, 1000)).toBe(12 % 8);
     expect(frameIndexAt(baked.shoot, 10_000)).toBe(4);
   });
+
+  // A requestAnimationFrame timestamp can be a few ms earlier than a start time
+  // taken from performance.now(), so elapsed time is sometimes slightly negative.
+  it('returns the first frame for negative elapsed time', () => {
+    expect(frameIndexAt(baked.run, -5)).toBe(0);
+    expect(frameIndexAt(baked.shoot, -5)).toBe(0);
+  });
 });
