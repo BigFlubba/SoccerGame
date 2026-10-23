@@ -101,6 +101,11 @@ export function stepMatch(m: MatchState, dt: number, goal: 'left' | 'right' | nu
   return { resetForKickoff: false };
 }
 
+/** Ends a goal pause early (the goal moment ran its own): the next step kicks off, or goes to full time after a golden goal. */
+export function endGoalPause(m: MatchState): void {
+  if (m.phase === 'goal') m.phaseT = Math.max(m.phaseT, GOAL_PAUSE_S);
+}
+
 /** The minute on the clock: 0..90, staying at 90 through golden goal. */
 export function clockMinute(m: MatchState): number {
   return Math.min(FULL_TIME_MIN, Math.floor(m.clockS + TIME_EPS));

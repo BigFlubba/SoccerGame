@@ -4,6 +4,7 @@ import { recordingRumble } from '../engine/testRumble';
 import type { GameArt } from './art';
 import type { GameContext } from './context';
 import { DIFFICULTY } from '../game/ai';
+import { GOAL_PAUSE_S } from '../game/match';
 import { DEFAULT_SETTINGS, type Settings } from '../meta/settings';
 import { PAUSE_ITEMS, createMatchScene, type MatchScene } from './matchScene';
 import type { Scene } from './scene';
@@ -240,6 +241,89 @@ describe('match scene: pause menu screens', () => {
       s.update(frame(['pause']), STEP);
       s.update(frame(['down']), STEP);
       expect(audio.played).toContain('menuMove');
+    });
+  });
+
+  describe('goal moment', () => {
+    function scored(team: 'home' | 'away' = 'home') {
+      const audio = recordingAudio();
+      const rumble = recordingRumble();
+      const s = createMatchScene({ ...CTX, audio, rumble }, 1);
+      s.world.match.phase = 'playing';
+      Object.assign(s.world.ball, team === 'home' ? { x: 616, y: 3, z: 32, vx: 100 } : { x: 24, y: 3, z: 32, vx: -100 });
+      s.update(frame(), STEP);
+      expect(s.world.events.goal).toBe(team);
+      return { s, audio, rumble };
+    }
+
+    it("Harrison's goal runs the moment, then kicks off", () => {
+      const { s } = scored();
+      expect(s.moment).not.toBeNull();
+      run(s, 3.9);
+      expect(s.world.match.phase).toBe('kickoff');
+      expect(s.moment).toBeNull();
+    });
+
+    it('a confirm press after 0.5 s skips to the kickoff', () => {
+      const { s } = scored();
+      run(s, 0.6);
+      expect(s.world.match.phase).toBe('goal');
+      s.update(frame(['confirm']), STEP);
+      expect(s.moment).toBeNull();
+      s.update(frame(), STEP);
+      expect(s.world.match.phase).toBe('kickoff');
+    });
+
+    it("Max's goal has no moment and kicks off after GOAL_PAUSE_S", () => {
+      const { s } = scored('away');
+      expect(s.moment).toBeNull();
+      run(s, GOAL_PAUSE_S - 0.1);
+      expect(s.world.match.phase).toBe('goal');
+      run(s, 0.2);
+      expect(s.world.match.phase).toBe('kickoff');
+    });
+
+    it('a golden goal by Harrison runs the moment, then full time', () => {
+      const audio = recordingAudio();
+      const s = createMatchScene({ ...CTX, audio, rumble: recordingRumble() }, 1);
+      Object.assign(s.world.match, { phase: 'playing', goldenGoal: true, clockS: 90 });
+      Object.assign(s.world.ball, { x: 616, y: 3, z: 32, vx: 100 });
+      s.update(frame(), STEP);
+      expect(s.moment).not.toBeNull();
+      run(s, 2);
+      expect(s.world.match.phase).toBe('goal');
+      run(s, 2);
+      expect(s.moment).toBeNull();
+      expect(s.world.match.phase).toBe('fullTime');
+    });
+
+    it('pausing mid-moment and resuming continues it, and the goal cues and rumble fire once', () => {
+      const { s, audio, rumble } = scored();
+      run(s, 0.5);
+      const t = s.moment!.t;
+      s.update(frame(['pause']), STEP);
+      run(s, 1);
+      expect(s.moment!.t).toBe(t);
+      s.update(frame(['confirm']), STEP);
+      expect(s.paused).toBe(false);
+      run(s, 3.5);
+      expect(s.moment).toBeNull();
+      expect(audio.played.filter(c => c === 'roar')).toHaveLength(1);
+      expect(rumble.pulses.filter(k => k === 'goal')).toHaveLength(1);
+    });
+
+    it('holding shoot through the skip and the kickoff does not charge until a fresh press', () => {
+      const { s } = scored();
+      run(s, 0.6);
+      s.update(frame(['shoot']), STEP);
+      expect(s.moment).toBeNull();
+      run(s, 1.5, ['shoot']);
+      expect(s.world.match.phase).toBe('playing');
+      expect(s.world.home.state).not.toBe('charging');
+      expect(s.world.home.kick).toBeNull();
+      s.update(frame(), STEP);
+      s.update(frame(['shoot']), STEP);
+      expect(s.world.home.state).toBe('charging');
     });
   });
 });

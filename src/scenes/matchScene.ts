@@ -7,9 +7,11 @@ import { updateCamera, type Camera } from '../game/camera';
 import { HUMAN_AIM_ERROR_DEG, type Aim } from '../game/kick';
 import { cancelCharge, type PlayerIntent } from '../game/player';
 import { BASE_STATS } from '../game/stats';
+import { endGoalPause } from '../game/match';
 import { createWorld, stepWorld, type World } from '../game/world';
 import type { GameContext } from './context';
 import { drawMenu, menuCue, stepMenu, type MenuState } from './menu';
+import { createGoalMoment, simScale, stepGoalMoment, type GoalMoment } from './goalMoment';
 import { drawMatch, type MatchHud } from './matchView';
 import type { Scene } from './scene';
 import { createHelpScene } from './helpScene';
@@ -21,6 +23,8 @@ export interface MatchScene extends Scene {
   readonly paused: boolean;
   /** Max's difficulty right now: a change in Options mid-match applies at once. */
   readonly difficulty: Difficulty;
+  /** Harrison's goal moment, while it runs. */
+  readonly moment: GoalMoment | null;
 }
 
 export const PAUSE_ITEMS = ['RESUME', 'RESTART', 'HELP', 'OPTIONS', 'QUIT TO TITLE'] as const;
@@ -55,7 +59,7 @@ export function createMatchScene(ctx: GameContext, seed: number): MatchScene {
   const world = createWorld(BASE_STATS, BASE_STATS, seed, { home: HUMAN_AIM_ERROR_DEG, away: profile.aimErrorDeg });
   const brain = createBrain(profile);
   const cam: Camera = { x: world.ball.x - BASE_W / 2 };
-  const hud: MatchHud = { perfect: null };
+  const hud: MatchHud = { perfect: null, moment: null };
   let pause: MenuState | null = null;
   let fullTime: MenuState | null = null;
   let t = 0;
@@ -92,6 +96,9 @@ export function createMatchScene(ctx: GameContext, seed: number): MatchScene {
     get difficulty() {
       return difficulty;
     },
+    get moment() {
+      return hud.moment;
+    },
     onHidden() {
       if (!pause && world.match.phase !== 'fullTime') openPause();
     },
@@ -122,15 +129,29 @@ export function createMatchScene(ctx: GameContext, seed: number): MatchScene {
       }
 
       t += dt;
-      const prevPhase = world.match.phase;
-      stepWorld(world, harrisonIntent(input), think(brain, world, world.away, world.home, dt), dt);
-      const feedback = matchFeedback(world, prevPhase);
-      for (const cue of feedback.cues) ctx.audio.play(cue);
-      for (const kind of feedback.rumble) ctx.rumble.pulse(kind);
-      world.events.kicks.forEach((k, i) => {
-        if (k.perfect) hud.perfect = { team: i === 0 ? 'home' : 'away', untilS: t + PERFECT_SHOW_S };
-      });
-      updateCamera(cam, world.ball, dt, world.field);
+      // Harrison's goal moment slows or freezes the match; the simulation only sees a smaller dt.
+      const moment = hud.moment;
+      const simDt = dt * (moment ? simScale(moment) : 1);
+      if (simDt > 0) {
+        const prevPhase = world.match.phase;
+        stepWorld(world, harrisonIntent(input), think(brain, world, world.away, world.home, simDt), simDt);
+        const feedback = matchFeedback(world, prevPhase);
+        for (const cue of feedback.cues) ctx.audio.play(cue);
+        for (const kind of feedback.rumble) ctx.rumble.pulse(kind);
+        world.events.kicks.forEach((k, i) => {
+          if (k.perfect) hud.perfect = { team: i === 0 ? 'home' : 'away', untilS: t + PERFECT_SHOW_S };
+        });
+        updateCamera(cam, world.ball, simDt, world.field);
+        if (world.events.goal === 'home') hud.moment = createGoalMoment();
+      }
+      if (moment) {
+        // A fresh press skips it; the held shot that scored doesn't, since presses are edges.
+        stepGoalMoment(moment, dt, input.pressed.has('confirm') || input.pressed.has('shoot'));
+        if (moment.done) {
+          endGoalPause(world.match);
+          hud.moment = null;
+        }
+      }
       if (world.match.phase === 'fullTime' && !fullTime && world.match.phaseT >= RESULT_DELAY_S) {
         fullTime = { items: FULL_TIME_ITEMS, index: 0 };
       }

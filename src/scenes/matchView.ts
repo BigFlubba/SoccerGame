@@ -8,11 +8,14 @@ import type { Player } from '../game/player';
 import type { World } from '../game/world';
 import type { GameArt } from './art';
 import { depthSorted, type Drawable } from './depthSort';
+import type { GoalMoment } from './goalMoment';
 
 /** Overlay state the match scene keeps between frames. */
 export interface MatchHud {
   /** Who just hit a PERFECT shot, and until when (seconds) to show it. */
   perfect: null | { team: Team; untilS: number };
+  /** Harrison's goal moment, while it runs. */
+  moment: GoalMoment | null;
 }
 
 export const HOME_NAME = 'HARRISON';

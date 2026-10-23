@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { GOAL_PAUSE_S, KICKOFF_S, clockMinute, createMatch, stepMatch, type MatchState } from './match';
+import { GOAL_PAUSE_S, KICKOFF_S, clockMinute, createMatch, endGoalPause, stepMatch, type MatchState } from './match';
 
 const STEP = 1 / 60;
 const ticks = (s: number) => Math.round(s / STEP);
@@ -120,5 +120,33 @@ describe('stepMatch', () => {
     const m = playing({ phase: 'fullTime', result: 'win', score: { home: 1, away: 0 } });
     run(m, 1, 'left');
     expect(m.score).toEqual({ home: 1, away: 0 });
+  });
+});
+
+describe('endGoalPause', () => {
+  it('endGoalPause makes the next step kick off', () => {
+    const m = playing();
+    stepMatch(m, STEP, 'right');
+    expect(m.phase).toBe('goal');
+    stepMatch(m, STEP, null);
+    expect(m.phase).toBe('goal');
+    endGoalPause(m);
+    expect(stepMatch(m, STEP, null).resetForKickoff).toBe(true);
+    expect(m.phase).toBe('kickoff');
+  });
+
+  it('after a golden goal it goes to full time', () => {
+    const m = playing({ goldenGoal: true, clockS: 90 });
+    stepMatch(m, STEP, 'right');
+    endGoalPause(m);
+    stepMatch(m, STEP, null);
+    expect(m.phase).toBe('fullTime');
+    expect(m.result).toBe('win');
+  });
+
+  it('does nothing outside the goal pause', () => {
+    const m = playing();
+    endGoalPause(m);
+    expect(m.phaseT).toBe(0);
   });
 });
