@@ -2,7 +2,7 @@ import { VOLUME_MAX } from '../meta/settings';
 import { CUES, type Cue, type Voice } from './cues';
 import { SONGS, parseNotes, type Song, type Track } from './music';
 
-export type CrowdLevel = 'off' | 'low' | 'match';
+export type CrowdLevel = 'off' | 'low' | 'match' | 'roar';
 
 /** The game's sound: Web Audio behind a surface that never throws and does nothing until unlocked. */
 export interface GameAudio {
@@ -26,8 +26,8 @@ export interface GameAudio {
 
 /** Even 10/10 stays well short of harsh. */
 const MASTER_GAIN = 0.7;
-/** The crowd sits well under everything else; scaled by the SFX bus. */
-export const CROWD_GAIN: Readonly<Record<CrowdLevel, number>> = { off: 0, low: 0.04, match: 0.12 };
+/** The crowd sits well under everything else, except while it roars for Harrison's goal; scaled by the SFX bus. */
+export const CROWD_GAIN: Readonly<Record<CrowdLevel, number>> = { off: 0, low: 0.04, match: 0.12, roar: 0.4 };
 const CROWD_FILTER_HZ = 500;
 /** How quickly the crowd level glides to a new value, seconds. */
 const CROWD_GLIDE_S = 0.25;
@@ -95,8 +95,10 @@ function playVoice(g: Graph, v: Voice, now: number): void {
   const t0 = now + (v.at ?? 0);
   const t1 = t0 + v.dur;
   const env = ctx.createGain();
+  const peakAt = t0 + Math.min(v.attack ?? DEFAULT_ATTACK_S, v.dur);
   env.gain.setValueAtTime(SILENT, t0);
-  env.gain.linearRampToValueAtTime(v.gain, t0 + Math.min(v.attack ?? DEFAULT_ATTACK_S, v.dur));
+  env.gain.linearRampToValueAtTime(v.gain, peakAt);
+  if (v.hold) env.gain.setValueAtTime(v.gain, Math.min(peakAt + v.hold, t1));
   env.gain.exponentialRampToValueAtTime(SILENT, t1);
   env.connect(g.sfx);
 

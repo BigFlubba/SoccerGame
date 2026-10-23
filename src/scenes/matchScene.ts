@@ -114,7 +114,7 @@ export function createMatchScene(ctx: GameContext, seed: number): MatchScene {
         if (r.chosen === 'QUIT TO TITLE') return createPressStartScene(ctx);
         if (r.chosen === 'RESUME' || r.back || (!r.chosen && input.pressed.has('pause'))) {
           pause = null;
-          ctx.audio.setCrowd('match');
+          ctx.audio.setCrowd(hud.moment ? 'roar' : 'match');
           // Buttons held while the menu closes (B is also "back") need a fresh press to act in play.
           world.home.held = { shoot: input.held.has('shoot'), chip: input.held.has('chip') };
         }
@@ -125,7 +125,8 @@ export function createMatchScene(ctx: GameContext, seed: number): MatchScene {
         fullTime = r.m;
         if (r.chosen === 'PLAY AGAIN') return restart();
         if (r.chosen === 'TITLE') return createPressStartScene(ctx);
-      } else if (input.pressed.has('pause') && world.match.phase !== 'fullTime') {
+      } else if (input.pressed.has('pause') && world.match.phase !== 'fullTime' && !(hud.moment && input.pressed.has('confirm'))) {
+        // During Harrison's moment Enter (pause plus confirm) skips it instead; Esc and Start still pause.
         openPause();
         return null;
       }
@@ -144,7 +145,11 @@ export function createMatchScene(ctx: GameContext, seed: number): MatchScene {
           if (k.perfect) hud.perfect = { team: i === 0 ? 'home' : 'away', untilS: t + PERFECT_SHOW_S };
         });
         updateCamera(cam, world.ball, simDt, world.field);
-        if (world.events.goal === 'home') hud.moment = createGoalMoment();
+        if (world.events.goal === 'home') {
+          hud.moment = createGoalMoment();
+          // The roar cue swells; the crowd holds it through the celebration.
+          ctx.audio.setCrowd('roar');
+        }
       }
       if (moment) {
         // A fresh press skips it; the held shot that scored doesn't, since presses are edges.
@@ -152,6 +157,7 @@ export function createMatchScene(ctx: GameContext, seed: number): MatchScene {
         if (moment.done) {
           endGoalPause(world.match);
           hud.moment = null;
+          ctx.audio.setCrowd('match');
         }
       }
       if (world.match.phase === 'fullTime' && !fullTime && world.match.phaseT >= RESULT_DELAY_S) {

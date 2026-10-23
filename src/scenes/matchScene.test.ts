@@ -312,6 +312,41 @@ describe('match scene: pause menu screens', () => {
       expect(rumble.pulses.filter(k => k === 'goal')).toHaveLength(1);
     });
 
+    it("the crowd holds its roar through Harrison's moment, and settles when it ends", () => {
+      const { s, audio } = scored();
+      expect(audio.crowd).toBe('roar');
+      run(s, 2);
+      expect(audio.crowd).toBe('roar');
+      s.update(frame(['pause']), STEP);
+      expect(audio.crowd).toBe('low');
+      s.update(frame(['confirm']), STEP);
+      expect(audio.crowd).toBe('roar');
+      run(s, 2);
+      expect(s.moment).toBeNull();
+      expect(audio.crowd).toBe('match');
+    });
+
+    it("Max's goal doesn't raise the roar", () => {
+      const { audio } = scored('away');
+      expect(audio.crowd).toBe('match');
+    });
+
+    it('Enter skips the moment instead of pausing', () => {
+      const { s } = scored();
+      run(s, 0.6);
+      s.update(frame(['pause', 'confirm']), STEP);
+      expect(s.paused).toBe(false);
+      expect(s.moment).toBeNull();
+    });
+
+    it('Esc or Start still pauses during the moment', () => {
+      const { s } = scored();
+      run(s, 0.6);
+      s.update(frame(['pause', 'back']), STEP);
+      expect(s.paused).toBe(true);
+      expect(s.moment).not.toBeNull();
+    });
+
     it('holding shoot through the skip and the kickoff does not charge until a fresh press', () => {
       const { s } = scored();
       run(s, 0.6);

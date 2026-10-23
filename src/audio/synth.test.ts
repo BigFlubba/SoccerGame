@@ -1,18 +1,22 @@
 import { describe, expect, it } from 'vitest';
+import { CUES } from './cues';
 import { CROWD_GAIN, createAudio, volumeGain } from './synth';
 
 /** Just enough of an AudioParam to read back the last value set. */
 class FakeParam {
   value = 0;
-  setValueAtTime(v: number) {
+  /** Every scheduled value, as [value, time]. */
+  events: [number, number][] = [];
+  setValueAtTime(v: number, t = 0) {
     this.value = v;
+    this.events.push([v, t]);
     return this;
   }
-  linearRampToValueAtTime(v: number) {
-    return this.setValueAtTime(v);
+  linearRampToValueAtTime(v: number, t = 0) {
+    return this.setValueAtTime(v, t);
   }
-  exponentialRampToValueAtTime(v: number) {
-    return this.setValueAtTime(v);
+  exponentialRampToValueAtTime(v: number, t = 0) {
+    return this.setValueAtTime(v, t);
   }
   setTargetAtTime(v: number) {
     return this.setValueAtTime(v);
@@ -179,5 +183,17 @@ describe('createAudio', () => {
     await settle();
     expect(f.made.oscillators).toBeGreaterThan(0);
     a.playMusic(null);
+  });
+
+  it('a held voice stays at its peak until its hold ends, then decays', async () => {
+    const f = fakeContext();
+    const a = createAudio(f.make);
+    a.unlock();
+    await settle();
+    a.play('whistleShort');
+    const v = CUES.whistleShort.voices[0]!;
+    const env = f.made.gains.find(g => g.gain.events.some(([value]) => value === v.gain))!;
+    const holdEnd = (v.attack ?? 0) + (v.hold ?? 0);
+    expect(env.gain.events).toContainEqual([v.gain, expect.closeTo(holdEnd, 6)]);
   });
 });

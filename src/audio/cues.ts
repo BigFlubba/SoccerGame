@@ -28,8 +28,10 @@ export interface Voice {
   dur: number;
   /** Peak gain, before the SFX bus. */
   gain: number;
-  /** Seconds to reach the peak; the rest of `dur` decays. */
+  /** Seconds to reach the peak. */
   attack?: number;
+  /** Seconds held at the peak after the attack; the rest of `dur` decays. */
+  hold?: number;
   /** Pitch, or the noise filter's centre for 'noise'. */
   freq: number;
   /** Glides to this by the end. */
@@ -44,7 +46,18 @@ export interface CueRecipe {
   minGapS: number;
 }
 
-const whistle = (at: number, dur: number): Voice => ({ wave: 'triangle', at, dur, gain: 0.3, attack: 0.01, freq: 1900, vibrato: { hz: 28, depth: 60 } });
+/** A referee's blast: it holds its pitch and volume, then cuts off quickly. */
+const WHISTLE_RELEASE_S = 0.06;
+const whistle = (at: number, dur: number): Voice => ({
+  wave: 'triangle',
+  at,
+  dur,
+  gain: 0.3,
+  attack: 0.01,
+  hold: dur - 0.01 - WHISTLE_RELEASE_S,
+  freq: 1900,
+  vibrato: { hz: 28, depth: 60 },
+});
 
 /** Written by ear: short, 8-bit, and nothing shrill. */
 export const CUES: Readonly<Record<Cue, CueRecipe>> = {

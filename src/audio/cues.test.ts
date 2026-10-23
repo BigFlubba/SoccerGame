@@ -8,8 +8,19 @@ describe('cue recipes', () => {
     for (const [cue, r] of Object.entries(CUES)) expect(r.voices.length, cue).toBeGreaterThan(0);
   });
 
-  it('every voice ends within 2.5 s', () => {
-    for (const [cue, r] of Object.entries(CUES)) for (const v of r.voices) expect((v.at ?? 0) + v.dur, cue).toBeLessThanOrEqual(2.5);
+  it('every voice ends within 2.5 s, and holds no longer than it lasts', () => {
+    for (const [cue, r] of Object.entries(CUES)) {
+      for (const v of r.voices) {
+        expect((v.at ?? 0) + v.dur, cue).toBeLessThanOrEqual(2.5);
+        expect((v.attack ?? 0) + (v.hold ?? 0), cue).toBeLessThan(v.dur);
+      }
+    }
+  });
+
+  it('whistle blasts hold at full volume for most of each blast', () => {
+    for (const cue of ['whistleShort', 'whistleFull'] as const) {
+      for (const v of CUES[cue].voices) expect((v.attack ?? 0) + (v.hold ?? 0), cue).toBeGreaterThanOrEqual(0.7 * v.dur);
+    }
   });
 
   it('every voice has a gain in (0, 1]', () => {
