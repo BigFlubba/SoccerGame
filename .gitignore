@@ -1,7 +1,11 @@
-# Reference photos of Harrison: never commit (public repo)
-*.jpg
-*.jpeg
+# Photos of Harrison: never commit (public repo). Case-insensitive, common phone formats.
 reference/
+*.[jJ][pP][gG]
+*.[jJ][pP][eE][gG]
+*.[hH][eE][iI][cC]
+*.[hH][eE][iI][fF]
+*.[wW][eE][bB][pP]
+/*.[pP][nN][gG]
 
 node_modules/
 dist/
