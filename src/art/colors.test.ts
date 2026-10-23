@@ -36,12 +36,16 @@ describe('MASTER', () => {
 
   it('has about 40 colours', () => {
     expect(Object.keys(MASTER).length).toBeGreaterThanOrEqual(36);
-    expect(Object.keys(MASTER).length).toBeLessThanOrEqual(44);
+    expect(Object.keys(MASTER).length).toBeLessThanOrEqual(48);
   });
 });
 
 describe('KITS', () => {
-  it('both kits define every kit slot', () => {
+  it('the blue kit is navy and blue', () => {
+    expect([KITS.blue.Jersey, KITS.blue.JerseyShadow, KITS.blue.Shorts]).toEqual(['blue', 'navy', 'blue']);
+  });
+
+  it('every kit defines every kit slot', () => {
     for (const kit of Object.values(KITS)) expect(Object.keys(kit).sort()).toEqual([...KIT_SLOT_NAMES].sort());
   });
 

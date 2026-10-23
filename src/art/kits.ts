@@ -13,9 +13,9 @@ export const KIT_SLOT_NAMES = [
 ] as const;
 
 export type KitSlots = (typeof KIT_SLOT_NAMES)[number];
-export type KitId = 'home' | 'away';
+export type KitId = 'home' | 'away' | 'blue';
 
-/** Harrison's club kits, as colours only (no logos or sponsor). */
+/** Harrison's club kits and opponents' kits, as colours only (no logos or sponsor). */
 export const KITS: Record<KitId, Record<KitSlots, MasterColor>> = {
   home: {
     JerseyShadow: 'redDark',
@@ -39,6 +39,17 @@ export const KITS: Record<KitId, Record<KitSlots, MasterColor>> = {
     Shorts: 'slate',
     SocksShadow: 'charcoal',
     Socks: 'slate',
+  },
+  blue: {
+    JerseyShadow: 'navy',
+    Jersey: 'blue',
+    JerseyLight: 'blueLight',
+    TrimShadow: 'silver',
+    Trim: 'white',
+    ShortsShadow: 'navy',
+    Shorts: 'blue',
+    SocksShadow: 'navy',
+    Socks: 'blue',
   },
 };
 

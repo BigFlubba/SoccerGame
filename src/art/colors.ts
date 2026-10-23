@@ -80,6 +80,9 @@ export const MASTER = {
   flame: '#ff8c1a',
   flameDark: '#d0401a',
   violet: '#9058e0',
+  navy: '#1c3c8c',
+  blue: '#2c64c8',
+  blueLight: '#5a8ce6',
 } as const;
 
 export type MasterColor = keyof typeof MASTER;

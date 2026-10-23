@@ -7,12 +7,13 @@ import { bakeAll } from '../src/art/body/bake';
 import { drawFigure } from '../src/art/body/drawFigure';
 import { standingPose } from '../src/art/body/pose';
 import { HARRISON_BODY } from '../src/art/body/proportions';
-import { C, MASTER, resolvePalette, toRGBA } from '../src/art/colors';
+import { C, MASTER, resolvePalette, toRGBA, type LookColors } from '../src/art/colors';
 import { HARRISON_HEADS, HARRISON_POWER_HEADS } from '../src/art/harrison/head';
 import { harrisonLook, type PowerForm } from '../src/art/harrison/look';
 import { renderText, textPalette } from '../src/art/font';
 import { harrisonPortrait } from '../src/art/harrison/portrait';
 import { IndexedImage, blit } from '../src/art/indexedImage';
+import { MAX_HEADS, maxLook } from '../src/art/opponents/max';
 import type { KitId } from '../src/art/kits';
 import { addOutline } from '../src/art/raster';
 import { encodePNG } from './png';
@@ -33,15 +34,20 @@ function swatch(hex: string): SheetItem {
   return { width: SWATCH, height: SWATCH, rgba };
 }
 
-/** Resolves an image with Harrison's look, outlining a padded copy first when asked. */
-function item(img: IndexedImage, kit: KitId = 'home', form: PowerForm = 'base', outline = false): SheetItem {
+/** Resolves an image with a look, outlining a padded copy first when asked. */
+function resolved(img: IndexedImage, look: LookColors, outline = false): SheetItem {
   let src = img;
   if (outline) {
     src = new IndexedImage(img.width + 2, img.height + 2);
     blit(src, img, 1, 1);
     addOutline(src, C.Outline);
   }
-  return { width: src.width, height: src.height, rgba: toRGBA(src, resolvePalette(harrisonLook(kit, form))) };
+  return { width: src.width, height: src.height, rgba: toRGBA(src, resolvePalette(look)) };
+}
+
+/** Resolves an image with Harrison's look. */
+function item(img: IndexedImage, kit: KitId = 'home', form: PowerForm = 'base', outline = false): SheetItem {
+  return resolved(img, harrisonLook(kit, form), outline);
 }
 
 /** HUD-style text: white ink, dark outline. */
@@ -53,6 +59,7 @@ function text(s: string, scale: number): SheetItem {
 const standing = standingPose(HARRISON_BODY);
 const baked = bakeAll(HARRISON_BODY, HARRISON_HEADS);
 const powered = bakeAll(HARRISON_BODY, HARRISON_POWER_HEADS);
+const max = bakeAll(HARRISON_BODY, MAX_HEADS);
 const clipRows = (kit: KitId) => Object.values(baked).map(clip => clip.frames.map(f => item(f, kit)));
 
 const EXPRESSIONS = ['neutral', 'celebrate', 'determined', 'disappointed'] as const;
@@ -74,6 +81,8 @@ const rows: SheetItem[][] = [
     ...FACINGS.map(f => item(HARRISON_POWER_HEADS[f].image, 'home', 'ultra', true)),
   ],
   Object.values(MASTER).map(swatch),
+  [...max.idle.frames, ...max.run.frames].map(f => resolved(f, maxLook())),
+  [...FACINGS.map(f => resolved(MAX_HEADS[f].image, maxLook(), true)), item(baked.idle.frames[0]!), resolved(max.idle.frames[0]!, maxLook())],
   [text("HARRISON 0-0 MAX 45'", 1), text('ABCDEFGHIJKLMNOPQRSTUVWXYZ', 1), text("0123456789 -':!?.,/+", 1)],
   [text("HARRISON 0-0 MAX 45'", 2), text('GOAL! PERFECT', 2)],
 ];
