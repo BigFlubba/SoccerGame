@@ -20,6 +20,10 @@ describe('computeViewport', () => {
     expect(v.scale).toBeCloseTo(150 / 180);
   });
 
+  it('never returns scale 0 for a zero-size window', () => {
+    expect(computeViewport(0, 0, 1).scale).toBeGreaterThan(0);
+  });
+
   it('handles ultrawide windows', () => {
     expect(computeViewport(3440, 1440, 1)).toMatchObject({ scale: 8, y: 0 });
   });

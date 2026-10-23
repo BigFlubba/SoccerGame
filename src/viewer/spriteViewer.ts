@@ -9,7 +9,8 @@ import { harrisonPortrait, type Expression } from '../art/harrison/portrait';
 import { flipX } from '../art/indexedImage';
 import type { KitId } from '../art/kits';
 import { toCanvas } from '../engine/bitmaps';
-import { BASE_H, BASE_W, computeViewport } from '../engine/viewport';
+import { createScreen } from '../engine/screen';
+import { BASE_H, BASE_W } from '../engine/viewport';
 
 const CLIP_ORDER: readonly AnimName[] = ['idle', 'run', 'jump', 'shoot', 'powerUp'];
 const KIT_ORDER: readonly KitId[] = ['home', 'away'];
@@ -31,12 +32,8 @@ const next = <T>(list: readonly T[], current: T): T => list[(list.indexOf(curren
 
 /** Dev page for reviewing Harrison's sprites and portrait. */
 export function startSpriteViewer(canvas: HTMLCanvasElement, status: HTMLElement): void {
-  const ctx = canvas.getContext('2d');
-  const game = document.createElement('canvas');
-  game.width = BASE_W;
-  game.height = BASE_H;
-  const g = game.getContext('2d');
-  if (!ctx || !g) throw new Error('2D canvas unavailable');
+  const screen = createScreen(canvas);
+  const g = screen.game;
 
   const baked = { base: bakeAll(HARRISON_BODY, HARRISON_HEADS), power: bakeAll(HARRISON_BODY, HARRISON_POWER_HEADS) };
   const state = { clip: 'idle' as AnimName, kit: 'home' as KitId, form: 'base' as PowerForm, facing: 'right' as 'right' | 'left', expression: 'neutral' as Expression, clipStart: performance.now() };
@@ -101,19 +98,6 @@ export function startSpriteViewer(canvas: HTMLCanvasElement, status: HTMLElement
     edge(GAMEPAD.RIGHT, () => actions.face('right'));
   };
 
-  const resize = () => {
-    const dpr = window.devicePixelRatio || 1;
-    const v = computeViewport(window.innerWidth, window.innerHeight, dpr);
-    canvas.width = v.deviceW;
-    canvas.height = v.deviceH;
-    // Exactly backing ÷ dpr so the browser maps canvas pixels 1:1 onto device pixels.
-    canvas.style.width = `${v.deviceW / dpr}px`;
-    canvas.style.height = `${v.deviceH / dpr}px`;
-    return v;
-  };
-  let viewport = resize();
-  window.addEventListener('resize', () => (viewport = resize()));
-
   const drawBackdrop = () => {
     g.fillStyle = MASTER.sky;
     g.fillRect(0, 0, BASE_W, GROUND_Y - 20);
@@ -139,10 +123,7 @@ export function startSpriteViewer(canvas: HTMLCanvasElement, status: HTMLElement
     g.drawImage(sprite, Math.round(BASE_W / 2) - ANCHOR.x, GROUND_Y - ANCHOR.y);
     g.drawImage(portrait(), PORTRAIT_POS.x, PORTRAIT_POS.y);
 
-    ctx.imageSmoothingEnabled = false;
-    ctx.fillStyle = '#000';
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
-    ctx.drawImage(game, viewport.x, viewport.y, BASE_W * viewport.scale, BASE_H * viewport.scale);
+    screen.present();
 
     status.textContent = `${state.clip} · ${state.kit} kit · ${state.form} form · facing ${state.facing} · ${state.expression}`;
     requestAnimationFrame(frame);
