@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { recordingAudio } from '../audio/testAudio';
+import { recordingRumble } from '../engine/testRumble';
 import { DIFFICULTY } from '../game/ai';
 import { DEFAULT_SETTINGS, type Settings } from '../meta/settings';
 import type { GameArt } from './art';
@@ -14,7 +15,7 @@ const STEP = 1 / 60;
 const NO_ART = {} as GameArt;
 
 function context(difficulty: Settings['difficulty'] = 'normal'): GameContext {
-  return { art: NO_ART, settings: { ...DEFAULT_SETTINGS, difficulty }, save: () => {}, audio: recordingAudio() };
+  return { art: NO_ART, settings: { ...DEFAULT_SETTINGS, difficulty }, save: () => {}, audio: recordingAudio(), rumble: recordingRumble() };
 }
 
 describe('press start screen', () => {

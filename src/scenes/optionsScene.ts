@@ -61,7 +61,11 @@ export function createOptionsScene(ctx: GameContext, back: () => Scene): Scene {
       if (input.pressed.has('down')) row = (row + 1) % n;
       const step = input.pressed.has('right') ? 1 : input.pressed.has('left') ? -1 : 0;
       // Saved first, so an SFX change blips at its new level.
-      if (step !== 0) ctx.save(changeOption(ctx.settings, OPTION_ROWS[row]!, step));
+      if (step !== 0) {
+        ctx.save(changeOption(ctx.settings, OPTION_ROWS[row]!, step));
+        // A little pulse says it's back on.
+        if (OPTION_ROWS[row] === 'RUMBLE' && ctx.settings.rumble) ctx.rumble.pulse('tap');
+      }
       if (step !== 0 || row !== before) ctx.audio.play('menuMove');
       return null;
     },

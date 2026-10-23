@@ -124,7 +124,9 @@ export function createMatchScene(ctx: GameContext, seed: number): MatchScene {
       t += dt;
       const prevPhase = world.match.phase;
       stepWorld(world, harrisonIntent(input), think(brain, world, world.away, world.home, dt), dt);
-      for (const cue of matchFeedback(world, prevPhase).cues) ctx.audio.play(cue);
+      const feedback = matchFeedback(world, prevPhase);
+      for (const cue of feedback.cues) ctx.audio.play(cue);
+      for (const kind of feedback.rumble) ctx.rumble.pulse(kind);
       world.events.kicks.forEach((k, i) => {
         if (k.perfect) hud.perfect = { team: i === 0 ? 'home' : 'away', untilS: t + PERFECT_SHOW_S };
       });

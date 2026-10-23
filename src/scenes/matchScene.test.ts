@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { recordingAudio } from '../audio/testAudio';
+import { recordingRumble } from '../engine/testRumble';
 import type { GameArt } from './art';
 import type { GameContext } from './context';
 import { DIFFICULTY } from '../game/ai';
@@ -11,7 +12,7 @@ import { frame } from './testInput';
 const STEP = 1 / 60;
 /** update() never touches the art, so tests can run without a DOM. */
 const NO_ART = {} as GameArt;
-const CTX: GameContext = { art: NO_ART, settings: { ...DEFAULT_SETTINGS }, save: () => {}, audio: recordingAudio() };
+const CTX: GameContext = { art: NO_ART, settings: { ...DEFAULT_SETTINGS }, save: () => {}, audio: recordingAudio(), rumble: recordingRumble() };
 
 function live(): MatchScene {
   const s = createMatchScene(CTX, 1);
@@ -157,7 +158,7 @@ describe('match scene: pause menu screens', () => {
 
   it('a difficulty change from pause applies to the current match', () => {
     const settings: Settings = { ...DEFAULT_SETTINGS };
-    const ctx: GameContext = { art: NO_ART, settings, save: next => void (ctx.settings = next), audio: recordingAudio() };
+    const ctx: GameContext = { art: NO_ART, settings, save: next => void (ctx.settings = next), audio: recordingAudio(), rumble: recordingRumble() };
     const s = liveWith(ctx);
     const options = pick(s, 'OPTIONS')!;
     options.update(frame(['right']), STEP);
@@ -223,6 +224,15 @@ describe('match scene: pause menu screens', () => {
       s.update(frame(['up']), STEP);
       expect(s.update(frame(['confirm']), STEP)?.kind).toBe('pressStart');
       expect(audio.crowd).toBe('off');
+    });
+
+    it("a home goal rumbles goal; RUMBLE OFF is respected by the Rumble, not the scene", () => {
+      const rumble = recordingRumble();
+      const s = createMatchScene({ ...CTX, settings: { ...DEFAULT_SETTINGS, rumble: false }, rumble }, 1);
+      s.world.match.phase = 'playing';
+      Object.assign(s.world.ball, { x: 616, y: 3, z: 32, vx: 100, vy: 0, vz: 0 });
+      s.update(frame(), STEP);
+      expect(rumble.pulses).toEqual(['goal']);
     });
 
     it('the pause menu blips', () => {

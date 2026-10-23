@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { recordingAudio } from '../audio/testAudio';
+import { recordingRumble } from '../engine/testRumble';
 import { glyph } from '../art/font';
 import { DEFAULT_SETTINGS, type Settings } from '../meta/settings';
 import type { GameArt } from './art';
@@ -18,6 +19,7 @@ function context(): GameContext & { saved: Settings[] } {
     settings: { ...DEFAULT_SETTINGS },
     saved,
     audio: recordingAudio(),
+    rumble: recordingRumble(),
     save(s) {
       saved.push(s);
       ctx.settings = s;
@@ -102,6 +104,18 @@ describe('options', () => {
   it('difficulty wraps both ways', () => {
     expect(changeOption({ ...DEFAULT_SETTINGS, difficulty: 'hard' }, 'DIFFICULTY', 1).difficulty).toBe('easy');
     expect(changeOption({ ...DEFAULT_SETTINGS, difficulty: 'easy' }, 'DIFFICULTY', -1).difficulty).toBe('hard');
+  });
+
+  it('turning rumble on gives a tap pulse', () => {
+    const ctx = context();
+    ctx.settings = { ...DEFAULT_SETTINGS, rumble: false };
+    const s = createOptionsScene(ctx, () => BEHIND);
+    s.update(frame(['up']), STEP);
+    s.update(frame(['right']), STEP);
+    expect(ctx.settings.rumble).toBe(true);
+    expect((ctx.rumble as ReturnType<typeof recordingRumble>).pulses).toEqual(['tap']);
+    s.update(frame(['right']), STEP);
+    expect((ctx.rumble as ReturnType<typeof recordingRumble>).pulses).toEqual(['tap']);
   });
 
   it('every change saves once, with the new settings', () => {
