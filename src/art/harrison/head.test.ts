@@ -50,7 +50,7 @@ describe('HARRISON_POWER_HEADS', () => {
 describe('harrisonLook', () => {
   it('defaults to the home kit and swaps to away', () => {
     expect(harrisonLook().Jersey).toBe('red');
-    expect(harrisonLook('away').Jersey).toBe('charcoal');
+    expect(harrisonLook('away').Jersey).toBe('slate');
     expect(harrisonLook().Boot).toBe('volt');
   });
 

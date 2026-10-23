@@ -46,6 +46,7 @@ export const MASTER = {
   gray: '#7c7c88',
   black: '#24242c',
   charcoal: '#3a3a46',
+  slate: '#50505e',
   skinShadow: '#c27c62',
   skin: '#e8a888',
   skinLight: '#f2c4a4',

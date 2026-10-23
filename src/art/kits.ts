@@ -28,16 +28,17 @@ export const KITS: Record<KitId, Record<KitSlots, MasterColor>> = {
     SocksShadow: 'redDark',
     Socks: 'red',
   },
+  // Black kit drawn one step lighter than true black so it never merges into the outline.
   away: {
-    JerseyShadow: 'black',
-    Jersey: 'charcoal',
+    JerseyShadow: 'charcoal',
+    Jersey: 'slate',
     JerseyLight: 'gray',
     TrimShadow: 'silver',
     Trim: 'white',
-    ShortsShadow: 'black',
-    Shorts: 'charcoal',
-    SocksShadow: 'black',
-    Socks: 'charcoal',
+    ShortsShadow: 'charcoal',
+    Shorts: 'slate',
+    SocksShadow: 'charcoal',
+    Socks: 'slate',
   },
 };
 

@@ -1,7 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import { ART_LEGEND, C, MASTER, resolvePalette, toRGBA, type LookColors, type Slot } from './colors';
 import { IndexedImage } from './indexedImage';
-import { KITS, KIT_SLOT_NAMES } from './kits';
+import { KITS, KIT_SLOT_NAMES, VOLT_BOOTS } from './kits';
+
+/** RGB distance below which a kit colour blurs into the outline at game scale. */
+const MIN_OUTLINE_CONTRAST = 40;
 
 const fullLook = (): LookColors => {
   const slots = Object.keys(C).filter(k => k !== 'None') as Slot[];
@@ -40,6 +43,15 @@ describe('MASTER', () => {
 describe('KITS', () => {
   it('both kits define every kit slot', () => {
     for (const kit of Object.values(KITS)) expect(Object.keys(kit).sort()).toEqual([...KIT_SLOT_NAMES].sort());
+  });
+
+  it('keeps every kit and boot colour clearly apart from the outline', () => {
+    const rgb = (hex: string) => [1, 3, 5].map(i => parseInt(hex.slice(i, i + 2), 16));
+    const outline = rgb(MASTER.outline);
+    for (const colour of [...Object.values(KITS).flatMap(k => Object.values(k)), ...Object.values(VOLT_BOOTS)]) {
+      const distance = Math.hypot(...rgb(MASTER[colour]).map((v, i) => v - outline[i]!));
+      expect(distance, colour).toBeGreaterThanOrEqual(MIN_OUTLINE_CONTRAST);
+    }
   });
 });
 
