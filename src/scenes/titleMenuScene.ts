@@ -3,7 +3,7 @@ import { drawBackdrop, drawTitle } from './backdrop';
 import type { GameContext } from './context';
 import { createHelpScene } from './helpScene';
 import { createMatchScene } from './matchScene';
-import { drawMenu, stepMenu, type MenuState } from './menu';
+import { drawMenu, menuCue, stepMenu, type MenuState } from './menu';
 import { createOptionsScene } from './optionsScene';
 import type { Scene } from './scene';
 import { createPressStartScene } from './titleScene';
@@ -23,9 +23,11 @@ export function createTitleMenuScene(ctx: GameContext, index = 0): Scene {
     update(input) {
       // Start confirms here, as on Press Start; Esc (pause plus back) backs out.
       const r = stepMenu(menu, input);
+      const chosen = r.back ? null : (r.chosen ?? (input.pressed.has('pause') ? r.m.items[r.m.index]! : null));
+      const cue = menuCue(menu, { ...r, chosen });
+      if (cue) ctx.audio.play(cue);
       menu = r.m;
       if (r.back) return createPressStartScene(ctx);
-      const chosen = r.chosen ?? (input.pressed.has('pause') ? menu.items[menu.index]! : null);
       if (chosen === 'START GAME') return createMatchScene(ctx, newSeed());
       if (chosen === 'HELP') return createHelpScene(ctx, () => createTitleMenuScene(ctx, menu.index));
       if (chosen === 'OPTIONS') return createOptionsScene(ctx, () => createTitleMenuScene(ctx, menu.index));

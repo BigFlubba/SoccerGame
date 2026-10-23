@@ -51,12 +51,18 @@ export function createOptionsScene(ctx: GameContext, back: () => Scene): Scene {
   return {
     kind: 'options',
     update(input) {
-      if (backsOut(input)) return back();
+      if (backsOut(input)) {
+        ctx.audio.play('menuBack');
+        return back();
+      }
       const n = OPTION_ROWS.length;
+      const before = row;
       if (input.pressed.has('up')) row = (row - 1 + n) % n;
       if (input.pressed.has('down')) row = (row + 1) % n;
       const step = input.pressed.has('right') ? 1 : input.pressed.has('left') ? -1 : 0;
+      // Saved first, so an SFX change blips at its new level.
       if (step !== 0) ctx.save(changeOption(ctx.settings, OPTION_ROWS[row]!, step));
+      if (step !== 0 || row !== before) ctx.audio.play('menuMove');
       return null;
     },
     draw(g, nowS) {

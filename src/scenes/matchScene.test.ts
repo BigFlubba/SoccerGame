@@ -191,4 +191,45 @@ describe('match scene: pause menu screens', () => {
   it('quit to title opens the Press Start screen', () => {
     expect(pick(live(), 'QUIT TO TITLE')?.kind).toBe('pressStart');
   });
+
+  describe('sound', () => {
+    function withAudio() {
+      const audio = recordingAudio();
+      const s = createMatchScene({ ...CTX, audio }, 1);
+      s.world.match.phase = 'playing';
+      return { s, audio };
+    }
+
+    it('a home goal plays net and roar', () => {
+      const { s, audio } = withAudio();
+      Object.assign(s.world.ball, { x: 616, y: 3, z: 32, vx: 100, vy: 0, vz: 0 });
+      s.update(frame(), STEP);
+      expect(s.world.events.goal).toBe('home');
+      expect(audio.played).toEqual(expect.arrayContaining(['net', 'roar']));
+    });
+
+    it('the crowd is at match level in play and low while paused', () => {
+      const { s, audio } = withAudio();
+      expect(audio.crowd).toBe('match');
+      s.update(frame(['pause']), STEP);
+      expect(audio.crowd).toBe('low');
+      s.update(frame(['confirm']), STEP);
+      expect(audio.crowd).toBe('match');
+    });
+
+    it('quit to title turns the crowd off', () => {
+      const { s, audio } = withAudio();
+      s.update(frame(['pause']), STEP);
+      s.update(frame(['up']), STEP);
+      expect(s.update(frame(['confirm']), STEP)?.kind).toBe('pressStart');
+      expect(audio.crowd).toBe('off');
+    });
+
+    it('the pause menu blips', () => {
+      const { s, audio } = withAudio();
+      s.update(frame(['pause']), STEP);
+      s.update(frame(['down']), STEP);
+      expect(audio.played).toContain('menuMove');
+    });
+  });
 });

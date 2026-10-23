@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { stepMenu } from './menu';
+import { menuCue, stepMenu } from './menu';
 import { frame } from './testInput';
 
 const menu = { items: ['RESUME', 'RESTART', 'QUIT'], index: 0 } as const;
@@ -20,5 +20,13 @@ describe('stepMenu', () => {
   it('reports back', () => {
     const r = stepMenu(menu, frame(['back']));
     expect([r.back, r.chosen]).toEqual([true, null]);
+  });
+
+  it('menuCue: a move blips, a choice confirms, back backs, and nothing else sounds', () => {
+    const at = (index: number) => ({ items: menu.items, index });
+    expect(menuCue(menu, { m: at(1), chosen: null, back: false })).toBe('menuMove');
+    expect(menuCue(menu, { m: at(0), chosen: 'RESUME', back: false })).toBe('menuConfirm');
+    expect(menuCue(menu, { m: at(0), chosen: null, back: true })).toBe('menuBack');
+    expect(menuCue(menu, { m: at(0), chosen: null, back: false })).toBeNull();
   });
 });

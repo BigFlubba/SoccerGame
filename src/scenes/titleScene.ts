@@ -23,8 +23,9 @@ export function createPressStartScene(ctx: GameContext): PressStartScene {
       return ctx.audio.available && !ctx.audio.unlocked;
     },
     update(input) {
-      if (input.pressed.has('confirm') || input.pressed.has('pause')) return createTitleMenuScene(ctx);
-      return null;
+      if (!input.pressed.has('confirm') && !input.pressed.has('pause')) return null;
+      ctx.audio.play('menuConfirm');
+      return createTitleMenuScene(ctx);
     },
     draw(g, nowS) {
       drawBackdrop(g, ctx.art, nowS);

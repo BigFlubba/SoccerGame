@@ -1,4 +1,5 @@
 import { MASTER } from '../art/colors';
+import type { Cue } from '../audio/cues';
 import type { InputFrame } from '../engine/input';
 import type { GameArt } from './art';
 
@@ -15,6 +16,13 @@ export function stepMenu(m: MenuState, input: InputFrame): { m: MenuState; chose
   if (input.pressed.has('down')) index = (index + 1) % n;
   const chosen = input.pressed.has('confirm') ? m.items[index]! : null;
   return { m: { items: m.items, index }, chosen, back: input.pressed.has('back') };
+}
+
+/** The blip a menu step makes, if any. */
+export function menuCue(before: MenuState, r: { m: MenuState; chosen: string | null; back: boolean }): Cue | null {
+  if (r.back) return 'menuBack';
+  if (r.chosen) return 'menuConfirm';
+  return r.m.index !== before.index ? 'menuMove' : null;
 }
 
 /** B, Backspace, Esc or Start backs out of a screen; Enter (pause plus confirm) does not. */

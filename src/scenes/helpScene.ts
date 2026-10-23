@@ -78,10 +78,15 @@ export function createHelpScene(ctx: GameContext, back: () => Scene): HelpScene 
       return page;
     },
     update(input) {
-      if (backsOut(input)) return back();
+      if (backsOut(input)) {
+        ctx.audio.play('menuBack');
+        return back();
+      }
       const n = HELP_PAGES.length;
+      const before = page;
       if (input.pressed.has('right')) page = (page + 1) % n;
       if (input.pressed.has('left')) page = (page - 1 + n) % n;
+      if (page !== before) ctx.audio.play('menuMove');
       return null;
     },
     draw(g, nowS) {

@@ -1,3 +1,4 @@
+import { matchFeedback } from '../audio/matchFeedback';
 import { MASTER } from '../art/colors';
 import type { InputFrame } from '../engine/input';
 import { BASE_W } from '../engine/viewport';
@@ -8,7 +9,7 @@ import { cancelCharge, type PlayerIntent } from '../game/player';
 import { BASE_STATS } from '../game/stats';
 import { createWorld, stepWorld, type World } from '../game/world';
 import type { GameContext } from './context';
-import { drawMenu, stepMenu, type MenuState } from './menu';
+import { drawMenu, menuCue, stepMenu, type MenuState } from './menu';
 import { drawMatch, type MatchHud } from './matchView';
 import type { Scene } from './scene';
 import { createHelpScene } from './helpScene';
@@ -58,11 +59,20 @@ export function createMatchScene(ctx: GameContext, seed: number): MatchScene {
   let pause: MenuState | null = null;
   let fullTime: MenuState | null = null;
   let t = 0;
+  ctx.audio.setCrowd('match');
 
+  /** Steps a menu, blipping as it goes. */
+  const step = (m: MenuState, input: InputFrame) => {
+    const r = stepMenu(m, input);
+    const cue = menuCue(m, r);
+    if (cue) ctx.audio.play(cue);
+    return r;
+  };
   const openPause = () => {
     pause = { items: PAUSE_ITEMS, index: 0 };
     // A held charge is dropped, not fired, so pausing can't shoot.
     cancelCharge(world.home);
+    ctx.audio.setCrowd('low');
   };
   const restart = () => createMatchScene(ctx, seed + 1);
   /** Help and Options come back to this match, still paused, with any new difficulty applied to Max. */
@@ -87,7 +97,7 @@ export function createMatchScene(ctx: GameContext, seed: number): MatchScene {
     },
     update(input, dt) {
       if (pause) {
-        const r = stepMenu(pause, input);
+        const r = step(pause, input);
         pause = r.m;
         if (r.chosen === 'RESTART') return restart();
         if (r.chosen === 'HELP') return createHelpScene(ctx, backHere);
@@ -95,13 +105,14 @@ export function createMatchScene(ctx: GameContext, seed: number): MatchScene {
         if (r.chosen === 'QUIT TO TITLE') return createPressStartScene(ctx);
         if (r.chosen === 'RESUME' || r.back || (!r.chosen && input.pressed.has('pause'))) {
           pause = null;
+          ctx.audio.setCrowd('match');
           // Buttons held while the menu closes (B is also "back") need a fresh press to act in play.
           world.home.held = { shoot: input.held.has('shoot'), chip: input.held.has('chip') };
         }
         return null;
       }
       if (fullTime) {
-        const r = stepMenu(fullTime, input);
+        const r = step(fullTime, input);
         fullTime = r.m;
         if (r.chosen === 'PLAY AGAIN') return restart();
         if (r.chosen === 'TITLE') return createPressStartScene(ctx);
@@ -111,7 +122,9 @@ export function createMatchScene(ctx: GameContext, seed: number): MatchScene {
       }
 
       t += dt;
+      const prevPhase = world.match.phase;
       stepWorld(world, harrisonIntent(input), think(brain, world, world.away, world.home, dt), dt);
+      for (const cue of matchFeedback(world, prevPhase).cues) ctx.audio.play(cue);
       world.events.kicks.forEach((k, i) => {
         if (k.perfect) hud.perfect = { team: i === 0 ? 'home' : 'away', untilS: t + PERFECT_SHOW_S };
       });
