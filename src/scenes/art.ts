@@ -9,7 +9,7 @@ import { renderText, textPalette } from '../art/font';
 import { buttonGlyph, type ButtonName } from '../art/glyphs';
 import { HARRISON_HEADS } from '../art/harrison/head';
 import { harrisonLook } from '../art/harrison/look';
-import { harrisonPortrait } from '../art/harrison/portrait';
+import { harrisonPortrait, type Expression } from '../art/harrison/portrait';
 import { MAX_HEADS, maxLook } from '../art/opponents/max';
 import { backyardLayers, goalSprites, type GoalArt, type VenueLayers } from '../art/venues/backyard';
 import { toCanvas } from '../engine/bitmaps';
@@ -37,7 +37,8 @@ export interface GameArt {
   buttons: Record<ButtonName, HTMLCanvasElement>;
   home: SpriteSet;
   away: SpriteSet;
-  portrait: HTMLCanvasElement;
+  /** Harrison's portrait in each expression, in the home kit. */
+  portraits: Record<Expression, HTMLCanvasElement>;
   /** Outlined text, cached per string, scale and colours. */
   text(s: string, scale: number, ink: MasterColor, outline: MasterColor): HTMLCanvasElement;
 }
@@ -59,6 +60,7 @@ function goalCanvases(g: GoalArt, palette: ResolvedPalette): GoalCanvases {
 }
 
 const BUTTONS: readonly ButtonName[] = ['A', 'B', 'X', 'RT', 'START'];
+const EXPRESSIONS: readonly Expression[] = ['neutral', 'celebrate', 'determined', 'disappointed'];
 
 /** Bakes and resolves every image the match needs, once, at boot. */
 export function loadGameArt(): GameArt {
@@ -73,7 +75,7 @@ export function loadGameArt(): GameArt {
     buttons: Object.fromEntries(BUTTONS.map(b => [b, toCanvas(buttonGlyph(b), master)])) as Record<ButtonName, HTMLCanvasElement>,
     home: spriteSet(cache, 'harrison', HARRISON_HEADS, harrisonLook('home')),
     away: spriteSet(cache, 'max', MAX_HEADS, maxLook()),
-    portrait: toCanvas(harrisonPortrait('neutral'), resolvePalette(harrisonLook('home'))),
+    portraits: Object.fromEntries(EXPRESSIONS.map(e => [e, toCanvas(harrisonPortrait(e), resolvePalette(harrisonLook('home')))])) as Record<Expression, HTMLCanvasElement>,
     text(s, scale, ink, outline) {
       const key = `${s}|${scale}|${ink}|${outline}`;
       let c = texts.get(key);

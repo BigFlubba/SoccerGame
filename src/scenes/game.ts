@@ -4,6 +4,8 @@ import { createInput, type InputFrame } from '../engine/input';
 import { createStepper, startLoop } from '../engine/loop';
 import { createRumble } from '../engine/rumble';
 import { createScreen } from '../engine/screen';
+import { loadProfile, saveProfile as storeProfile } from '../meta/profile';
+import { localDate } from '../meta/progress';
 import { loadSettings, saveSettings } from '../meta/settings';
 import type { KeyValueStore } from '../meta/storage';
 import { loadGameArt } from './art';
@@ -44,6 +46,12 @@ export function startGame(canvas: HTMLCanvasElement): void {
       audio.setVolumes(s.musicVolume, s.sfxVolume);
       rumble.enabled = s.rumble;
     },
+    profile: loadProfile(store),
+    saveProfile(p) {
+      ctx.profile = p;
+      storeProfile(store, p);
+    },
+    today: () => localDate(new Date()),
     audio,
     rumble,
   };
@@ -68,8 +76,8 @@ export function startGame(canvas: HTMLCanvasElement): void {
     scene = scene.update(frame, dt) ?? scene;
   });
 
-  // Dev server only (stripped from builds): lets a playtester inspect and stage the current scene.
-  if (import.meta.env.DEV) Object.assign(window, { __soccer: { scene: () => scene } });
+  // Dev server only (stripped from builds): lets a playtester inspect and stage the current scene and the profile.
+  if (import.meta.env.DEV) Object.assign(window, { __soccer: { scene: () => scene, ctx } });
 
   // Losing the window or the controller pauses the match (and drops a held charge) before play can go on without him.
   document.addEventListener('visibilitychange', () => {

@@ -1,22 +1,19 @@
 import { describe, expect, it } from 'vitest';
 import { recordingAudio } from '../audio/testAudio';
 import { recordingRumble } from '../engine/testRumble';
-import type { GameArt } from './art';
 import type { GameContext } from './context';
 import { DIFFICULTY } from '../game/ai';
 import { GOAL_PAUSE_S } from '../game/match';
-import { DEFAULT_SETTINGS, type Settings } from '../meta/settings';
+import { DEFAULT_SETTINGS } from '../meta/settings';
 import { PAUSE_ITEMS, createMatchScene, type MatchScene } from './matchScene';
 import type { Scene } from './scene';
+import { testContext } from './testContext';
 import { frame } from './testInput';
 
 const STEP = 1 / 60;
-/** update() never touches the art, so tests can run without a DOM. */
-const NO_ART = {} as GameArt;
-const CTX: GameContext = { art: NO_ART, settings: { ...DEFAULT_SETTINGS }, save: () => {}, audio: recordingAudio(), rumble: recordingRumble() };
 
 function live(): MatchScene {
-  const s = createMatchScene(CTX, 1);
+  const s = createMatchScene(testContext(), 1);
   s.world.match.phase = 'playing';
   return s;
 }
@@ -158,8 +155,7 @@ describe('match scene: pause menu screens', () => {
   });
 
   it('a difficulty change from pause applies to the current match', () => {
-    const settings: Settings = { ...DEFAULT_SETTINGS };
-    const ctx: GameContext = { art: NO_ART, settings, save: next => void (ctx.settings = next), audio: recordingAudio(), rumble: recordingRumble() };
+    const ctx = testContext();
     const s = liveWith(ctx);
     const options = pick(s, 'OPTIONS')!;
     options.update(frame(['right']), STEP);
@@ -197,7 +193,7 @@ describe('match scene: pause menu screens', () => {
   describe('sound', () => {
     function withAudio() {
       const audio = recordingAudio();
-      const s = createMatchScene({ ...CTX, audio }, 1);
+      const s = createMatchScene(testContext({ audio }), 1);
       s.world.match.phase = 'playing';
       return { s, audio };
     }
@@ -229,7 +225,7 @@ describe('match scene: pause menu screens', () => {
 
     it("a home goal rumbles goal; RUMBLE OFF is respected by the Rumble, not the scene", () => {
       const rumble = recordingRumble();
-      const s = createMatchScene({ ...CTX, settings: { ...DEFAULT_SETTINGS, rumble: false }, rumble }, 1);
+      const s = createMatchScene(testContext({ settings: { ...DEFAULT_SETTINGS, rumble: false }, rumble }), 1);
       s.world.match.phase = 'playing';
       Object.assign(s.world.ball, { x: 616, y: 3, z: 32, vx: 100, vy: 0, vz: 0 });
       s.update(frame(), STEP);
@@ -248,7 +244,7 @@ describe('match scene: pause menu screens', () => {
     function scored(team: 'home' | 'away' = 'home') {
       const audio = recordingAudio();
       const rumble = recordingRumble();
-      const s = createMatchScene({ ...CTX, audio, rumble }, 1);
+      const s = createMatchScene(testContext({ audio, rumble }), 1);
       s.world.match.phase = 'playing';
       Object.assign(s.world.ball, team === 'home' ? { x: 616, y: 3, z: 32, vx: 100 } : { x: 24, y: 3, z: 32, vx: -100 });
       s.update(frame(), STEP);
@@ -292,7 +288,7 @@ describe('match scene: pause menu screens', () => {
 
     it('a golden goal by Harrison runs the moment, then full time', () => {
       const audio = recordingAudio();
-      const s = createMatchScene({ ...CTX, audio, rumble: recordingRumble() }, 1);
+      const s = createMatchScene(testContext({ audio, rumble: recordingRumble() }), 1);
       Object.assign(s.world.match, { phase: 'playing', goldenGoal: true, clockS: 90 });
       Object.assign(s.world.ball, { x: 616, y: 3, z: 32, vx: 100 });
       s.update(frame(), STEP);
@@ -356,7 +352,7 @@ describe('match scene: pause menu screens', () => {
 
     it("Harrison's header shows HEADER! with the moment, and it clears after", () => {
       const audio = recordingAudio();
-      const s = createMatchScene({ ...CTX, audio, rumble: recordingRumble() }, 1);
+      const s = createMatchScene(testContext({ audio, rumble: recordingRumble() }), 1);
       s.world.match.phase = 'playing';
       Object.assign(s.world.away, { x: 300 });
       Object.assign(s.world.home, { x: 540, z: 32, y: 10, state: 'air', vy: 0, facing: 1, kick: null });
@@ -372,7 +368,7 @@ describe('match scene: pause menu screens', () => {
     it('a third goal is a HAT-TRICK! with an extra roar', () => {
       const { s, audio } = (() => {
         const audio = recordingAudio();
-        const s = createMatchScene({ ...CTX, audio, rumble: recordingRumble() }, 1);
+        const s = createMatchScene(testContext({ audio, rumble: recordingRumble() }), 1);
         Object.assign(s.world.match, { phase: 'playing', score: { home: 2, away: 0 } });
         Object.assign(s.world.ball, { x: 616, y: 3, z: 32, vx: 100 });
         s.update(frame(), STEP);
@@ -384,7 +380,7 @@ describe('match scene: pause menu screens', () => {
     });
 
     it('a hard shot leaves a trail, and a still ball none', () => {
-      const s = createMatchScene({ ...CTX, audio: recordingAudio(), rumble: recordingRumble() }, 1);
+      const s = createMatchScene(testContext({ audio: recordingAudio(), rumble: recordingRumble() }), 1);
       s.world.match.phase = 'playing';
       Object.assign(s.world.away, { x: 100 });
       Object.assign(s.world.ball, { x: 200, y: 20, z: 32, vx: 600, vy: 0, vz: 0 });
@@ -414,7 +410,7 @@ describe('match scene: pause menu screens', () => {
     it('the match stops the title music, and the result plays its jingle', () => {
       const audio = recordingAudio();
       audio.music = 'title';
-      const s = createMatchScene({ ...CTX, audio }, 1);
+      const s = createMatchScene(testContext({ audio }), 1);
       expect(audio.music).toBeNull();
       Object.assign(s.world.match, { phase: 'playing', clockS: 89.99, score: { home: 2, away: 1 } });
       run(s, 0.1);
@@ -429,7 +425,7 @@ describe('match scene: pause menu screens', () => {
         [{ home: 1, away: 1 }, 'draw'],
       ] as const) {
         const audio = recordingAudio();
-        const s = createMatchScene({ ...CTX, audio }, 1);
+        const s = createMatchScene(testContext({ audio }), 1);
         Object.assign(s.world.match, { phase: 'playing', goldenGoal: true, goldenS: 200, score: { ...score } });
         run(s, 2.2);
         expect(audio.music, track).toBe(track);

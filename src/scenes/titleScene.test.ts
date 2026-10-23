@@ -1,13 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import { recordingAudio } from '../audio/testAudio';
-import { recordingRumble } from '../engine/testRumble';
-import { DEFAULT_SETTINGS } from '../meta/settings';
-import type { GameArt } from './art';
-import type { GameContext } from './context';
+import { testContext } from './testContext';
 import { frame } from './testInput';
 import { createPressStartScene } from './titleScene';
 
-const context = (audio = recordingAudio()): GameContext => ({ art: {} as GameArt, settings: { ...DEFAULT_SETTINGS }, save: () => {}, audio, rumble: recordingRumble() });
+const context = (audio = recordingAudio()) => testContext({ audio });
 
 describe('press start sound hint', () => {
   it('shows the sound hint while audio is available but locked', () => {

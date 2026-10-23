@@ -1,32 +1,15 @@
 import { describe, expect, it } from 'vitest';
-import { recordingAudio } from '../audio/testAudio';
-import { recordingRumble } from '../engine/testRumble';
 import { glyph } from '../art/font';
-import { DEFAULT_SETTINGS, type Settings } from '../meta/settings';
-import type { GameArt } from './art';
-import type { GameContext } from './context';
+import { DEFAULT_SETTINGS } from '../meta/settings';
 import { OPTION_ROWS, changeOption, createOptionsScene, optionRow } from './optionsScene';
 import type { Scene } from './scene';
+import { testContext } from './testContext';
 import { frame } from './testInput';
 
 const STEP = 1 / 60;
 const BEHIND: Scene = { kind: 'titleMenu', update: () => null, draw: () => {} };
 
-function context(): GameContext & { saved: Settings[] } {
-  const saved: Settings[] = [];
-  const ctx: GameContext & { saved: Settings[] } = {
-    art: {} as GameArt,
-    settings: { ...DEFAULT_SETTINGS },
-    saved,
-    audio: recordingAudio(),
-    rumble: recordingRumble(),
-    save(s) {
-      saved.push(s);
-      ctx.settings = s;
-    },
-  };
-  return ctx;
-}
+const context = () => testContext();
 
 describe('options', () => {
   it('changes and saves difficulty', () => {
@@ -35,11 +18,11 @@ describe('options', () => {
     expect(s.kind).toBe('options');
     s.update(frame(['right']), STEP);
     expect(ctx.settings.difficulty).toBe('hard');
-    expect(ctx.saved.at(-1)).toEqual({ ...DEFAULT_SETTINGS, difficulty: 'hard' });
+    expect(ctx.savedSettings.at(-1)).toEqual({ ...DEFAULT_SETTINGS, difficulty: 'hard' });
     s.update(frame(['right']), STEP);
     expect(ctx.settings.difficulty).toBe('easy');
     s.update(frame(['left']), STEP);
-    expect(ctx.saved.map(x => x.difficulty)).toEqual(['hard', 'easy', 'hard']);
+    expect(ctx.savedSettings.map(x => x.difficulty)).toEqual(['hard', 'easy', 'hard']);
   });
 
   it('B goes back and keeps the change', () => {
@@ -113,17 +96,17 @@ describe('options', () => {
     s.update(frame(['up']), STEP);
     s.update(frame(['right']), STEP);
     expect(ctx.settings.rumble).toBe(true);
-    expect((ctx.rumble as ReturnType<typeof recordingRumble>).pulses).toEqual(['tap']);
+    expect(ctx.rumble.pulses).toEqual(['tap']);
     s.update(frame(['right']), STEP);
-    expect((ctx.rumble as ReturnType<typeof recordingRumble>).pulses).toEqual(['tap']);
+    expect(ctx.rumble.pulses).toEqual(['tap']);
   });
 
   it('every change saves once, with the new settings', () => {
     const ctx = context();
     const s = createOptionsScene(ctx, () => BEHIND);
     s.update(frame(['down']), STEP);
-    expect(ctx.saved).toHaveLength(0);
+    expect(ctx.savedSettings).toHaveLength(0);
     s.update(frame(['right']), STEP);
-    expect(ctx.saved).toEqual([{ ...DEFAULT_SETTINGS, musicVolume: 7 }]);
+    expect(ctx.savedSettings).toEqual([{ ...DEFAULT_SETTINGS, musicVolume: 7 }]);
   });
 });

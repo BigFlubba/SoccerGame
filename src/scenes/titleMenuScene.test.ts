@@ -1,21 +1,15 @@
 import { describe, expect, it } from 'vitest';
-import { recordingAudio } from '../audio/testAudio';
-import { recordingRumble } from '../engine/testRumble';
 import { DIFFICULTY } from '../game/ai';
 import { DEFAULT_SETTINGS, type Settings } from '../meta/settings';
-import type { GameArt } from './art';
-import type { GameContext } from './context';
 import type { MatchScene } from './matchScene';
+import { testContext } from './testContext';
 import { frame } from './testInput';
 import { TITLE_MENU_ITEMS, createTitleMenuScene } from './titleMenuScene';
 import { createPressStartScene } from './titleScene';
 
 const STEP = 1 / 60;
-/** update() never touches the art, so tests can run without a DOM. */
-const NO_ART = {} as GameArt;
-
-function context(difficulty: Settings['difficulty'] = 'normal'): GameContext {
-  return { art: NO_ART, settings: { ...DEFAULT_SETTINGS, difficulty }, save: () => {}, audio: recordingAudio(), rumble: recordingRumble() };
+function context(difficulty: Settings['difficulty'] = 'normal') {
+  return testContext({ settings: { ...DEFAULT_SETTINGS, difficulty } });
 }
 
 describe('press start screen', () => {
@@ -95,7 +89,7 @@ describe('title menu', () => {
     for (const make of [createPressStartScene, createTitleMenuScene]) {
       const ctx = context();
       make(ctx);
-      expect((ctx.audio as ReturnType<typeof recordingAudio>).music).toBe('title');
+      expect(ctx.audio.music).toBe('title');
     }
   });
 });
