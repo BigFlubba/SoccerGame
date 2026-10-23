@@ -16,7 +16,7 @@ export interface PlayerIntent {
 
 export const NO_INTENT: Readonly<PlayerIntent> = Object.freeze({
   moveX: 0,
-  aim: 'level',
+  aim: 'straight',
   jump: false,
   shootHeld: false,
   chipHeld: false,
@@ -107,7 +107,7 @@ export function createPlayer(team: 'home' | 'away', stats: Stats, x: number, fac
     exhausted: false,
     kick: null,
     anim: { name: 'idle', frame: 0 },
-    aim: 'level',
+    aim: 'straight',
     held: { shoot: false, chip: false },
     slideCooldown: 0,
     touchCooldown: 0,
@@ -161,7 +161,7 @@ function strike(p: Player, timing: { activeS: number; doneS: number }): void {
 function startSlide(p: Player): void {
   enter(p, 'sliding');
   p.slideCooldown = SLIDE_COOLDOWN;
-  p.kick = { kind: 'slide', charge: 0, overchargeS: 0, aim: 'level', active: true };
+  p.kick = { kind: 'slide', charge: 0, overchargeS: 0, aim: 'straight', active: true };
 }
 
 /** Knocked over: no control for FALL_TIME, and any charge or kick is cancelled. */

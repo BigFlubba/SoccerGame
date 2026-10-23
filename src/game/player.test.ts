@@ -101,9 +101,9 @@ describe('stepPlayer: shooting', () => {
     tick(p, { shootHeld: true }, ticks(0.5));
     expect(p.state).toBe('charging');
     expect(p.charge).toBeCloseTo(0.5 / chargeTime(BASE_STATS), 1);
-    tick(p, { aim: 'up' });
+    tick(p, { aim: 'far' });
     expect(p.state).toBe('kicking');
-    expect(p.kick).toMatchObject({ kind: 'shot', aim: 'up' });
+    expect(p.kick).toMatchObject({ kind: 'shot', aim: 'far' });
   });
 
   it('a quick tap uses the tap charge', () => {

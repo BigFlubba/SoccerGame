@@ -3,13 +3,13 @@ import { seeded } from '../engine/random';
 import { BALL_REST_Y, stepBall, type Ball } from './ball';
 import { resolveContacts } from './contact';
 import { BACKYARD, type Field } from './field';
-import { header, shot } from './kick';
+import { aimLine, header, shot } from './kick';
 import { NO_INTENT, createPlayer, stepPlayer, type Kick, type Player } from './player';
 import { BASE_STATS, touchPush } from './stats';
 
 const STEP = 1 / 60;
 const ball = (p: Partial<Ball>): Ball => ({ x: 320, y: BALL_REST_Y, z: BACKYARD.depth / 2, vx: 0, vy: 0, vz: 0, spin: 0, spinAngle: 0, ...p });
-const kick = (k: Partial<Kick>): Kick => ({ kind: 'shot', charge: 0.6, overchargeS: 0, aim: 'level', active: true, ...k });
+const kick = (k: Partial<Kick>): Kick => ({ kind: 'shot', charge: 0.6, overchargeS: 0, aim: 'straight', active: true, ...k });
 
 function setup(x = 300): { p: Player; opp: Player } {
   return { p: createPlayer('home', BASE_STATS, x, 1), opp: createPlayer('away', BASE_STATS, 500, -1) };
@@ -24,7 +24,7 @@ describe('resolveContacts: kicks', () => {
     p.kick = kick({});
     const b = ball({ x: 308 });
     const ev = contact(p, opp, b);
-    const expected = shot(BASE_STATS, 0.6, 0, 'level', 1, 4, seeded(5));
+    const expected = shot(BASE_STATS, 0.6, 0, { facing: 1, slope: 0 }, 4, seeded(5));
     expect(b.vx).toBe(expected.vx);
     expect(b.vy).toBe(expected.vy);
     expect(ev.kicked).toBe('shot');
@@ -126,12 +126,12 @@ describe('resolveContacts: headers and tackles', () => {
     const { p, opp } = setup();
     p.state = 'air';
     p.y = 10;
-    p.aim = 'up';
+    p.aim = 'far';
     const b = ball({ x: 303, y: 47, vx: -50, vy: -100 });
     const ev = contact(p, opp, b);
     expect(ev.kicked).toBe('header');
     expect(b.vy).toBeGreaterThan(0);
-    expect(b.vx).toBeCloseTo(header(BASE_STATS, 'up', 1, Math.hypot(50, 100)).vx);
+    expect(b.vx).toBeCloseTo(header(BASE_STATS, aimLine(b, 1, 'far', BACKYARD), Math.hypot(50, 100)).vx);
     expect(p.kick?.kind).toBe('header');
   });
 

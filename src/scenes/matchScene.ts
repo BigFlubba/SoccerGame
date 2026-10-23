@@ -29,7 +29,7 @@ const RESULT_TEXT = { win: 'YOU WIN!', lose: 'YOU LOSE', draw: 'DRAW' } as const
 
 /** Harrison's intent from the controller: the stick moves and aims, buttons act. */
 function harrisonIntent(input: InputFrame): PlayerIntent {
-  const aim: Aim = input.moveY < -AIM_THRESHOLD ? 'up' : input.moveY > AIM_THRESHOLD ? 'down' : 'level';
+  const aim: Aim = input.moveY < -AIM_THRESHOLD ? 'far' : input.moveY > AIM_THRESHOLD ? 'near' : 'straight';
   return {
     moveX: input.moveX,
     aim,

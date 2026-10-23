@@ -2,7 +2,7 @@ import { BALL_R } from '../art/ball';
 import type { Rng } from '../engine/random';
 import { BALL_REST_Y, type Ball } from './ball';
 import { roofSpan, type Field } from './field';
-import { chip, header, shot, volley } from './kick';
+import { aimLine, chip, header, shot, volley } from './kick';
 import { PLAYER_W, knockDown, type Player } from './player';
 import { touchPush } from './stats';
 import { ballIn, bodyBox, footZone, headZone, slideZone, touchZone } from './zones';
@@ -31,9 +31,10 @@ const SQUEEZE_SQUIRT_VX = 60;
 /** How close counts as touching a wall. */
 const TOUCH_EPS = 0.5;
 
-function hit(ball: Ball, k: { vx: number; vy: number; spin: number }): void {
+function hit(ball: Ball, k: { vx: number; vy: number; vz: number; spin: number }): void {
   ball.vx = k.vx;
   ball.vy = k.vy;
+  ball.vz = k.vz;
   ball.spin = k.spin;
 }
 
@@ -42,7 +43,7 @@ function slide(p: Player, opponent: Player, ball: Ball, ev: ContactEvents): void
   if (p.state !== 'sliding' || !p.kick?.active) return;
   const reach = slideZone(p);
   if (ballIn(reach, ball, BALL_R)) {
-    hit(ball, { vx: p.facing * SLIDE_BALL_VX, vy: SLIDE_BALL_VY, spin: 0 });
+    hit(ball, { vx: p.facing * SLIDE_BALL_VX, vy: SLIDE_BALL_VY, vz: 0, spin: 0 });
     p.kick.active = false;
     ev.tackledBall = true;
     return;
@@ -57,17 +58,18 @@ function slide(p: Player, opponent: Player, ball: Ball, ev: ContactEvents): void
 }
 
 /** Shots, chips and volleys: the swing connects once if the ball is in reach of his foot. */
-function strike(p: Player, ball: Ball, aimErrorDeg: number, rng: Rng, ev: ContactEvents): void {
+function strike(p: Player, ball: Ball, aimErrorDeg: number, rng: Rng, field: Field, ev: ContactEvents): void {
   const k = p.kick;
   if (!k?.active || !ballIn(footZone(p), ball, BALL_R)) return;
+  const line = aimLine(ball, p.facing, k.aim, field);
   if (k.kind === 'shot' && p.state === 'kicking') {
-    const result = shot(p.stats, k.charge, k.overchargeS, k.aim, p.facing, aimErrorDeg, rng);
+    const result = shot(p.stats, k.charge, k.overchargeS, line, aimErrorDeg, rng);
     hit(ball, result);
     ev.perfect = result.perfect;
   } else if (k.kind === 'chip' && p.state === 'chipping') {
-    hit(ball, chip(p.stats, k.charge, p.facing));
+    hit(ball, chip(p.stats, k.charge, line));
   } else if (k.kind === 'volley' && p.state === 'air') {
-    hit(ball, volley(p.stats, k.aim, p.facing));
+    hit(ball, volley(p.stats, line));
   } else {
     return;
   }
@@ -76,12 +78,12 @@ function strike(p: Player, ball: Ball, aimErrorDeg: number, rng: Rng, ev: Contac
 }
 
 /** A ball meeting his head mid-jump is a header, aimed by the stick. Once per jump. */
-function headBall(p: Player, ball: Ball, ev: ContactEvents): void {
+function headBall(p: Player, ball: Ball, field: Field, ev: ContactEvents): void {
   if (p.state !== 'air' || p.kick || !ballIn(headZone(p), ball, BALL_R)) return;
   const speed = Math.hypot(ball.vx, ball.vy);
   const comingAtHim = ball.vx * p.facing < 0;
   if (!comingAtHim && speed >= HEADER_MAX_AWAY_SPEED) return;
-  hit(ball, header(p.stats, p.aim, p.facing, speed));
+  hit(ball, header(p.stats, aimLine(ball, p.facing, p.aim, field), speed));
   p.kick = { kind: 'header', charge: 0, overchargeS: 0, aim: p.aim, active: false };
   p.stateT = 0;
   ev.kicked = 'header';
@@ -150,8 +152,8 @@ function squirt(p: Player, opponent: Player, ball: Ball, rng: Rng): void {
 export function resolveContacts(p: Player, opponent: Player, ball: Ball, aimErrorDeg: number, rng: Rng, field: Field): ContactEvents {
   const ev: ContactEvents = { touched: false, kicked: null, perfect: false, tackledBall: false, trippedOpponent: false };
   slide(p, opponent, ball, ev);
-  strike(p, ball, aimErrorDeg, rng, ev);
-  if (!ev.kicked) headBall(p, ball, ev);
+  strike(p, ball, aimErrorDeg, rng, field, ev);
+  if (!ev.kicked) headBall(p, ball, field, ev);
   if (ev.kicked || ev.tackledBall || onRoof(ball, field)) return ev;
   if (!squeezed(p, opponent, ball)) {
     dribble(p, ball, ev);

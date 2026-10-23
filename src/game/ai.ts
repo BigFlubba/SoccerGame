@@ -87,7 +87,7 @@ function decide(brain: AiBrain, w: World, me: Player, them: Player): void {
     const charging = brain.plan === 'charge' && brain.intent.shootHeld;
     if (charging) return;
     if ((goalLine - me.x) * dir <= profile.shootRange) {
-      const aim: Aim = w.rng() < 0.5 ? 'level' : 'up';
+      const aim: Aim = w.rng() < 0.5 ? 'straight' : 'far';
       brain.plan = 'charge';
       brain.chargeLeftS = CHARGE_MIN_S + w.rng() * CHARGE_SPREAD_S;
       brain.intent = { ...intent, moveX: dir, shootHeld: true, aim };
@@ -120,7 +120,7 @@ function decide(brain: AiBrain, w: World, me: Player, them: Player): void {
   // Loose ball: head it if it's overhead, otherwise get behind it.
   if (ball.y > HIGH_BALL && Math.abs(ball.x - me.x) <= HIGH_BALL_RANGE) {
     brain.plan = 'jump';
-    brain.intent = { ...intent, moveX: toward(me.x, ball.x), jump: true, aim: 'level' };
+    brain.intent = { ...intent, moveX: toward(me.x, ball.x), jump: true, aim: 'straight' };
     return;
   }
   brain.plan = 'chase';

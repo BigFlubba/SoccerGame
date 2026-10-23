@@ -86,11 +86,11 @@ describe('match scene', () => {
     expect((next as Partial<MatchScene>).world).toBeUndefined();
   });
 
-  it('the stick aims shots: up is high', () => {
+  it('the stick aims shots: up is the far post', () => {
     const s = live();
     run(s, 0.2, ['shoot']);
     s.update({ ...frame(), moveY: -1 }, STEP);
-    expect(s.world.home.kick?.aim).toBe('up');
+    expect(s.world.home.kick?.aim).toBe('far');
   });
 
   it('offers play again after full time', () => {
