@@ -9,10 +9,17 @@ export interface Goal {
   /** Height of the crossbar's underside. */
   barY: number;
   barThick: number;
+  /** Depth of the near post (closer to the camera). */
+  z0: number;
+  /** Depth of the far post. */
+  z1: number;
 }
 
+/** World: x along the pitch, z away from the camera, y up. */
 export interface Field {
   width: number;
+  /** From the near board (z 0) to the back fence. */
+  depth: number;
   /** Inner faces of the end fences. */
   fenceL: number;
   fenceR: number;
@@ -21,11 +28,12 @@ export interface Field {
 
 export const BACKYARD: Field = {
   width: 640,
+  depth: 64,
   fenceL: 4,
   fenceR: 636,
   goals: [
-    { side: 'left', lineX: 28, backX: 12, barY: 28, barThick: 2 },
-    { side: 'right', lineX: 612, backX: 628, barY: 28, barThick: 2 },
+    { side: 'left', lineX: 28, backX: 12, barY: 28, barThick: 2, z0: 18, z1: 46 },
+    { side: 'right', lineX: 612, backX: 628, barY: 28, barThick: 2, z0: 18, z1: 46 },
   ],
 };
 
@@ -37,17 +45,24 @@ export function roofSpan(field: Field, g: Goal): [x0: number, x1: number] {
   return g.side === 'right' ? [g.lineX, field.fenceR] : [field.fenceL, g.lineX];
 }
 
-/** Where players may stand: between the backs of the two nets. */
-export function playerSpan(field: Field): [x0: number, x1: number] {
-  const backs = field.goals.map(g => g.backX);
-  return [Math.max(field.fenceL, Math.min(...backs)), Math.min(field.fenceR, Math.max(...backs))];
+/** Whether (x, z) is inside a goal: between its line and net back, between its posts, grown by margin. */
+export function inGoalBox(g: Goal, x: number, z: number, margin = 0): boolean {
+  const x0 = Math.min(g.lineX, g.backX) - margin;
+  const x1 = Math.max(g.lineX, g.backX) + margin;
+  return x >= x0 && x <= x1 && z >= g.z0 - margin && z <= g.z1 + margin;
 }
 
-/** Which goal the ball is in: the whole ball past the line and under the bar. */
-export function goalScored(field: Field, b: { x: number; y: number }): 'left' | 'right' | null {
+/** Where players may stand along the pitch: fence to fence, so they can walk round the goals. */
+export function playerSpan(field: Field): [x0: number, x1: number] {
+  return [field.fenceL, field.fenceR];
+}
+
+/** Which goal the ball is in: the whole ball past the line, under the bar and between the posts. */
+export function goalScored(field: Field, b: { x: number; y: number; z: number }): 'left' | 'right' | null {
   for (const g of field.goals) {
     const past = g.side === 'right' ? b.x - BALL_R >= g.lineX : b.x + BALL_R <= g.lineX;
-    if (past && b.y + BALL_R <= g.barY) return g.side;
+    const between = b.z - BALL_R >= g.z0 && b.z + BALL_R <= g.z1;
+    if (past && between && b.y + BALL_R <= g.barY) return g.side;
   }
   return null;
 }

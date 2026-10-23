@@ -89,7 +89,7 @@ export function stepWorld(w: World, homeIntent: PlayerIntent, awayIntent: Player
   w.tick++;
 
   const before = { ...w.match.score };
-  const { resetForKickoff } = stepMatch(w.match, dt, goalScored(w.field, w.ball));
+  const { resetForKickoff } = stepMatch(w.match, dt, goalScored(w.field, { ...w.ball, z: w.field.depth / 2 }));
   const goal: Team | null = w.match.score.home > before.home ? 'home' : w.match.score.away > before.away ? 'away' : null;
   w.events = { kicks, ball, goal };
   if (resetForKickoff) placeForKickoff(w);

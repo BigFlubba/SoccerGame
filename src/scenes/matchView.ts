@@ -2,7 +2,8 @@ import { ANCHOR } from '../art/body/pose';
 import { MASTER, type MasterColor } from '../art/colors';
 import { PARALLAX } from '../art/venues/backyard';
 import { BALL_REST_Y } from '../game/ball';
-import { GROUND_SY, VIEW_W, offscreenArrow, type Camera } from '../game/camera';
+import { VIEW_W, offscreenArrow, project, type Camera } from '../game/camera';
+import { BACKYARD } from '../game/field';
 import { SWEET_SPOT } from '../game/kick';
 import { clockMinute, type Team } from '../game/match';
 import type { Player } from '../game/player';
@@ -35,8 +36,14 @@ const CROSSING_RANGE = 20;
 
 const ink = (g: CanvasRenderingContext2D, c: MasterColor) => (g.fillStyle = MASTER[c]);
 
-/** Screen position of a world point. */
-const screen = (cam: Camera, x: number, y: number) => ({ x: Math.round(x - cam.x), y: Math.round(GROUND_SY - y) });
+/** Until the match is drawn in depth, everything stands on the pitch's centre line. */
+const MID_Z = BACKYARD.depth / 2;
+
+/** Screen position of a world point on the centre line. */
+function screen(cam: Camera, x: number, y: number): { x: number; y: number } {
+  const p = project(x, y, MID_Z, cam.x);
+  return { x: Math.round(p.sx), y: Math.round(p.sy) };
+}
 
 function drawLayers(g: CanvasRenderingContext2D, cam: Camera, art: GameArt): void {
   // The far sky is narrower than its scroll range, so it tiles.
@@ -50,9 +57,9 @@ function drawLayers(g: CanvasRenderingContext2D, cam: Camera, art: GameArt): voi
 function drawGoals(g: CanvasRenderingContext2D, cam: Camera, art: GameArt, part: 'back' | 'front'): void {
   const left = art.goal[part];
   const right = part === 'back' ? art.goal.backFlipped : art.goal.frontFlipped;
-  const top = GROUND_SY - (left.height - 1);
-  g.drawImage(left, GOAL_LEFT_X - Math.round(cam.x), top);
-  g.drawImage(right, GOAL_RIGHT_X - Math.round(cam.x), top);
+  const top = screen(cam, 0, 0).y - (left.height - 1);
+  g.drawImage(left, screen(cam, GOAL_LEFT_X, 0).x, top);
+  g.drawImage(right, screen(cam, GOAL_RIGHT_X, 0).x, top);
 }
 
 /**
@@ -76,7 +83,7 @@ function drawBall(g: CanvasRenderingContext2D, w: World, cam: Camera, art: GameA
   const s = screen(cam, b.x, b.y);
   if (b.y > BALL_REST_Y + 1) {
     ink(g, 'grassDark');
-    g.fillRect(s.x - 2, GROUND_SY + 1, 5, 1);
+    g.fillRect(s.x - 2, screen(cam, b.x, 0).y + 1, 5, 1);
   }
   const quarter = Math.PI / 2;
   const n = art.ball.length;
@@ -127,7 +134,7 @@ function banner(w: World): string | null {
 }
 
 function drawArrow(g: CanvasRenderingContext2D, w: World, cam: Camera): void {
-  const arrow = offscreenArrow(w.ball, cam);
+  const arrow = offscreenArrow({ ...w.ball, z: MID_Z }, cam);
   if (!arrow) return;
   const x = Math.round(Math.min(Math.max(arrow.x, 3), VIEW_W - 4));
   ink(g, 'outline');

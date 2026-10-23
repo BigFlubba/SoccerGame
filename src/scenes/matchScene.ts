@@ -94,7 +94,7 @@ export function createMatchScene(art: GameArt, difficulty: Difficulty, seed: num
       world.events.kicks.forEach((k, i) => {
         if (k.perfect) hud.perfect = { team: i === 0 ? 'home' : 'away', untilS: t + PERFECT_SHOW_S };
       });
-      updateCamera(cam, world.ball, dt, world.field.width);
+      updateCamera(cam, { ...world.ball, z: world.field.depth / 2 }, dt, world.field);
       if (world.match.phase === 'fullTime' && !fullTime && world.match.phaseT >= RESULT_DELAY_S) {
         fullTime = { items: FULL_TIME_ITEMS, index: 0 };
       }

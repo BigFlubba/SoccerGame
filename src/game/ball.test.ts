@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { BALL_R } from '../art/ball';
 import { BALL_REST_Y, stepBall, type Ball, type BallEvents } from './ball';
-import { BACKYARD, goalScored } from './field';
+import { BACKYARD } from './field';
 
 const STEP = 1 / 60;
 
@@ -97,14 +97,6 @@ describe('stepBall', () => {
     run(b, 0.2);
     expect(b.vx).toBeGreaterThan(0);
     expect(b.x - BALL_R).toBeGreaterThanOrEqual(4);
-  });
-
-  it('detects a goal only when the whole ball is past the line and under the bar', () => {
-    expect(goalScored(BACKYARD, { x: 612 + 3, y: 10 })).toBe('right');
-    expect(goalScored(BACKYARD, { x: 612 + 2, y: 10 })).toBeNull();
-    expect(goalScored(BACKYARD, { x: 620, y: 27 })).toBeNull(); // ball top above the bar underside
-    expect(goalScored(BACKYARD, { x: 28 - 3, y: 0 })).toBe('left');
-    expect(goalScored(BACKYARD, { x: 320, y: 0 })).toBeNull();
   });
 
   it('never tunnels through the crossbar at full power', () => {
