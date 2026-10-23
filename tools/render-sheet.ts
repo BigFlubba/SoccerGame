@@ -3,7 +3,12 @@
  * Run with `npm run sheet`.
  */
 import { mkdirSync, writeFileSync } from 'node:fs';
-import { MASTER } from '../src/art/colors';
+import { C, MASTER, resolvePalette, toRGBA } from '../src/art/colors';
+import { HARRISON_HEADS, HARRISON_POWER_HEADS } from '../src/art/harrison/head';
+import { harrisonLook, type PowerForm } from '../src/art/harrison/look';
+import { IndexedImage, blit } from '../src/art/indexedImage';
+import type { KitId } from '../src/art/kits';
+import { addOutline } from '../src/art/raster';
 import { encodePNG } from './png';
 import { composeSheet, type SheetItem } from './sheet';
 
@@ -13,6 +18,7 @@ const BACKGROUND = [200, 204, 212] as const;
 const SWATCH = 6;
 const OUT_DIR = 'preview';
 const OUT_FILE = `${OUT_DIR}/character-sheet.png`;
+const FACINGS = ['side', 'threeQuarter', 'front'] as const;
 
 function swatch(hex: string): SheetItem {
   const n = parseInt(hex.slice(1), 16);
@@ -21,7 +27,25 @@ function swatch(hex: string): SheetItem {
   return { width: SWATCH, height: SWATCH, rgba };
 }
 
-const rows: SheetItem[][] = [Object.values(MASTER).map(swatch)];
+/** Resolves an image with Harrison's look, outlining a padded copy first when asked. */
+function item(img: IndexedImage, kit: KitId = 'home', form: PowerForm = 'base', outline = false): SheetItem {
+  let src = img;
+  if (outline) {
+    src = new IndexedImage(img.width + 2, img.height + 2);
+    blit(src, img, 1, 1);
+    addOutline(src, C.Outline);
+  }
+  return { width: src.width, height: src.height, rgba: toRGBA(src, resolvePalette(harrisonLook(kit, form))) };
+}
+
+const rows: SheetItem[][] = [
+  [
+    ...FACINGS.map(f => item(HARRISON_HEADS[f].image, 'home', 'base', true)),
+    ...FACINGS.map(f => item(HARRISON_POWER_HEADS[f].image, 'home', 'golden', true)),
+    ...FACINGS.map(f => item(HARRISON_POWER_HEADS[f].image, 'home', 'ultra', true)),
+  ],
+  Object.values(MASTER).map(swatch),
+];
 
 const sheet = composeSheet(rows, { scale: SCALE, gap: GAP, background: BACKGROUND });
 mkdirSync(OUT_DIR, { recursive: true });
