@@ -5,7 +5,8 @@ import { harrisonLook } from '../harrison/look';
 import { opaqueBounds } from '../raster';
 import { CLIPS } from './animations';
 import { bakeAll, frameIndexAt, samplePoses } from './bake';
-import { mirrorPose } from './pose';
+import { flipX } from '../indexedImage';
+import { ANCHOR, FRAME_W, mirrorPose } from './pose';
 import { HARRISON_BODY, standingHipHeight } from './proportions';
 
 const KITS = ['home', 'away'] as const;
@@ -62,6 +63,18 @@ describe('bakeAll', () => {
       for (const form of FORMS) {
         const pal = resolvePalette(harrisonLook(kit, form));
         for (const id of used) expect(pal[id]?.[3]).toBe(255);
+      }
+    }
+  });
+});
+
+describe('facing left', () => {
+  it('keeps the feet on the anchor column when a frame is flipped', () => {
+    expect(ANCHOR.x).toBe((FRAME_W - 1) / 2);
+    for (const clip of Object.values(baked)) {
+      for (const f of clip.frames) {
+        const flipped = flipX(f);
+        for (let y = 0; y < f.height; y++) expect(flipped.get(ANCHOR.x, y)).toBe(f.get(ANCHOR.x, y));
       }
     }
   });
