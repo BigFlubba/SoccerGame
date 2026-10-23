@@ -7,6 +7,7 @@ import {
   BAR_ROLL_SPEED,
   GRAVITY,
   NET_DAMPING,
+  POST_R,
   ROLL_FRICTION,
   SETTLE_SPEED,
   SPIN_DECAY,
@@ -19,12 +20,14 @@ import { roofSpan, type Field, type Goal } from './field';
 /** Height of a resting ball's centre: it sits on the grass. */
 export const BALL_REST_Y = BALL_R;
 
-/** World: x right, y up; (x, y) is the ball's centre. */
+/** World: x along the pitch, y up, z away from the camera; (x, y, z) is the ball's centre. */
 export interface Ball {
   x: number;
   y: number;
+  z: number;
   vx: number;
   vy: number;
+  vz: number;
   /** Positive is topspin, negative backspin. */
   spin: number;
   /** Rolling animation angle, radians. */
@@ -34,66 +37,124 @@ export interface Ball {
 export interface BallEvents {
   bounced: boolean;
   hitBar: boolean;
+  hitPost: boolean;
   hitWall: boolean;
   hitNet: boolean;
 }
 
-const towardZero = (v: number, by: number): number => (v > 0 ? Math.max(0, v - by) : Math.min(0, v + by));
+/** Goal collisions run this many passes per substep, so corners where two solids meet settle. */
+const GOAL_PASSES = 2;
 
-/** The crossbar as a solid box, with the net roof running on to the fence. */
-function barBox(g: Goal, field: Field) {
-  const [x0, x1] = roofSpan(field, g);
-  return { x0, x1, y0: g.barY, y1: g.barY + g.barThick };
+const towardZero = (v: number, by: number): number => (v > 0 ? Math.max(0, v - by) : Math.min(0, v + by));
+const clamp = (v: number, lo: number, hi: number): number => Math.min(Math.max(v, lo), hi);
+
+/**
+ * Pushes the ball out of a solid along the normal from `closest`, the solid's
+ * nearest point to its centre, and reflects the inward velocity. Returns the
+ * outward normal on a hit.
+ */
+function pushOut(b: Ball, closest: { x: number; y: number; z: number }, radius: number, restitution: number): null | { nx: number; ny: number; nz: number; vn: number } {
+  const [dx, dy, dz] = [b.x - closest.x, b.y - closest.y, b.z - closest.z];
+  const d = Math.hypot(dx, dy, dz);
+  if (d >= radius) return null;
+  // A centre exactly on the solid only comes from a bad start position: leave upward.
+  const [nx, ny, nz] = d === 0 ? [0, 1, 0] : [dx / d, dy / d, dz / d];
+  b.x = closest.x + nx * radius;
+  b.y = closest.y + ny * radius;
+  b.z = closest.z + nz * radius;
+  const vn = b.vx * nx + b.vy * ny + b.vz * nz;
+  if (vn < 0) {
+    b.vx -= (1 + restitution) * vn * nx;
+    b.vy -= (1 + restitution) * vn * ny;
+    b.vz -= (1 + restitution) * vn * nz;
+  }
+  return { nx, ny, nz, vn };
 }
 
-/** Circle–box contact: pushes the ball out and reflects its velocity. Returns true on a hit. */
+/**
+ * The crossbar and the net roof: one slab from the goal line back to the end
+ * fence, between the posts, so nothing drops into the gap behind the net.
+ */
 function collideBar(b: Ball, g: Goal, field: Field): boolean {
-  const { x0, x1, y0, y1 } = barBox(g, field);
-  const dx = b.x - Math.min(Math.max(b.x, x0), x1);
-  const dy = b.y - Math.min(Math.max(b.y, y0), y1);
-  const d = Math.hypot(dx, dy);
-  if (d >= BALL_R) return false;
-  let nx = 0;
-  let ny: number;
-  if (d === 0) {
-    // Centre inside the bar (only from a bad start position): leave by the nearer of top and bottom.
-    ny = b.y >= (y0 + y1) / 2 ? 1 : -1;
-    b.y = ny > 0 ? y1 + BALL_R : y0 - BALL_R;
-  } else {
-    nx = dx / d;
-    ny = dy / d;
-    b.x += nx * (BALL_R - d);
-    b.y += ny * (BALL_R - d);
-  }
-  const vn = b.vx * nx + b.vy * ny;
-  if (vn < 0) {
-    b.vx -= (1 + BAR_RESTITUTION) * vn * nx;
-    b.vy -= (1 + BAR_RESTITUTION) * vn * ny;
-  }
-  const onTop = ny > 0.7;
-  if (onTop) {
+  const [x0, x1] = roofSpan(field, g);
+  const closest = { x: clamp(b.x, x0, x1), y: clamp(b.y, g.barY, g.barY + g.barThick), z: clamp(b.z, g.z0, g.z1) };
+  const hit = pushOut(b, closest, BALL_R, BAR_RESTITUTION);
+  if (!hit) return false;
+  if (hit.ny > 0.7) {
     if (Math.abs(b.vy) < SETTLE_SPEED) b.vy = 0;
     // The top is slightly rounded: a resting ball always rolls off toward the field.
     const towardField = g.side === 'right' ? -1 : 1;
     if (Math.abs(b.vx) < BAR_ROLL_SPEED) b.vx = towardField * BAR_ROLL_SPEED;
   }
-  return vn < -SETTLE_SPEED;
+  return hit.vn < -SETTLE_SPEED;
 }
 
-/** The net back: a wall from the ground to the bar that soaks up most of the ball's pace. */
-function collideNet(b: Ball, g: Goal): boolean {
+/** The posts: upright cylinders from the ground to the bar's top. */
+function collidePosts(b: Ball, g: Goal): boolean {
+  let hit = false;
+  for (const z of [g.z0, g.z1]) {
+    const closest = { x: g.lineX, y: clamp(b.y, 0, g.barY + g.barThick), z };
+    const h = pushOut(b, closest, BALL_R + POST_R, BAR_RESTITUTION);
+    if (h && h.vn < -SETTLE_SPEED) hit = true;
+  }
+  return hit;
+}
+
+/**
+ * The netting: the back at backX and the sides at the posts' depths, running
+ * from the goal line to the end fence. Every net stops the ball from either
+ * side and soaks up most of its pace.
+ */
+function collideNets(b: Ball, g: Goal, field: Field): boolean {
   if (b.y >= g.barY) return false;
-  if (g.side === 'right' && b.x > g.lineX && b.x + BALL_R > g.backX) {
-    b.x = g.backX - BALL_R;
-    b.vx = -Math.abs(b.vx) * NET_DAMPING;
-    return true;
+  let hit = false;
+  const [x0, x1] = roofSpan(field, g);
+  if (b.x >= x0 && b.x <= x1) {
+    for (const zn of [g.z0, g.z1]) {
+      const d = b.z - zn;
+      if (Math.abs(d) >= BALL_R) continue;
+      const side = d > 0 || (d === 0 && zn === g.z0) ? 1 : -1;
+      b.z = zn + side * BALL_R;
+      if (b.vz * side < 0) b.vz = -b.vz * NET_DAMPING;
+      hit = true;
+    }
   }
-  if (g.side === 'left' && b.x < g.lineX && b.x - BALL_R < g.backX) {
-    b.x = g.backX + BALL_R;
-    b.vx = Math.abs(b.vx) * NET_DAMPING;
-    return true;
+  if (b.z >= g.z0 && b.z <= g.z1) {
+    const d = b.x - g.backX;
+    if (Math.abs(d) < BALL_R) {
+      // From inside the goal, or (if it ever got there) from the closed gap behind it.
+      const inside = g.side === 'right' ? d < 0 : d > 0;
+      const side = inside === (g.side === 'right') ? -1 : 1;
+      b.x = g.backX + side * BALL_R;
+      if (b.vx * side < 0) b.vx = -b.vx * NET_DAMPING;
+      hit = true;
+    }
   }
-  return false;
+  return hit;
+}
+
+/** Keeps the ball inside the end fences, the near board and the back fence. */
+function collideWalls(b: Ball, field: Field): boolean {
+  let hit = false;
+  if (b.x - BALL_R < field.fenceL) {
+    b.x = field.fenceL + BALL_R;
+    b.vx = Math.abs(b.vx) * WALL_RESTITUTION;
+    hit = true;
+  } else if (b.x + BALL_R > field.fenceR) {
+    b.x = field.fenceR - BALL_R;
+    b.vx = -Math.abs(b.vx) * WALL_RESTITUTION;
+    hit = true;
+  }
+  if (b.z - BALL_R < 0) {
+    b.z = BALL_R;
+    b.vz = Math.abs(b.vz) * WALL_RESTITUTION;
+    hit = true;
+  } else if (b.z + BALL_R > field.depth) {
+    b.z = field.depth - BALL_R;
+    b.vz = -Math.abs(b.vz) * WALL_RESTITUTION;
+    hit = true;
+  }
+  return hit;
 }
 
 function substep(b: Ball, h: number, field: Field, ev: BallEvents): void {
@@ -103,13 +164,19 @@ function substep(b: Ball, h: number, field: Field, ev: BallEvents): void {
     const drag = 1 - AIR_DRAG * h;
     b.vx *= drag;
     b.vy *= drag;
+    b.vz *= drag;
   } else {
-    b.vx = towardZero(b.vx, ROLL_FRICTION * h);
+    // Rolling friction slows the ball along its path without turning it.
+    const speed = Math.hypot(b.vx, b.vz);
+    const k = speed > 0 ? Math.max(0, speed - ROLL_FRICTION * h) / speed : 0;
+    b.vx *= k;
+    b.vz *= k;
   }
   b.spin = towardZero(b.spin, SPIN_DECAY * h);
   b.x += b.vx * h;
   b.y += b.vy * h;
-  b.spinAngle += (b.vx * h) / BALL_R;
+  b.z += b.vz * h;
+  b.spinAngle += ((b.vx < 0 ? -1 : 1) * Math.hypot(b.vx, b.vz) * h) / BALL_R;
 
   if (b.y < BALL_REST_Y) {
     b.y = BALL_REST_Y;
@@ -119,33 +186,31 @@ function substep(b: Ball, h: number, field: Field, ev: BallEvents): void {
         b.vy = 0;
       } else {
         b.vy = up;
-        b.vx += b.vx * SPIN_SKIP * b.spin;
+        const skip = 1 + SPIN_SKIP * b.spin;
+        b.vx *= skip;
+        b.vz *= skip;
         ev.bounced = true;
       }
     }
   }
-  if (b.x - BALL_R < field.fenceL) {
-    b.x = field.fenceL + BALL_R;
-    b.vx = Math.abs(b.vx) * WALL_RESTITUTION;
-    ev.hitWall = true;
-  } else if (b.x + BALL_R > field.fenceR) {
-    b.x = field.fenceR - BALL_R;
-    b.vx = -Math.abs(b.vx) * WALL_RESTITUTION;
-    ev.hitWall = true;
+  if (collideWalls(b, field)) ev.hitWall = true;
+  for (let pass = 0; pass < GOAL_PASSES; pass++) {
+    for (const g of field.goals) {
+      if (collidePosts(b, g)) ev.hitPost = true;
+      if (collideBar(b, g, field)) ev.hitBar = true;
+      if (collideNets(b, g, field)) ev.hitNet = true;
+    }
   }
-  for (const g of field.goals) {
-    if (collideBar(b, g, field)) ev.hitBar = true;
-    if (collideNet(b, g)) ev.hitNet = true;
-  }
+  if (b.y < BALL_REST_Y) b.y = BALL_REST_Y;
 }
 
 /**
  * Advances the ball by dt in substeps of at most BALL_SUBSTEP_PX, so even a
- * full-power shot can't tunnel through the bar, net or fences.
+ * full-power shot can't tunnel through a post, the bar, a net or a fence.
  */
 export function stepBall(ball: Ball, dt: number, field: Field): BallEvents {
-  const ev: BallEvents = { bounced: false, hitBar: false, hitWall: false, hitNet: false };
-  const fastest = Math.max(Math.abs(ball.vx), Math.abs(ball.vy) + GRAVITY * dt);
+  const ev: BallEvents = { bounced: false, hitBar: false, hitPost: false, hitWall: false, hitNet: false };
+  const fastest = Math.max(Math.hypot(ball.vx, ball.vz), Math.abs(ball.vy) + GRAVITY * dt);
   const n = Math.max(1, Math.ceil((fastest * dt) / BALL_SUBSTEP_PX));
   for (let i = 0; i < n; i++) substep(ball, dt / n, field, ev);
   return ev;

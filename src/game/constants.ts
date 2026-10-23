@@ -15,3 +15,5 @@ export const SETTLE_SPEED = 30;
 export const SPIN_SKIP = 0.1;
 /** The rounded top of the crossbar: a ball resting there always rolls at least this fast. */
 export const BAR_ROLL_SPEED = 20;
+/** Goal posts are solid uprights of this radius at (lineX, z0) and (lineX, z1), from the ground to the bar's top. */
+export const POST_R = 1;

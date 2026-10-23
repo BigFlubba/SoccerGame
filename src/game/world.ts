@@ -34,13 +34,13 @@ const KICKOFF_DEFENDER_DEPTH = 70;
 
 const attackDir = (team: Team): 1 | -1 => (team === 'home' ? 1 : -1);
 
-const quietEvents = (): WorldEvents => ({ kicks: [], ball: { bounced: false, hitBar: false, hitWall: false, hitNet: false }, goal: null });
+const quietEvents = (): WorldEvents => ({ kicks: [], ball: { bounced: false, hitBar: false, hitPost: false, hitWall: false, hitNet: false }, goal: null });
 
 export function createWorld(homeStats: Stats, awayStats: Stats, seed: number, aimErrorDeg: { home: number; away: number }): World {
   const centre = BACKYARD.width / 2;
   const w: World = {
     field: BACKYARD,
-    ball: { x: centre, y: BALL_REST_Y, vx: 0, vy: 0, spin: 0, spinAngle: 0 },
+    ball: { x: centre, y: BALL_REST_Y, z: BACKYARD.depth / 2, vx: 0, vy: 0, vz: 0, spin: 0, spinAngle: 0 },
     home: createPlayer('home', homeStats, centre, 1),
     away: createPlayer('away', awayStats, centre, -1),
     match: createMatch(),
@@ -62,7 +62,7 @@ function reset(p: Player, x: number): void {
 /** Ball on the centre spot, the kicking-off player just behind it, the other back in his own half. */
 export function placeForKickoff(w: World): void {
   const centre = w.field.width / 2;
-  Object.assign(w.ball, { x: centre, y: BALL_REST_Y, vx: 0, vy: 0, spin: 0 });
+  Object.assign(w.ball, { x: centre, y: BALL_REST_Y, z: w.field.depth / 2, vx: 0, vy: 0, vz: 0, spin: 0 });
   for (const p of [w.home, w.away]) {
     const dir = attackDir(p.team);
     reset(p, p.team === w.match.kickoffTeam ? centre - KICKOFF_GAP * dir : centre - KICKOFF_DEFENDER_DEPTH * dir);
@@ -89,7 +89,7 @@ export function stepWorld(w: World, homeIntent: PlayerIntent, awayIntent: Player
   w.tick++;
 
   const before = { ...w.match.score };
-  const { resetForKickoff } = stepMatch(w.match, dt, goalScored(w.field, { ...w.ball, z: w.field.depth / 2 }));
+  const { resetForKickoff } = stepMatch(w.match, dt, goalScored(w.field, w.ball));
   const goal: Team | null = w.match.score.home > before.home ? 'home' : w.match.score.away > before.away ? 'away' : null;
   w.events = { kicks, ball, goal };
   if (resetForKickoff) placeForKickoff(w);

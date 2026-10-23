@@ -8,7 +8,7 @@ import { NO_INTENT, createPlayer, stepPlayer, type Kick, type Player } from './p
 import { BASE_STATS, touchPush } from './stats';
 
 const STEP = 1 / 60;
-const ball = (p: Partial<Ball>): Ball => ({ x: 320, y: BALL_REST_Y, vx: 0, vy: 0, spin: 0, spinAngle: 0, ...p });
+const ball = (p: Partial<Ball>): Ball => ({ x: 320, y: BALL_REST_Y, z: BACKYARD.depth / 2, vx: 0, vy: 0, vz: 0, spin: 0, spinAngle: 0, ...p });
 const kick = (k: Partial<Kick>): Kick => ({ kind: 'shot', charge: 0.6, overchargeS: 0, aim: 'level', active: true, ...k });
 
 function setup(x = 300): { p: Player; opp: Player } {

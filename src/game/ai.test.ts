@@ -11,7 +11,7 @@ const STEP = 1 / 60;
 function scene(ball: { x: number; y?: number; vx?: number; vy?: number }, home: number, away: number): World {
   const w = createWorld(BASE_STATS, BASE_STATS, 3, { home: 4, away: DIFFICULTY.normal.aimErrorDeg });
   w.match.phase = 'playing';
-  Object.assign(w.ball, { y: BALL_REST_Y, vx: 0, vy: 0, ...ball });
+  Object.assign(w.ball, { y: BALL_REST_Y, vx: 0, vy: 0, vz: 0, ...ball });
   w.home.x = home;
   w.away.x = away;
   return w;
