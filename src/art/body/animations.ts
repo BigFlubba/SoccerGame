@@ -1,7 +1,7 @@
 import { plantLeg, type ArmPose, type HeadFacing, type LegPose, type Pose } from './pose';
 import { HARRISON_BODY, standingHipHeight, type BodyProportions } from './proportions';
 
-export type AnimName = 'idle' | 'run' | 'jump' | 'shoot' | 'powerUp' | 'sprint' | 'chip' | 'header' | 'volley' | 'slide' | 'fall' | 'juggle';
+export type AnimName = 'idle' | 'run' | 'jump' | 'shoot' | 'powerUp' | 'sprint' | 'chip' | 'header' | 'volley' | 'slide' | 'fall' | 'juggle' | 'celebrate';
 
 /** Shoot frame held while a shot charges. */
 export const SHOOT_CHARGE_FRAME = 1;
@@ -215,6 +215,17 @@ export function clipsFor(body: BodyProportions): Record<AnimName, AnimationClip>
         k({ hip: 0, torso: -5, head: { dx: 1 }, near: { hip: 70, knee: 35, ankle: 0 }, far: { plant: -1 }, nearArm: [-40, 30], farArm: [45, 30] }),
         k({ hip: 0, torso: -3, head: { dx: 1 }, near: { hip: 30, knee: 50, ankle: 15 }, far: { plant: -1 }, nearArm: [-30, 30], farArm: [35, 30] }),
         k({ hip: 0, torso: 0, near: { plant: 3 }, far: { plant: -1 }, nearArm: [-15, 25], farArm: [20, 25] }),
+      ],
+    },
+    celebrate: {
+      name: 'celebrate',
+      frameCount: 2,
+      fps: 6,
+      loop: true,
+      // Both arms straight up: a little dip, then up tall (the match draws that frame a hop higher).
+      keys: [
+        k({ hip: -1, torso: 0, head: { dy: -1 }, near: { plant: 3 }, far: { plant: -2 }, nearArm: [140, 15], farArm: [-145, 15] }),
+        k({ hip: 0, torso: -3, head: { dy: -1 }, near: { plant: 2 }, far: { plant: -1 }, nearArm: [145, 5], farArm: [-150, 5] }),
       ],
     },
   };

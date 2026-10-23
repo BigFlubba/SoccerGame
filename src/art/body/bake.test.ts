@@ -30,6 +30,7 @@ describe('bakeAll', () => {
       slide: 4,
       fall: 5,
       juggle: 4,
+      celebrate: 2,
     });
   });
 

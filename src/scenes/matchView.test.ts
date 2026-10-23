@@ -3,7 +3,7 @@ import { BASE_STATS } from '../game/stats';
 import { createWorld } from '../game/world';
 import type { GameArt } from './art';
 import { depthSorted } from './depthSort';
-import { pitchDrawables } from './matchView';
+import { banner, homeClip, pitchDrawables } from './matchView';
 
 /** Building the list never touches the art; only drawing does. */
 const NO_ART = {} as GameArt;
@@ -32,3 +32,58 @@ describe('pitchDrawables', () => {
     });
   });
 });
+
+describe('banner', () => {
+  const world = () => createWorld(BASE_STATS, BASE_STATS, 1, { home: 4, away: 6 });
+  const moment = (t: number) => ({ t, done: false });
+
+  it('GOAL!!! slams in big once the moment shows its banner', () => {
+    const w = world();
+    Object.assign(w.match, { phase: 'goal', lastScorer: 'home' });
+    expect(banner(w, moment(0.1))).toBeNull();
+    expect(banner(w, moment(0.5))).toEqual({ text: 'GOAL!!!', scale: 3 });
+  });
+
+  it("Max's goal gets a smaller MAX SCORES", () => {
+    const w = world();
+    Object.assign(w.match, { phase: 'goal', lastScorer: 'away' });
+    expect(banner(w, null)).toEqual({ text: 'MAX SCORES', scale: 2 });
+  });
+
+  it('no banner in the goal pause otherwise', () => {
+    const w = world();
+    Object.assign(w.match, { phase: 'goal', lastScorer: 'home' });
+    expect(banner(w, null)).toBeNull();
+  });
+
+  it('FULL TIME, KICK OFF and GOLDEN GOAL as before', () => {
+    const w = world();
+    expect(banner(w, null)).toEqual({ text: 'KICK OFF', scale: 2 });
+    w.match.goldenGoal = true;
+    expect(banner(w, null)).toEqual({ text: 'GOLDEN GOAL', scale: 2 });
+    w.match.phase = 'playing';
+    expect(banner(w, null)).toEqual({ text: 'GOLDEN GOAL', scale: 2 });
+    w.match.goldenS = 5;
+    expect(banner(w, null)).toBeNull();
+    w.match.phase = 'fullTime';
+    expect(banner(w, null)).toEqual({ text: 'FULL TIME', scale: 2 });
+  });
+});
+
+describe('homeClip', () => {
+  const world = () => createWorld(BASE_STATS, BASE_STATS, 1, { home: 4, away: 6 });
+
+  it('while celebrating without the card, Harrison is drawn with the celebrate clip', () => {
+    const w = world();
+    const frames = [1.6, 1.8, 2.0, 2.2].map(t => homeClip(w, { t, done: false }));
+    for (const f of frames) expect(f.name).toBe('celebrate');
+    expect(new Set(frames.map(f => f.frame))).toEqual(new Set([0, 1]));
+  });
+
+  it('otherwise his own clip', () => {
+    const w = world();
+    expect(homeClip(w, null)).toEqual(w.home.anim);
+    expect(homeClip(w, { t: 0.5, done: false })).toEqual(w.home.anim);
+  });
+});
+

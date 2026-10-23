@@ -1,6 +1,8 @@
+import { CLIPS, type AnimName } from '../art/body/animations';
 import { ANCHOR } from '../art/body/pose';
 import { MASTER, type MasterColor } from '../art/colors';
 import { PARALLAX } from '../art/venues/backyard';
+import { BASE_H } from '../engine/viewport';
 import { VIEW_W, offscreenArrow, project, type Camera } from '../game/camera';
 import { SWEET_SPOT } from '../game/kick';
 import { clockMinute, type Team } from '../game/match';
@@ -8,7 +10,7 @@ import type { Player } from '../game/player';
 import type { World } from '../game/world';
 import type { GameArt } from './art';
 import { depthSorted, type Drawable } from './depthSort';
-import type { GoalMoment } from './goalMoment';
+import { BANNER_FROM_S, CELEBRATE_FROM_S, bannerShown, celebrating, flashing, shakeOffset, type GoalMoment } from './goalMoment';
 
 /** Overlay state the match scene keeps between frames. */
 export interface MatchHud {
@@ -26,6 +28,11 @@ const CHARGE_BAR = { w: 12, h: 2, above: 46 };
 const STAMINA_BAR = { x: 4, y: 2, w: 30, h: 3 };
 const BANNER_Y = 58;
 const GOLDEN_GOAL_BANNER_S = 1.5;
+/** GOAL!!! lands big, then bounces to rest. */
+const GOAL_SLAM = { scale: 4, forS: 0.1, settleS: 0.2, bouncePx: 6 };
+const FLASH_ALPHA = 0.6;
+/** The celebration's up-tall frame is drawn this far higher: a little hop. */
+const CELEBRATE_HOP_PX = 2;
 /** Blinks per second for the overcharge flash. */
 const BLINK_HZ = 8;
 const ARROW_Y = 16;
@@ -61,11 +68,25 @@ function drawShadow(g: CanvasRenderingContext2D, cam: Camera, x: number, z: numb
   g.fillRect(s.x - Math.floor(SHADOW_W / 2), s.y + 1, SHADOW_W, 1);
 }
 
-function drawPlayer(g: CanvasRenderingContext2D, cam: Camera, p: Player, art: GameArt): void {
+type Clip = { name: AnimName; frame: number };
+
+function drawPlayer(g: CanvasRenderingContext2D, cam: Camera, p: Player, art: GameArt, clip: Clip = p.anim): void {
   const set = p.team === 'home' ? art.home : art.away;
-  const frames = (p.facing === 1 ? set.right : set.left)[p.anim.name];
+  const frames = (p.facing === 1 ? set.right : set.left)[clip.name];
   const s = screen(cam, p.x, p.y, p.z);
-  g.drawImage(frames[Math.min(p.anim.frame, frames.length - 1)]!, s.x - ANCHOR.x, s.y - ANCHOR.y);
+  const hop = clip.name === 'celebrate' && clip.frame === 1 ? CELEBRATE_HOP_PX : 0;
+  g.drawImage(frames[Math.min(clip.frame, frames.length - 1)]!, s.x - ANCHOR.x, s.y - ANCHOR.y - hop);
+}
+
+/**
+ * Harrison's clip this frame: arms up while he celebrates (the match is
+ * frozen then, so it runs on the moment's clock), unless the back-view card
+ * is showing instead.
+ */
+export function homeClip(w: World, moment: GoalMoment | null, withCard = false): Clip {
+  if (!moment || !celebrating(moment) || withCard) return w.home.anim;
+  const { fps, frameCount } = CLIPS.celebrate;
+  return { name: 'celebrate', frame: Math.floor((moment.t - CELEBRATE_FROM_S) * fps) % frameCount };
 }
 
 function drawBall(g: CanvasRenderingContext2D, w: World, cam: Camera, art: GameArt): void {
@@ -82,7 +103,7 @@ function drawBall(g: CanvasRenderingContext2D, w: World, cam: Camera, art: GameA
  * the ball, and each goal's nets and posts. The nets come first, so at the
  * same depth a post is drawn over its net.
  */
-export function pitchDrawables(w: World, cam: Camera, art: GameArt): Drawable[] {
+export function pitchDrawables(w: World, cam: Camera, art: GameArt, home: Clip = w.home.anim): Drawable[] {
   const goals = w.field.goals.flatMap(goal => {
     const part = (z: number, which: 'farNet' | 'nearNet' | 'nearPost' | 'farPost'): Drawable => ({
       z,
@@ -96,7 +117,7 @@ export function pitchDrawables(w: World, cam: Camera, art: GameArt): Drawable[] 
   });
   return [
     ...goals,
-    { z: w.home.z, draw: g => drawPlayer(g, cam, w.home, art) },
+    { z: w.home.z, draw: g => drawPlayer(g, cam, w.home, art, home) },
     { z: w.away.z, draw: g => drawPlayer(g, cam, w.away, art) },
     // Last among equals: at his feet, the ball is drawn over his boots.
     { z: w.ball.z, draw: g => drawBall(g, w, cam, art) },
@@ -136,13 +157,25 @@ function drawHud(g: CanvasRenderingContext2D, w: World, art: GameArt): void {
   g.fillRect(STAMINA_BAR.x, STAMINA_BAR.y, Math.round(home.stamina * STAMINA_BAR.w), STAMINA_BAR.h);
 }
 
-function banner(w: World): string | null {
+/** The banner over the pitch, if any: GOAL!!! for Harrison's goal moment, a smaller MAX SCORES for Max's. */
+export function banner(w: World, moment: GoalMoment | null): { text: string; scale: number } | null {
   const m = w.match;
-  if (m.phase === 'goal') return 'GOAL!';
-  if (m.phase === 'fullTime') return 'FULL TIME';
-  if (m.phase === 'kickoff') return m.goldenGoal ? 'GOLDEN GOAL' : 'KICK OFF';
-  if (m.goldenGoal && m.goldenS < GOLDEN_GOAL_BANNER_S) return 'GOLDEN GOAL';
+  const text = (t: string) => ({ text: t, scale: 2 });
+  if (moment) return bannerShown(moment) ? { text: 'GOAL!!!', scale: 3 } : null;
+  if (m.phase === 'goal') return m.lastScorer === 'away' ? text('MAX SCORES') : null;
+  if (m.phase === 'fullTime') return text('FULL TIME');
+  if (m.phase === 'kickoff') return text(m.goldenGoal ? 'GOLDEN GOAL' : 'KICK OFF');
+  if (m.goldenGoal && m.goldenS < GOLDEN_GOAL_BANNER_S) return text('GOLDEN GOAL');
   return null;
+}
+
+/** GOAL!!! slams in at a bigger scale, then drops in and bounces to rest. */
+function drawGoalBanner(g: CanvasRenderingContext2D, art: GameArt, moment: GoalMoment, scale: number): void {
+  const s = moment.t - BANNER_FROM_S;
+  if (s < GOAL_SLAM.forS) return drawText(g, art, 'GOAL!!!', VIEW_W / 2, BANNER_Y - 4, GOAL_SLAM.scale, 'energyGold');
+  const settle = Math.min(1, (s - GOAL_SLAM.forS) / GOAL_SLAM.settleS);
+  const bounce = Math.round(GOAL_SLAM.bouncePx * Math.sin(settle * Math.PI) * (1 - settle));
+  drawText(g, art, 'GOAL!!!', VIEW_W / 2, BANNER_Y + bounce, scale, 'energyGold');
 }
 
 function drawArrow(g: CanvasRenderingContext2D, w: World, cam: Camera): void {
@@ -157,21 +190,38 @@ function drawArrow(g: CanvasRenderingContext2D, w: World, cam: Camera): void {
   g.fillRect(x, ARROW_Y + 2, 1, 1);
 }
 
-/** Draws one frame of the match: scenery, shadows, then everything on the pitch far to near, bars, HUD and banners. */
+/**
+ * Draws one frame of the match: scenery, shadows, then everything on the
+ * pitch far to near, bars, HUD and banners. During Harrison's goal moment
+ * the pitch shakes (the HUD doesn't), and the first frame flashes white.
+ */
 export function drawMatch(g: CanvasRenderingContext2D, w: World, cam: Camera, art: GameArt, nowS: number, hud: MatchHud): void {
+  const { moment } = hud;
+  const shake = moment ? shakeOffset(moment) : { dx: 0, dy: 0 };
+  g.save();
+  g.translate(shake.dx, shake.dy);
   drawLayers(g, cam, art);
   drawShadow(g, cam, w.ball.x, w.ball.z);
   for (const p of [w.away, w.home]) drawShadow(g, cam, p.x, p.z);
-  for (const d of depthSorted(pitchDrawables(w, cam, art))) d.draw(g);
+  for (const d of depthSorted(pitchDrawables(w, cam, art, homeClip(w, moment)))) d.draw(g);
   drawChargeBar(g, cam, w.away, nowS);
   drawChargeBar(g, cam, w.home, nowS);
+  g.restore();
+  if (moment && flashing(moment)) {
+    g.save();
+    g.globalAlpha = FLASH_ALPHA;
+    ink(g, 'white');
+    g.fillRect(0, 0, VIEW_W, BASE_H);
+    g.restore();
+  }
   drawHud(g, w, art);
   if (hud.perfect && nowS < hud.perfect.untilS) {
     const kicker = hud.perfect.team === 'home' ? w.home : w.away;
     const at = screen(cam, kicker.x, kicker.y, kicker.z);
     drawText(g, art, 'PERFECT', at.x, at.y - 56, 1, 'energyGold');
   }
-  const b = banner(w);
-  if (b) drawText(g, art, b, VIEW_W / 2, BANNER_Y, 2);
+  const b = banner(w, moment);
+  if (b && moment) drawGoalBanner(g, art, moment, b.scale);
+  else if (b) drawText(g, art, b.text, VIEW_W / 2, BANNER_Y, b.scale);
   drawArrow(g, w, cam);
 }
