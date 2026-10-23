@@ -88,9 +88,9 @@ export type RGBA = readonly [number, number, number, number];
 /** Indexed by logical colour id; entry 0 is transparent. */
 export type ResolvedPalette = readonly RGBA[];
 
-const TRANSPARENT: RGBA = [0, 0, 0, 0];
+export const TRANSPARENT: RGBA = [0, 0, 0, 0];
 
-function hexToRGBA(hex: string): RGBA {
+export function hexToRGBA(hex: string): RGBA {
   const n = parseInt(hex.slice(1), 16);
   return [(n >> 16) & 0xff, (n >> 8) & 0xff, n & 0xff, 255];
 }

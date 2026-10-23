@@ -10,6 +10,7 @@ import { HARRISON_BODY } from '../src/art/body/proportions';
 import { C, MASTER, resolvePalette, toRGBA } from '../src/art/colors';
 import { HARRISON_HEADS, HARRISON_POWER_HEADS } from '../src/art/harrison/head';
 import { harrisonLook, type PowerForm } from '../src/art/harrison/look';
+import { renderText, textPalette } from '../src/art/font';
 import { harrisonPortrait } from '../src/art/harrison/portrait';
 import { IndexedImage, blit } from '../src/art/indexedImage';
 import type { KitId } from '../src/art/kits';
@@ -43,6 +44,12 @@ function item(img: IndexedImage, kit: KitId = 'home', form: PowerForm = 'base', 
   return { width: src.width, height: src.height, rgba: toRGBA(src, resolvePalette(harrisonLook(kit, form))) };
 }
 
+/** HUD-style text: white ink, dark outline. */
+function text(s: string, scale: number): SheetItem {
+  const img = renderText(s, scale);
+  return { width: img.width, height: img.height, rgba: toRGBA(img, textPalette('white', 'outline')) };
+}
+
 const standing = standingPose(HARRISON_BODY);
 const baked = bakeAll(HARRISON_BODY, HARRISON_HEADS);
 const powered = bakeAll(HARRISON_BODY, HARRISON_POWER_HEADS);
@@ -67,6 +74,8 @@ const rows: SheetItem[][] = [
     ...FACINGS.map(f => item(HARRISON_POWER_HEADS[f].image, 'home', 'ultra', true)),
   ],
   Object.values(MASTER).map(swatch),
+  [text("HARRISON 0-0 MAX 45'", 1), text('ABCDEFGHIJKLMNOPQRSTUVWXYZ', 1), text("0123456789 -':!?.,/+", 1)],
+  [text("HARRISON 0-0 MAX 45'", 2), text('GOAL! PERFECT', 2)],
 ];
 
 const sheet = composeSheet(rows, { scale: SCALE, gap: GAP, background: BACKGROUND });
