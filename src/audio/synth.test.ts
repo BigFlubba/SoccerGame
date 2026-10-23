@@ -1,0 +1,159 @@
+import { describe, expect, it } from 'vitest';
+import { CROWD_GAIN, createAudio, volumeGain } from './synth';
+
+/** Just enough of an AudioParam to read back the last value set. */
+class FakeParam {
+  value = 0;
+  setValueAtTime(v: number) {
+    this.value = v;
+    return this;
+  }
+  linearRampToValueAtTime(v: number) {
+    return this.setValueAtTime(v);
+  }
+  exponentialRampToValueAtTime(v: number) {
+    return this.setValueAtTime(v);
+  }
+  setTargetAtTime(v: number) {
+    return this.setValueAtTime(v);
+  }
+  cancelScheduledValues() {
+    return this;
+  }
+}
+
+const node = () => ({ connect: (n: unknown) => n, disconnect: () => {} });
+
+/** A hand-written stand-in for AudioContext that counts what it makes. */
+function fakeContext(opts: { rejectResume?: boolean } = {}) {
+  const made = { gains: [] as { gain: FakeParam }[], sources: 0, oscillators: 0 };
+  const ctx = {
+    state: 'suspended',
+    currentTime: 0,
+    sampleRate: 8000,
+    destination: node(),
+    createGain() {
+      const g = { ...node(), gain: new FakeParam() };
+      made.gains.push(g);
+      return g;
+    },
+    createOscillator() {
+      made.oscillators++;
+      return { ...node(), type: 'sine', frequency: new FakeParam(), start() {}, stop() {} };
+    },
+    createBufferSource() {
+      made.sources++;
+      return { ...node(), buffer: null, loop: false, start() {}, stop() {} };
+    },
+    createBuffer(_channels: number, length: number) {
+      const data = new Float32Array(length);
+      return { getChannelData: () => data };
+    },
+    createBiquadFilter() {
+      return { ...node(), type: 'lowpass', frequency: new FakeParam(), Q: new FakeParam() };
+    },
+    resume() {
+      if (opts.rejectResume) return Promise.reject(new Error('not allowed'));
+      ctx.state = 'running';
+      return Promise.resolve();
+    },
+    suspend() {
+      ctx.state = 'suspended';
+      return Promise.resolve();
+    },
+  };
+  return { ctx, made, make: () => ctx as unknown as AudioContext };
+}
+
+const settle = () => new Promise(r => setTimeout(r, 0));
+
+describe('createAudio', () => {
+  it('createAudio(null) is unavailable and every call is a no-op', () => {
+    const a = createAudio(null);
+    expect(a.available).toBe(false);
+    expect(() => {
+      a.unlock();
+      a.setVolumes(5, 5);
+      a.play('kickHard');
+      a.setCrowd('match');
+      a.suspend();
+      a.resume();
+    }).not.toThrow();
+    expect(a.unlocked).toBe(false);
+  });
+
+  it('a context that cannot be made leaves it unavailable, without throwing', () => {
+    const a = createAudio(() => {
+      throw new Error('no audio');
+    });
+    expect(() => a.unlock()).not.toThrow();
+    expect(a.unlocked).toBe(false);
+    expect(a.available).toBe(false);
+  });
+
+  it('nothing plays before unlock', () => {
+    const f = fakeContext();
+    const a = createAudio(f.make);
+    expect(a.available).toBe(true);
+    a.play('kickHard');
+    a.setCrowd('match');
+    expect(f.made.oscillators + f.made.sources).toBe(0);
+    expect(a.unlocked).toBe(false);
+  });
+
+  it('unlock with a rejecting resume stays locked and does not throw', async () => {
+    const f = fakeContext({ rejectResume: true });
+    const a = createAudio(f.make);
+    expect(() => a.unlock()).not.toThrow();
+    await settle();
+    expect(a.unlocked).toBe(false);
+    const before = f.made.oscillators;
+    a.play('kickHard');
+    expect(f.made.oscillators).toBe(before);
+  });
+
+  it('setCrowd twice makes one crowd source', async () => {
+    const f = fakeContext();
+    const a = createAudio(f.make);
+    a.unlock();
+    await settle();
+    a.setCrowd('match');
+    a.setCrowd('low');
+    a.setCrowd('match');
+    expect(f.made.sources).toBe(1);
+  });
+
+  it('a crowd level set while locked starts on unlock', async () => {
+    const f = fakeContext();
+    const a = createAudio(f.make);
+    a.setCrowd('match');
+    a.unlock();
+    await settle();
+    expect(a.unlocked).toBe(true);
+    expect(f.made.gains.map(g => g.gain.value)).toContain(CROWD_GAIN.match);
+  });
+
+  it('the same cue inside minGapS plays once', async () => {
+    const f = fakeContext();
+    const a = createAudio(f.make);
+    a.unlock();
+    await settle();
+    const count = () => f.made.oscillators + f.made.sources;
+    const start = count();
+    a.play('tap');
+    const once = count();
+    expect(once).toBeGreaterThan(start);
+    a.play('tap');
+    expect(count()).toBe(once);
+    f.ctx.currentTime = 1;
+    a.play('tap');
+    expect(count()).toBeGreaterThan(once);
+  });
+
+  it('volumeGain(0) is 0 and volumeGain(10) is 1', () => {
+    expect(volumeGain(0)).toBe(0);
+    expect(volumeGain(10)).toBe(1);
+    expect(volumeGain(5)).toBeCloseTo(0.25);
+    expect(volumeGain(99)).toBe(1);
+  });
+});

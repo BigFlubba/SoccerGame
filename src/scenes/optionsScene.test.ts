@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { recordingAudio } from '../audio/testAudio';
 import { glyph } from '../art/font';
 import { DEFAULT_SETTINGS, type Settings } from '../meta/settings';
 import type { GameArt } from './art';
@@ -16,6 +17,7 @@ function context(): GameContext & { saved: Settings[] } {
     art: {} as GameArt,
     settings: { ...DEFAULT_SETTINGS },
     saved,
+    audio: recordingAudio(),
     save(s) {
       saved.push(s);
       ctx.settings = s;

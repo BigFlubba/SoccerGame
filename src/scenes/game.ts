@@ -1,3 +1,4 @@
+import { createAudio } from '../audio/synth';
 import { createInput, type InputFrame } from '../engine/input';
 import { createStepper, startLoop } from '../engine/loop';
 import { createScreen } from '../engine/screen';
@@ -29,14 +30,22 @@ export function startGame(canvas: HTMLCanvasElement): void {
   const screen = createScreen(canvas);
   const input = createInput(window);
   const store = browserStore();
+  const audio = createAudio(typeof AudioContext === 'undefined' ? null : () => new AudioContext());
   const ctx: GameContext = {
     art: loadGameArt(),
     settings: loadSettings(store),
     save(s) {
       ctx.settings = s;
       saveSettings(store, s);
+      audio.setVolumes(s.musicVolume, s.sfxVolume);
     },
+    audio,
   };
+  audio.setVolumes(ctx.settings.musicVolume, ctx.settings.sfxVolume);
+  // Browsers only allow sound after a key press or click. Chrome doesn't count a gamepad press, but trying is harmless.
+  const unlock = () => audio.unlock();
+  window.addEventListener('keydown', unlock);
+  window.addEventListener('pointerdown', unlock);
   let scene: Scene = createPressStartScene(ctx);
   let latest = input.poll();
   let pending: InputFrame | null = null;
@@ -46,6 +55,7 @@ export function startGame(canvas: HTMLCanvasElement): void {
   const stepper = createStepper(dt => {
     const frame = pending ?? { ...latest, pressed: NONE, released: NONE };
     pending = null;
+    if (frame.pressed.size > 0) audio.unlock();
     scene = scene.update(frame, dt) ?? scene;
   });
 
@@ -54,7 +64,11 @@ export function startGame(canvas: HTMLCanvasElement): void {
 
   // Losing the window or the controller pauses the match (and drops a held charge) before play can go on without him.
   document.addEventListener('visibilitychange', () => {
-    if (!document.hidden) return;
+    if (!document.hidden) {
+      audio.resume();
+      return;
+    }
+    audio.suspend();
     input.releaseAll();
     scene.onHidden?.();
   });

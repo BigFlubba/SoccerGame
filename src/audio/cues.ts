@@ -1,0 +1,116 @@
+/** Every sound effect the game makes. */
+export type Cue =
+  | 'kickSoft'
+  | 'kickHard'
+  | 'tap'
+  | 'bounce'
+  | 'post'
+  | 'fence'
+  | 'tackle'
+  | 'net'
+  | 'perfect'
+  | 'whistleShort'
+  | 'whistleFull'
+  | 'roar'
+  | 'groan'
+  | 'ooh'
+  | 'menuMove'
+  | 'menuConfirm'
+  | 'menuBack';
+
+export type Wave = 'square' | 'triangle' | 'noise';
+
+/** One voice of a cue: a tone or filtered noise with a quick attack and a decay to silence. */
+export interface Voice {
+  wave: Wave;
+  /** Start, seconds after the cue. */
+  at?: number;
+  dur: number;
+  /** Peak gain, before the SFX bus. */
+  gain: number;
+  /** Seconds to reach the peak; the rest of `dur` decays. */
+  attack?: number;
+  /** Pitch, or the noise filter's centre for 'noise'. */
+  freq: number;
+  /** Glides to this by the end. */
+  toFreq?: number;
+  filter?: { type: 'lowpass' | 'bandpass' | 'highpass'; q?: number };
+  vibrato?: { hz: number; depth: number };
+}
+
+export interface CueRecipe {
+  voices: readonly Voice[];
+  /** The same cue again sooner than this is dropped. */
+  minGapS: number;
+}
+
+const whistle = (at: number, dur: number): Voice => ({ wave: 'triangle', at, dur, gain: 0.3, attack: 0.01, freq: 1900, vibrato: { hz: 28, depth: 60 } });
+
+/** Written by ear: short, 8-bit, and nothing shrill. */
+export const CUES: Readonly<Record<Cue, CueRecipe>> = {
+  kickSoft: {
+    voices: [
+      { wave: 'noise', dur: 0.06, gain: 0.3, freq: 900, filter: { type: 'lowpass' } },
+      { wave: 'triangle', dur: 0.08, gain: 0.45, freq: 140, toFreq: 60 },
+    ],
+    minGapS: 0.05,
+  },
+  kickHard: {
+    voices: [
+      { wave: 'noise', dur: 0.12, gain: 0.55, freq: 1800, toFreq: 400, filter: { type: 'lowpass' } },
+      { wave: 'triangle', dur: 0.14, gain: 0.8, freq: 180, toFreq: 50 },
+    ],
+    minGapS: 0.05,
+  },
+  tap: { voices: [{ wave: 'triangle', dur: 0.04, gain: 0.12, freq: 220, toFreq: 120 }], minGapS: 0.08 },
+  bounce: { voices: [{ wave: 'triangle', dur: 0.06, gain: 0.25, freq: 120, toFreq: 70 }], minGapS: 0.06 },
+  post: {
+    voices: [
+      { wave: 'square', dur: 0.3, gain: 0.18, freq: 1200, filter: { type: 'lowpass', q: 2 } },
+      { wave: 'square', dur: 0.15, gain: 0.07, freq: 1800, filter: { type: 'lowpass' } },
+    ],
+    minGapS: 0.1,
+  },
+  fence: {
+    voices: [
+      { wave: 'noise', dur: 0.1, gain: 0.35, freq: 400, filter: { type: 'lowpass' } },
+      { wave: 'triangle', dur: 0.12, gain: 0.4, freq: 90, toFreq: 50 },
+    ],
+    minGapS: 0.08,
+  },
+  tackle: {
+    voices: [
+      { wave: 'noise', dur: 0.15, gain: 0.45, freq: 600, toFreq: 200, filter: { type: 'lowpass' } },
+      { wave: 'triangle', dur: 0.15, gain: 0.55, freq: 110, toFreq: 55 },
+    ],
+    minGapS: 0.1,
+  },
+  net: { voices: [{ wave: 'noise', dur: 0.35, gain: 0.3, attack: 0.02, freq: 3000, toFreq: 1500, filter: { type: 'highpass' } }], minGapS: 0.2 },
+  perfect: {
+    voices: [
+      { wave: 'square', dur: 0.08, gain: 0.12, freq: 1047 },
+      { wave: 'square', at: 0.07, dur: 0.15, gain: 0.12, freq: 1568 },
+    ],
+    minGapS: 0.2,
+  },
+  whistleShort: { voices: [whistle(0, 0.35)], minGapS: 0.3 },
+  whistleFull: { voices: [whistle(0, 0.25), whistle(0.35, 0.25), whistle(0.7, 0.9)], minGapS: 1 },
+  roar: { voices: [{ wave: 'noise', dur: 2.5, gain: 0.45, attack: 0.8, freq: 500, toFreq: 900, filter: { type: 'bandpass', q: 0.7 } }], minGapS: 1 },
+  groan: { voices: [{ wave: 'noise', dur: 1.4, gain: 0.35, attack: 0.15, freq: 700, toFreq: 250, filter: { type: 'bandpass', q: 1 } }], minGapS: 1 },
+  ooh: {
+    voices: [
+      { wave: 'noise', dur: 0.45, gain: 0.3, attack: 0.15, freq: 400, toFreq: 900, filter: { type: 'bandpass', q: 1.5 } },
+      { wave: 'noise', at: 0.35, dur: 0.45, gain: 0.25, attack: 0.05, freq: 900, toFreq: 400, filter: { type: 'bandpass', q: 1.5 } },
+    ],
+    minGapS: 0.5,
+  },
+  menuMove: { voices: [{ wave: 'square', dur: 0.04, gain: 0.08, freq: 660 }], minGapS: 0.03 },
+  menuConfirm: {
+    voices: [
+      { wave: 'square', dur: 0.05, gain: 0.1, freq: 880 },
+      { wave: 'square', at: 0.05, dur: 0.08, gain: 0.1, freq: 1320 },
+    ],
+    minGapS: 0.05,
+  },
+  menuBack: { voices: [{ wave: 'square', dur: 0.08, gain: 0.08, freq: 660, toFreq: 440 }], minGapS: 0.05 },
+};
