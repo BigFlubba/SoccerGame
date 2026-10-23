@@ -64,6 +64,8 @@ export function createMatchScene(ctx: GameContext, seed: number): MatchScene {
   let fullTime: MenuState | null = null;
   let t = 0;
   ctx.audio.setCrowd('match');
+  // No music in a match: the crowd carries it.
+  ctx.audio.playMusic(null);
 
   /** Steps a menu, blipping as it goes. */
   const step = (m: MenuState, input: InputFrame) => {
@@ -154,6 +156,8 @@ export function createMatchScene(ctx: GameContext, seed: number): MatchScene {
       }
       if (world.match.phase === 'fullTime' && !fullTime && world.match.phaseT >= RESULT_DELAY_S) {
         fullTime = { items: FULL_TIME_ITEMS, index: 0 };
+        // The jingle comes in with the result, after the full-time whistle.
+        if (world.match.result) ctx.audio.playMusic(world.match.result);
       }
       return null;
     },

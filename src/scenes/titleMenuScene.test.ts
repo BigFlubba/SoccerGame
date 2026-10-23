@@ -90,4 +90,12 @@ describe('title menu', () => {
     s.update(frame(['up']), STEP);
     expect(s.update(frame(['confirm']), STEP)?.kind).toBe('match');
   });
+
+  it('Press Start and the title menu play the title theme', () => {
+    for (const make of [createPressStartScene, createTitleMenuScene]) {
+      const ctx = context();
+      make(ctx);
+      expect((ctx.audio as ReturnType<typeof recordingAudio>).music).toBe('title');
+    }
+  });
 });

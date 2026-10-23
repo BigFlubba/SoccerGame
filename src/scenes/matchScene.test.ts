@@ -326,4 +326,31 @@ describe('match scene: pause menu screens', () => {
       expect(s.world.home.state).toBe('charging');
     });
   });
+
+  describe('music', () => {
+    it('the match stops the title music, and the result plays its jingle', () => {
+      const audio = recordingAudio();
+      audio.music = 'title';
+      const s = createMatchScene({ ...CTX, audio }, 1);
+      expect(audio.music).toBeNull();
+      Object.assign(s.world.match, { phase: 'playing', clockS: 89.99, score: { home: 2, away: 1 } });
+      run(s, 0.1);
+      expect(s.world.match.phase).toBe('fullTime');
+      run(s, 2);
+      expect(audio.music).toBe('win');
+    });
+
+    it('a loss and a draw get their own jingles', () => {
+      for (const [score, track] of [
+        [{ home: 0, away: 1 }, 'lose'],
+        [{ home: 1, away: 1 }, 'draw'],
+      ] as const) {
+        const audio = recordingAudio();
+        const s = createMatchScene({ ...CTX, audio }, 1);
+        Object.assign(s.world.match, { phase: 'playing', goldenGoal: true, goldenS: 200, score: { ...score } });
+        run(s, 2.2);
+        expect(audio.music, track).toBe(track);
+      }
+    });
+  });
 });

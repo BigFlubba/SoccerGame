@@ -18,6 +18,7 @@ const newSeed = () => Math.floor(Math.random() * 2 ** 32);
 /** START GAME, OPTIONS, HELP. Up/down choose, A or Start confirms, B or Esc goes back to Press Start. */
 export function createTitleMenuScene(ctx: GameContext, index = 0): Scene {
   let menu: MenuState = { items: TITLE_MENU_ITEMS, index };
+  ctx.audio.playMusic('title');
   return {
     kind: 'titleMenu',
     update(input) {

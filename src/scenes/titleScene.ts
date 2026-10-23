@@ -17,6 +17,7 @@ export interface PressStartScene extends Scene {
 /** The first screen: the Backyard, Harrison juggling, the title and a blinking PRESS START. Start, A or Enter goes on. */
 export function createPressStartScene(ctx: GameContext): PressStartScene {
   ctx.audio.setCrowd('off');
+  ctx.audio.playMusic('title');
   return {
     kind: 'pressStart',
     get soundHint() {

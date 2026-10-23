@@ -1,5 +1,6 @@
 import { VOLUME_MAX } from '../meta/settings';
 import { CUES, type Cue, type Voice } from './cues';
+import { SONGS, parseNotes, type Song, type Track } from './music';
 
 export type CrowdLevel = 'off' | 'low' | 'match';
 
@@ -17,6 +18,8 @@ export interface GameAudio {
   play(cue: Cue): void;
   /** Remembered while locked and applied on unlock. */
   setCrowd(level: CrowdLevel): void;
+  /** The same track already playing is a no-op; null stops it. Remembered while locked. */
+  playMusic(track: Track | null): void;
   suspend(): void;
   resume(): void;
 }
@@ -35,6 +38,15 @@ const SILENT = 0.0001;
 /** Sources stop this long after their envelope ends. */
 const TAIL_S = 0.05;
 const DEFAULT_VOLUME = 5;
+/** Lookahead scheduling: every SCHEDULE_MS, notes due within LOOKAHEAD_S are queued on the music bus. */
+const SCHEDULE_MS = 25;
+const LOOKAHEAD_S = 0.1;
+const MUSIC_START_S = 0.05;
+/** Each note sounds for this share of its slot, so repeated notes separate. */
+const NOTE_LENGTH = 0.9;
+/** A note decays to this share of its peak before its release. */
+const NOTE_SUSTAIN = 0.4;
+const MUSIC_FADE_S = 0.05;
 
 /** A volume level as a gain: squared, so the low end of the slider is usable. */
 export function volumeGain(level: number): number {
@@ -130,6 +142,61 @@ function playVoice(g: Graph, v: Voice, now: number): void {
   src.stop(t1 + TAIL_S);
 }
 
+/** One note of music: a short attack, a decay toward a sustain, then a release. */
+function playNote(ctx: AudioContext, out: AudioNode, p: Song['parts'][number], freq: number, t: number, dur: number): void {
+  const o = ctx.createOscillator();
+  o.type = p.wave;
+  o.frequency.setValueAtTime(freq, t);
+  const env = ctx.createGain();
+  env.gain.setValueAtTime(SILENT, t);
+  env.gain.linearRampToValueAtTime(p.gain, t + DEFAULT_ATTACK_S);
+  env.gain.exponentialRampToValueAtTime(p.gain * NOTE_SUSTAIN, t + dur * 0.7);
+  env.gain.exponentialRampToValueAtTime(SILENT, t + dur);
+  o.connect(env).connect(out);
+  o.start(t);
+  o.stop(t + dur + TAIL_S);
+}
+
+/** Plays a song on the music bus with a lookahead scheduler. Returns a stop that fades it out at once. */
+function startSong(g: Graph, song: Song): () => void {
+  const { ctx } = g;
+  const out = ctx.createGain();
+  out.connect(g.music);
+  const beatS = 60 / song.bpm;
+  const t0 = ctx.currentTime + MUSIC_START_S;
+  const parts = song.parts.map(p => ({ part: p, notes: parseNotes(p.notes), i: 0, t: t0 }));
+  const tick = () => {
+    const horizon = ctx.currentTime + LOOKAHEAD_S;
+    let more = false;
+    for (const p of parts) {
+      while (p.t < horizon) {
+        if (p.i >= p.notes.length) {
+          if (!song.loop) break;
+          p.i = 0;
+        }
+        const n = p.notes[p.i++]!;
+        const dur = n.beats * beatS;
+        if (n.freq !== null) playNote(ctx, out, p.part, n.freq, p.t, dur * NOTE_LENGTH);
+        p.t += dur;
+      }
+      if (song.loop || p.i < p.notes.length) more = true;
+    }
+    if (!more) clearInterval(timer);
+  };
+  const timer = setInterval(() => {
+    try {
+      tick();
+    } catch {
+      clearInterval(timer);
+    }
+  }, SCHEDULE_MS);
+  tick();
+  return () => {
+    clearInterval(timer);
+    out.gain.setTargetAtTime(0, ctx.currentTime, MUSIC_FADE_S);
+  };
+}
+
 /** The game's audio. `makeContext` is null where Web Audio doesn't exist (and in tests). */
 export function createAudio(makeContext: (() => AudioContext) | null): GameAudio {
   let make = makeContext;
@@ -137,6 +204,8 @@ export function createAudio(makeContext: (() => AudioContext) | null): GameAudio
   let crowdLevel: CrowdLevel = 'off';
   let volumes = { music: DEFAULT_VOLUME, sfx: DEFAULT_VOLUME };
   let resumeOnShow = false;
+  let wantTrack: Track | null = null;
+  let stopSong: (() => void) | null = null;
   const lastPlayed = new Map<Cue, number>();
 
   const running = () => graph?.ctx.state === 'running';
@@ -149,6 +218,17 @@ export function createAudio(makeContext: (() => AudioContext) | null): GameAudio
   const applyCrowd = () => {
     if (!graph || !running()) return;
     graph.crowd.gain.setTargetAtTime(CROWD_GAIN[crowdLevel], graph.ctx.currentTime, CROWD_GLIDE_S);
+  };
+  const restartMusic = () => {
+    stopSong?.();
+    stopSong = null;
+    if (!graph || !running() || !wantTrack) return;
+    stopSong = startSong(graph, SONGS[wantTrack]);
+  };
+  /** Whatever was asked for while locked starts now. */
+  const onRunning = () => {
+    applyCrowd();
+    if (!stopSong) restartMusic();
   };
   const safely = (f: () => void) => {
     try {
@@ -178,8 +258,8 @@ export function createAudio(makeContext: (() => AudioContext) | null): GameAudio
           applyVolumes();
         }
         // A context made inside a key press can already be running.
-        if (running()) return applyCrowd();
-        graph.ctx.resume().then(applyCrowd, () => {});
+        if (running()) return onRunning();
+        graph.ctx.resume().then(onRunning, () => {});
       });
     },
     setVolumes(music, sfx) {
@@ -201,6 +281,11 @@ export function createAudio(makeContext: (() => AudioContext) | null): GameAudio
       crowdLevel = level;
       safely(applyCrowd);
     },
+    playMusic(track) {
+      if (track === wantTrack) return;
+      wantTrack = track;
+      safely(restartMusic);
+    },
     suspend() {
       if (!graph) return;
       resumeOnShow = running();
@@ -211,7 +296,7 @@ export function createAudio(makeContext: (() => AudioContext) | null): GameAudio
       if (!graph || !resumeOnShow) return;
       resumeOnShow = false;
       const ctx = graph.ctx;
-      safely(() => void ctx.resume().then(applyCrowd, () => {}));
+      safely(() => void ctx.resume().then(onRunning, () => {}));
     },
   };
 }

@@ -156,4 +156,28 @@ describe('createAudio', () => {
     expect(volumeGain(5)).toBeCloseTo(0.25);
     expect(volumeGain(99)).toBe(1);
   });
+
+  it("playMusic('title') twice schedules one loop", async () => {
+    const f = fakeContext();
+    const a = createAudio(f.make);
+    a.unlock();
+    await settle();
+    a.playMusic('title');
+    const once = f.made.oscillators;
+    expect(once).toBeGreaterThan(0);
+    a.playMusic('title');
+    expect(f.made.oscillators).toBe(once);
+    a.playMusic(null);
+  });
+
+  it('a track asked for while locked starts on unlock', async () => {
+    const f = fakeContext();
+    const a = createAudio(f.make);
+    a.playMusic('title');
+    expect(f.made.oscillators).toBe(0);
+    a.unlock();
+    await settle();
+    expect(f.made.oscillators).toBeGreaterThan(0);
+    a.playMusic(null);
+  });
 });
