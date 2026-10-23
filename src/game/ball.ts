@@ -105,30 +105,27 @@ function collidePosts(b: Ball, g: Goal): boolean {
  * from the goal line to the end fence. Every net stops the ball from either
  * side and soaks up most of its pace.
  */
-function collideNets(b: Ball, g: Goal, field: Field): boolean {
+function collideNets(b: Ball, g: Goal, field: Field, from: { x: number; z: number }): boolean {
   if (b.y >= g.barY) return false;
   let hit = false;
   const [x0, x1] = roofSpan(field, g);
   if (b.x >= x0 && b.x <= x1) {
     for (const zn of [g.z0, g.z1]) {
-      const d = b.z - zn;
-      if (Math.abs(d) >= BALL_R) continue;
-      const side = d > 0 || (d === 0 && zn === g.z0) ? 1 : -1;
+      if (Math.abs(b.z - zn) >= BALL_R) continue;
+      // The side it was on before this substep moved it: a ball can't be dragged through the net.
+      const side = Math.sign(from.z - zn) || Math.sign(b.z - zn) || (zn === g.z0 ? 1 : -1);
       b.z = zn + side * BALL_R;
       if (b.vz * side < 0) b.vz = -b.vz * NET_DAMPING;
       hit = true;
     }
   }
-  if (b.z >= g.z0 && b.z <= g.z1) {
-    const d = b.x - g.backX;
-    if (Math.abs(d) < BALL_R) {
-      // From inside the goal, or (if it ever got there) from the closed gap behind it.
-      const inside = g.side === 'right' ? d < 0 : d > 0;
-      const side = inside === (g.side === 'right') ? -1 : 1;
-      b.x = g.backX + side * BALL_R;
-      if (b.vx * side < 0) b.vx = -b.vx * NET_DAMPING;
-      hit = true;
-    }
+  if (b.z >= g.z0 && b.z <= g.z1 && Math.abs(b.x - g.backX) < BALL_R) {
+    // From inside the goal, or (if it ever got there) from the closed gap behind it.
+    const inward = g.side === 'right' ? -1 : 1;
+    const side = Math.sign(from.x - g.backX) || inward;
+    b.x = g.backX + side * BALL_R;
+    if (b.vx * side < 0) b.vx = -b.vx * NET_DAMPING;
+    hit = true;
   }
   return hit;
 }
@@ -158,6 +155,7 @@ function collideWalls(b: Ball, field: Field): boolean {
 }
 
 function substep(b: Ball, h: number, field: Field, ev: BallEvents): void {
+  const from = { x: b.x, z: b.z };
   const airborne = b.y > BALL_REST_Y || b.vy > 0;
   if (airborne) {
     b.vy -= (GRAVITY + Math.max(b.spin, 0) * SPIN_DIP) * h;
@@ -198,7 +196,7 @@ function substep(b: Ball, h: number, field: Field, ev: BallEvents): void {
     for (const g of field.goals) {
       if (collidePosts(b, g)) ev.hitPost = true;
       if (collideBar(b, g, field)) ev.hitBar = true;
-      if (collideNets(b, g, field)) ev.hitNet = true;
+      if (collideNets(b, g, field, from)) ev.hitNet = true;
     }
   }
   if (b.y < BALL_REST_Y) b.y = BALL_REST_Y;

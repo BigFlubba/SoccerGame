@@ -1,3 +1,4 @@
+import { seeded } from '../engine/random';
 import { describe, expect, it } from 'vitest';
 import { inGoalBox } from './field';
 import { NO_INTENT, PLAYER_R, type PlayerIntent } from './player';
@@ -155,5 +156,60 @@ describe('world', () => {
     w.match.phase = 'playing';
     stepWorld(w, { ...NO_INTENT, chipHeld: true }, NO_INTENT, STEP);
     expect(w.home.state).toBe('chipping');
+  });
+
+  it('clearing a ball out of the corner beside your own goal is never an own goal', () => {
+    for (const sprint of [false, true]) {
+      const w = createWorld(BASE_STATS, BASE_STATS, 3, ERR);
+      w.match.phase = 'playing';
+      Object.assign(w.ball, { x: 9, y: BALL_REST_Y, z: 9, vx: 0, vy: 0, vz: 0 });
+      Object.assign(w.home, { x: 19, z: 5 });
+      Object.assign(w.away, { x: 320, z: 32 });
+      for (let i = 0; i < 3 * 60; i++) {
+        const [dx, dz] = [w.ball.x - w.home.x, w.ball.z - w.home.z];
+        const d = Math.hypot(dx, dz) || 1;
+        stepWorld(w, { ...NO_INTENT, moveX: dx / d, moveZ: dz / d, sprint }, NO_INTENT, STEP);
+      }
+      expect(w.match.score, `sprint ${sprint}`).toEqual({ home: 0, away: 0 });
+    }
+  });
+
+  it('a body push beside the far side netting is never a goal', () => {
+    const w = createWorld(BASE_STATS, BASE_STATS, 3, ERR);
+    w.match.phase = 'playing';
+    Object.assign(w.ball, { x: 629.73, y: 7.68, z: 49, vx: -59, vy: 129, vz: -3 });
+    Object.assign(w.home, { x: 626.2, z: 51, vz: -19 });
+    Object.assign(w.away, { x: 320, z: 32 });
+    for (let i = 0; i < 60; i++) stepWorld(w, NO_INTENT, NO_INTENT, STEP);
+    expect(w.match.score).toEqual({ home: 0, away: 0 });
+  });
+
+  it('every goal goes in through the mouth: bodies pushing balls about beside both goals', () => {
+    const rng = seeded(77);
+    for (let trial = 0; trial < 400; trial++) {
+      const w = createWorld(BASE_STATS, BASE_STATS, trial, ERR);
+      w.match.phase = 'playing';
+      const g = w.field.goals[trial % 2]!;
+      const toField = g.side === 'right' ? -1 : 1;
+      const far = rng() < 0.5;
+      const bx = g.lineX - toField * (2 + rng() * 20);
+      const bz = far ? g.z1 + 2 + rng() * 14 : g.z0 - 2 - rng() * 14;
+      Object.assign(w.ball, { x: bx, y: BALL_REST_Y + rng() * 12, z: bz, vx: (rng() - 0.5) * 200, vy: rng() * 150, vz: (rng() - 0.5) * 200 });
+      Object.assign(w.home, { x: bx + toField * (6 + rng() * 20), z: far ? 60 - rng() * 6 : 4 + rng() * 6 });
+      Object.assign(w.away, { x: 320, z: 32 });
+      let mouth = false;
+      for (let i = 0; i < 90 && w.match.phase === 'playing'; i++) {
+        const before = { x: w.ball.x, z: w.ball.z };
+        const [dx, dz] = [w.ball.x - w.home.x, w.ball.z - w.home.z];
+        const d = Math.hypot(dx, dz) || 1;
+        stepWorld(w, { ...NO_INTENT, moveX: dx / d, moveZ: dz / d, sprint: trial % 3 === 0 }, NO_INTENT, STEP);
+        const b = w.ball;
+        if ((before.x - g.lineX) * toField > 0 && (b.x - g.lineX) * toField <= 0) {
+          const z = before.z + ((g.lineX - before.x) / (b.x - before.x)) * (b.z - before.z);
+          if (z >= g.z0 && z <= g.z1) mouth = true;
+        }
+      }
+      if (w.match.score.home + w.match.score.away > 0) expect(mouth, `trial ${trial}: a goal that never crossed the goal mouth`).toBe(true);
+    }
   });
 });

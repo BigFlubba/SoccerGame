@@ -218,6 +218,22 @@ describe('stepBall', () => {
     run(far, 1, s => expect(goalScored(BACKYARD, s)).toBeNull());
   });
 
+  it('a ball pressed against the outside of the side netting is never pulled through it', () => {
+    for (const [x, z, vz, outside] of [
+      [620, 17.5, 300, -1],
+      [620, 16, 200, -1],
+      [20, 46.5, -300, 1],
+      [630, 47, -250, 1],
+    ] as const) {
+      const b = ball({ x, y: 10, z, vz });
+      run(b, 0.5, s => {
+        const net = outside < 0 ? 18 : 46;
+        expect((s.z - net) * outside, `from (${x}, z ${z})`).toBeGreaterThanOrEqual(BALL_R - EPS);
+        expect(goalScored(BACKYARD, s)).toBeNull();
+      });
+    }
+  });
+
   it('a ball in the net cannot leave through the side netting', () => {
     for (const vz of [-400, 400]) {
       const b = ball({ x: 620, y: BALL_R, z: 32, vz });

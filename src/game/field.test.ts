@@ -8,6 +8,11 @@ describe('goalScored', () => {
     expect(goalScored(BACKYARD, { x: 615, y: 10, z: 10 })).toBeNull(); // wide of the near post
   });
 
+  it('never counts a ball in the sealed gap behind the net', () => {
+    expect(goalScored(BACKYARD, { x: 632, y: 10, z: 32 })).toBeNull();
+    expect(goalScored(BACKYARD, { x: 8, y: 10, z: 32 })).toBeNull();
+  });
+
   it('needs the whole ball past the line and under the bar', () => {
     expect(goalScored(BACKYARD, { x: 612 + 2, y: 10, z: 32 })).toBeNull();
     expect(goalScored(BACKYARD, { x: 620, y: 27, z: 32 })).toBeNull();

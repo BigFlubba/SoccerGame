@@ -56,10 +56,12 @@ const ROUND_BALL_Z = 12;
 /** An opponent this close ahead on its path, and this close to the path's line, is in the way: it sidesteps. */
 const BLOCKER_AHEAD = 16;
 const BLOCKER_SIDE = 10;
+/** How far ahead it checks that a sidestep doesn't walk it into a goal. */
+const SIDESTEP_LOOKAHEAD = 8;
+/** A route that only touches a goal's edge (he stands on it after being pushed out) doesn't count as crossing it. */
+const EDGE_SLACK = 0.5;
 /** A spot it wants inside a goal moves out to this far from the goal's outline: a body radius and a little. */
 const GOAL_CLEARANCE = PLAYER_R + 1;
-/** With the ball behind the line of the goal it attacks, it first takes it out this far in front. */
-const OUT_FROM_BEHIND = 40;
 const CHARGE_MIN_S = 0.25;
 const CHARGE_SPREAD_S = 0.55;
 const SPRINT_DISTANCE = 120;
@@ -122,10 +124,15 @@ function goRound(w: World, me: Player, them: Player, move: [number, number], goa
   const along = rx * mx + rz * mz;
   const across = rx * mz - rz * mx;
   if (along <= 0 || along > BLOCKER_AHEAD || Math.abs(across) >= BLOCKER_SIDE) return move;
-  const side = Math.abs(goalZ - them.z) > BLOCKER_SIDE / 2 ? Math.sign(goalZ - them.z) : roomySide(w, them.z, me.z);
-  const [sx, sz] = [mx, mz + side];
-  const d = Math.hypot(sx, sz);
-  return [sx / d, sz / d];
+  const preferred = Math.abs(goalZ - them.z) > BLOCKER_SIDE / 2 ? Math.sign(goalZ - them.z) : roomySide(w, them.z, me.z);
+  // Never sidestep into a goal: the goal would push him straight back, every tick.
+  for (const side of [preferred, -preferred]) {
+    const [sx, sz] = [mx, mz + side];
+    const d = Math.hypot(sx, sz);
+    const ahead = { x: me.x + (sx / d) * SIDESTEP_LOOKAHEAD, z: me.z + (sz / d) * SIDESTEP_LOOKAHEAD };
+    if (!w.field.goals.some(g => inGoalBox(g, ahead.x, ahead.z, PLAYER_R))) return [sx / d, sz / d];
+  }
+  return move;
 }
 
 interface Box {
@@ -184,11 +191,12 @@ function outOfGoals(w: World, x: number, z: number): { x: number; z: number } {
  */
 function route(w: World, me: Player, x: number, z: number): { x: number; z: number } {
   for (const g of w.field.goals) {
-    const box = goalBox(g, PLAYER_R);
+    const box = goalBox(g, PLAYER_R - EDGE_SLACK);
     if (!crosses(me, { x, z }, box)) continue;
     const corners = goalBox(g, CORNER_CLEARANCE);
     const front = g.side === 'right' ? corners.x0 : corners.x1;
-    const inFront = g.side === 'right' ? me.x <= front + ARRIVE : me.x >= front - ARRIVE;
+    // In front means on the pitch side of the goal line; beside the goal means behind it.
+    const inFront = g.side === 'right' ? me.x < g.lineX : me.x > g.lineX;
     const middle = (g.z0 + g.z1) / 2;
     const sideOf = (depth: number) => (depth < middle ? corners.z0 : corners.z1);
     const corner = { x: front, z: sideOf(inFront ? z : me.z) };
@@ -223,7 +231,9 @@ function decide(brain: AiBrain, w: World, me: Player, them: Player): void {
   const moveTo = (x: number, z: number, aimZ = z): PlayerIntent => {
     const spot = outOfGoals(w, x, z);
     const next = route(w, me, spot.x, spot.z);
-    const [moveX, moveZ] = goRound(w, me, them, steer(me, next.x, next.z), aimZ);
+    // Rounding a goal, it passes the opponent on the side of the corner it's heading for.
+    const sideZ = next.x === spot.x && next.z === spot.z ? aimZ : next.z;
+    const [moveX, moveZ] = goRound(w, me, them, steer(me, next.x, next.z), sideZ);
     return { ...intent, moveX, moveZ };
   };
   const toGoal = (attacking.lineX - me.x) * dir;
@@ -239,8 +249,10 @@ function decide(brain: AiBrain, w: World, me: Player, them: Player): void {
       return;
     }
     brain.plan = 'dribble';
+    // Behind the line it attacks, the ball is in a pocket beside the goal with no room to get round it:
+    // run into it, so it is touched or popped back out toward the pitch.
     const behindLine = (attacking.lineX - ball.x) * dir < 0;
-    brain.intent = behindLine ? moveTo(attacking.lineX - dir * OUT_FROM_BEHIND, goalCentreZ(attacking)) : moveTo(attacking.lineX, goalCentreZ(attacking));
+    brain.intent = behindLine ? moveTo(ball.x, ball.z) : moveTo(attacking.lineX, goalCentreZ(attacking));
     return;
   }
 
@@ -251,7 +263,9 @@ function decide(brain: AiBrain, w: World, me: Player, them: Player): void {
     const close = dist <= SLIDE_RANGE;
     if (close && !facingBall) {
       // Turn to face the ball, or it would stand on its spot facing away and never challenge.
-      brain.intent = { ...intent, moveX: Math.sign(ball.x - me.x) };
+      // Steer at it in depth too: a full-speed run along x alone overshoots a ball off his line.
+      const [moveX, moveZ] = steer(me, ball.x, ball.z);
+      brain.intent = { ...intent, moveX: moveX || Math.sign(ball.x - me.x), moveZ };
       return;
     }
     if (close && inLine && brain.slideReadyS === 0 && w.rng() < profile.aggression) {

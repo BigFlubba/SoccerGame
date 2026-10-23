@@ -110,19 +110,29 @@ function dribble(p: Player, ball: Ball, ev: ContactEvents): void {
 
 const clamp = (v: number, lo: number, hi: number): number => Math.min(Math.max(v, lo), hi);
 
-/** Whether moving the ball's centre from `from` to `to` (at height y) would pass through a goal's netting or a post. */
+/**
+ * Whether moving the ball's centre from `from` to `to` (at height y) would
+ * pass through a goal's netting or posts, or leave it overlapping any of
+ * them or the bar: the ball physics would then pick a side for it, and that
+ * side could be inside the goal.
+ */
 function throughGoal(field: Field, y: number, from: { x: number; z: number }, to: { x: number; z: number }): boolean {
   return field.goals.some(g => {
-    if (y >= g.barY + g.barThick + BALL_R) return false;
+    const top = g.barY + g.barThick;
+    if (y >= top + BALL_R) return false;
     const posts = [g.z0, g.z1].some(z => Math.hypot(to.x - g.lineX, to.z - z) < BALL_R + POST_R);
-    if (posts || y >= g.barY) return posts;
     const [x0, x1] = roofSpan(field, g);
+    const bar = Math.hypot(to.x - clamp(to.x, x0, x1), y - clamp(y, g.barY, top), to.z - clamp(to.z, g.z0, g.z1)) < BALL_R;
+    if (posts || bar || y >= g.barY) return posts || bar;
     const crossesSide = [g.z0, g.z1].some(z => {
+      const alongNet = to.x >= x0 && to.x <= x1 && Math.abs(to.z - z) < BALL_R;
+      if (alongNet) return true;
       if (Math.sign(from.z - z) === Math.sign(to.z - z)) return false;
       const x = from.x + ((z - from.z) / (to.z - from.z)) * (to.x - from.x);
       return x >= x0 - BALL_R - POST_R && x <= x1 + BALL_R + POST_R;
     });
-    const crossesBack = Math.sign(from.x - g.backX) !== Math.sign(to.x - g.backX) && to.z >= g.z0 - BALL_R && to.z <= g.z1 + BALL_R;
+    const nearBack = to.z >= g.z0 - BALL_R && to.z <= g.z1 + BALL_R;
+    const crossesBack = nearBack && (Math.abs(to.x - g.backX) < BALL_R || Math.sign(from.x - g.backX) !== Math.sign(to.x - g.backX));
     return crossesSide || crossesBack;
   });
 }

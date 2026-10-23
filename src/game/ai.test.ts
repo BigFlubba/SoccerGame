@@ -267,4 +267,68 @@ describe('think', () => {
       expect(goals.away).toBeGreaterThan(0);
     },
   );
+
+  it('reaches a ball beside its own side netting past a still Harrison at the goal\u2019s front corner', () => {
+    for (const [difficulty, mx, mz] of [
+      ['normal', 616.7, 13],
+      ['hard', 590, 8],
+      ['easy', 600, 6],
+    ] as const) {
+      const w = scene({ x: 630.7, z: 14.7 }, 607, 590);
+      Object.assign(w.home, { z: 16.7 });
+      Object.assign(w.away, { x: mx, z: mz });
+      const brain = createBrain(DIFFICULTY[difficulty]);
+      let moved = false;
+      for (let t = 0; t < 4 * 60 && !moved; t++) {
+        stepWorld(w, NO_INTENT, think(brain, w, w.away, w.home, STEP), STEP);
+        moved = Math.hypot(w.ball.x - 630.7, w.ball.z - 14.7) > 4;
+      }
+      expect(moved, difficulty).toBe(true);
+    }
+  });
+
+  /** Plays a match with Harrison parked (or idle where he kicked off); returns the longest the ball sat still in play, and Max's goals. */
+  function parkedMatch(difficulty: 'easy' | 'normal' | 'hard', seed: number, park?: { x: number; z: number }): { stuckS: number; maxGoals: number } {
+    const w = createWorld(BASE_STATS, BASE_STATS, seed, { home: 4, away: DIFFICULTY[difficulty].aimErrorDeg });
+    const brain = createBrain(DIFFICULTY[difficulty]);
+    let anchor = { x: w.ball.x, z: w.ball.z, s: 0 };
+    let stuckS = 0;
+    for (let t = 0; t < 60 * 90 && w.match.phase !== 'fullTime'; t++) {
+      if (park && w.match.phase === 'playing') Object.assign(w.home, { ...park, vx: 0, vz: 0 });
+      stepWorld(w, NO_INTENT, think(brain, w, w.away, w.home, STEP), STEP);
+      if (w.match.phase !== 'playing' || Math.hypot(w.ball.x - anchor.x, w.ball.z - anchor.z) > 4) anchor = { x: w.ball.x, z: w.ball.z, s: 0 };
+      else stuckS = Math.max(stuckS, (anchor.s += STEP));
+    }
+    return { stuckS, maxGoals: w.match.score.away };
+  }
+
+  it.each(['easy', 'normal', 'hard'] as const)('on %s, against an idle Harrison, Max always plays the ball and scores', difficulty => {
+    for (let seed = 1; seed <= 20; seed++) {
+      const r = parkedMatch(difficulty, seed);
+      expect(r.stuckS, `seed ${seed}: ball sat still`).toBeLessThanOrEqual(10);
+      expect(r.maxGoals, `seed ${seed}: Max never scored`).toBeGreaterThan(0);
+    }
+  });
+
+  it('reaches a ball in the far pocket beside the goal it attacks, from in front of that goal', () => {
+    for (const difficulty of ['easy', 'normal', 'hard'] as const) {
+      const w = scene({ x: 11.8, z: 49.4 }, 36, 33);
+      Object.assign(w.home, { z: 18 });
+      Object.assign(w.away, { z: 27.4 });
+      const brain = createBrain(DIFFICULTY[difficulty]);
+      let moved = false;
+      for (let t = 0; t < 5 * 60 && !moved; t++) {
+        Object.assign(w.home, { x: 36, z: 18, vx: 0, vz: 0 });
+        stepWorld(w, NO_INTENT, think(brain, w, w.away, w.home, STEP), STEP);
+        moved = Math.hypot(w.ball.x - 11.8, w.ball.z - 49.4) > 4;
+      }
+      expect(moved, difficulty).toBe(true);
+    }
+  });
+
+  it('against Harrison parked in his goal mouth, the ball never sits still for long', () => {
+    for (let seed = 1; seed <= 20; seed++) {
+      expect(parkedMatch('normal', seed, { x: 36, z: 32 }).stuckS, `seed ${seed}`).toBeLessThanOrEqual(10);
+    }
+  });
 });

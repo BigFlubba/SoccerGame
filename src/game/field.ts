@@ -57,12 +57,15 @@ export function playerSpan(field: Field): [x0: number, x1: number] {
   return [field.fenceL, field.fenceR];
 }
 
-/** Which goal the ball is in: the whole ball past the line, under the bar and between the posts. */
+/**
+ * Which goal the ball is in: the whole ball past the line, under the bar and
+ * between the posts, and in front of the net back (never in the sealed gap behind it).
+ */
 export function goalScored(field: Field, b: { x: number; y: number; z: number }): 'left' | 'right' | null {
   for (const g of field.goals) {
     const past = g.side === 'right' ? b.x - BALL_R >= g.lineX : b.x + BALL_R <= g.lineX;
     const between = b.z - BALL_R >= g.z0 && b.z + BALL_R <= g.z1;
-    if (past && between && b.y + BALL_R <= g.barY) return g.side;
+    if (past && between && inGoalBox(g, b.x, b.z) && b.y + BALL_R <= g.barY) return g.side;
   }
   return null;
 }
