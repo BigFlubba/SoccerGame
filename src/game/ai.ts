@@ -1,8 +1,11 @@
+import { BALL_R } from '../art/ball';
 import { BALL_REST_Y } from './ball';
 import { GRAVITY } from './constants';
+import { inGoalBox, type Goal } from './field';
 import type { Aim } from './kick';
-import { NO_INTENT, type Player, type PlayerIntent } from './player';
+import { NO_INTENT, PLAYER_R, type Player, type PlayerIntent } from './player';
 import type { World } from './world';
+import { REACH_Z } from './zones';
 
 export type Difficulty = 'easy' | 'normal' | 'hard';
 
@@ -38,39 +41,172 @@ const POSSESSION_RANGE = 16;
 const BALL_LOW = 6;
 /** It runs to this far behind a loose ball, so it pushes the ball toward goal. */
 const CHASE_OFFSET = 8;
-/** It stands this far goal-side of the ball when defending. */
+/** It stands this far goal-side of the ball when defending... */
 const DEFEND_OFFSET = 20;
+/** ...and this fraction of the way across from the ball toward its own goal's centre. */
+const DEFEND_COVER = 1 / 3;
 const SLIDE_RANGE = 26;
 const SLIDE_COOLDOWN_S = 1.2;
 const HIGH_BALL = 30;
 const HIGH_BALL_RANGE = 30;
-/** On the wrong side of a ball this close, it hops over it rather than pushing it toward its own goal. */
-const HOP_RANGE = 24;
+/** On the wrong side of a ball this close, it goes round it rather than pushing it toward its own goal... */
+const ROUND_BALL_RANGE = 40;
+/** ...passing this far to the side of it. */
+const ROUND_BALL_Z = 12;
+/** An opponent this close ahead on its path, and this close to the path's line, is in the way: it sidesteps. */
+const BLOCKER_AHEAD = 16;
+const BLOCKER_SIDE = 10;
+/** A spot it wants inside a goal moves out to this far from the goal's outline: a body radius and a little. */
+const GOAL_CLEARANCE = PLAYER_R + 1;
+/** With the ball behind the line of the goal it attacks, it first takes it out this far in front. */
+const OUT_FROM_BEHIND = 40;
 const CHARGE_MIN_S = 0.25;
 const CHARGE_SPREAD_S = 0.55;
 const SPRINT_DISTANCE = 120;
 const SPRINT_MIN_STAMINA = 0.4;
 /** Close enough to a target spot to stop. */
 const ARRIVE = 3;
+/**
+ * It rounds a goal's corners this far out, further than it needs to stop at
+ * a spot, so from a corner the way on is always clear of the goal.
+ */
+const CORNER_CLEARANCE = PLAYER_R + ARRIVE + 1;
 /** How far ahead it leads a rolling ball. */
 const LEAD_S = 0.25;
+/** Where it aims its shots: mostly the far post, then the near post, sometimes straight. */
+const AIM_ODDS: readonly (readonly [Aim, number])[] = [
+  ['far', 1 / 2],
+  ['near', 1 / 3],
+  ['straight', 1 / 6],
+];
 
 export function createBrain(profile: AiProfile): AiBrain {
   return { profile, nextDecisionS: 0, intent: { ...NO_INTENT }, plan: 'chase', chargeLeftS: 0, slideReadyS: 0 };
 }
 
 const attackDir = (me: Player): 1 | -1 => (me.team === 'home' ? 1 : -1);
+const goalCentreZ = (g: Goal): number => (g.z0 + g.z1) / 2;
 
 /** Where a loose ball will be: its landing spot if airborne, a little ahead if rolling. */
-function predictBallX(w: World): number {
+function predictBall(w: World): { x: number; z: number } {
   const b = w.ball;
   const drop = b.y - BALL_REST_Y;
   const airborne = drop > 1 || b.vy > 0;
   const t = airborne ? (b.vy + Math.sqrt(b.vy * b.vy + 2 * GRAVITY * Math.max(drop, 0))) / GRAVITY : LEAD_S;
-  return Math.min(Math.max(b.x + b.vx * t, w.field.fenceL), w.field.fenceR);
+  return {
+    x: Math.min(Math.max(b.x + b.vx * t, w.field.fenceL), w.field.fenceR),
+    z: Math.min(Math.max(b.z + b.vz * t, BALL_R), w.field.depth - BALL_R),
+  };
 }
 
-const toward = (from: number, to: number): number => (Math.abs(to - from) <= ARRIVE ? 0 : Math.sign(to - from));
+/** A unit stick direction from `me` toward (x, z), or still once there. */
+function steer(me: Player, x: number, z: number): [number, number] {
+  const [dx, dz] = [x - me.x, z - me.z];
+  const d = Math.hypot(dx, dz);
+  return d <= ARRIVE ? [0, 0] : [dx / d, dz / d];
+}
+
+/** The side (+1 deeper, −1 nearer) with more room to pass something standing at depth z. */
+const roomySide = (w: World, z: number, from: number): number =>
+  z === w.field.depth / 2 ? Math.sign(from - z) || 1 : Math.sign(w.field.depth / 2 - z);
+
+/**
+ * Bodies are solid: if the opponent stands just ahead on its path, it adds
+ * a sidestep, toward where it's heading if that's off to one side, otherwise
+ * toward the side with more room.
+ */
+function goRound(w: World, me: Player, them: Player, move: [number, number], goalZ: number): [number, number] {
+  const [mx, mz] = move;
+  if (mx === 0 && mz === 0) return move;
+  const [rx, rz] = [them.x - me.x, them.z - me.z];
+  const along = rx * mx + rz * mz;
+  const across = rx * mz - rz * mx;
+  if (along <= 0 || along > BLOCKER_AHEAD || Math.abs(across) >= BLOCKER_SIDE) return move;
+  const side = Math.abs(goalZ - them.z) > BLOCKER_SIDE / 2 ? Math.sign(goalZ - them.z) : roomySide(w, them.z, me.z);
+  const [sx, sz] = [mx, mz + side];
+  const d = Math.hypot(sx, sz);
+  return [sx / d, sz / d];
+}
+
+interface Box {
+  x0: number;
+  x1: number;
+  z0: number;
+  z1: number;
+}
+
+/** A goal's footprint on the ground, grown by `margin`. */
+function goalBox(g: Goal, margin: number): Box {
+  return { x0: Math.min(g.lineX, g.backX) - margin, x1: Math.max(g.lineX, g.backX) + margin, z0: g.z0 - margin, z1: g.z1 + margin };
+}
+
+/** Whether the segment from a to b passes through a box (Liang–Barsky). */
+function crosses(a: { x: number; z: number }, b: { x: number; z: number }, box: Box): boolean {
+  let [t0, t1] = [0, 1];
+  const [dx, dz] = [b.x - a.x, b.z - a.z];
+  for (const [p, q] of [
+    [-dx, a.x - box.x0],
+    [dx, box.x1 - a.x],
+    [-dz, a.z - box.z0],
+    [dz, box.z1 - a.z],
+  ] as const) {
+    if (p === 0) {
+      if (q < 0) return false;
+      continue;
+    }
+    const t = q / p;
+    if (p < 0) t0 = Math.max(t0, t);
+    else t1 = Math.min(t1, t);
+    if (t0 > t1) return false;
+  }
+  return true;
+}
+
+/** A spot inside a goal moved out to the nearest place he can stand: in front of it, or past either post. */
+function outOfGoals(w: World, x: number, z: number): { x: number; z: number } {
+  for (const g of w.field.goals) {
+    if (!inGoalBox(g, x, z, PLAYER_R)) continue;
+    const box = goalBox(g, GOAL_CLEARANCE);
+    const front = g.side === 'right' ? box.x0 : box.x1;
+    const exits = [
+      { x: front, z },
+      { x, z: box.z0 },
+      { x, z: box.z1 },
+    ];
+    return exits.reduce((m, e) => (Math.hypot(e.x - x, e.z - z) < Math.hypot(m.x - x, m.z - z) ? e : m));
+  }
+  return { x, z };
+}
+
+/**
+ * The next spot on the way to (x, z): straight there, unless a goal is in
+ * the way, in which case round its front, corner by corner.
+ */
+function route(w: World, me: Player, x: number, z: number): { x: number; z: number } {
+  for (const g of w.field.goals) {
+    const box = goalBox(g, PLAYER_R);
+    if (!crosses(me, { x, z }, box)) continue;
+    const corners = goalBox(g, CORNER_CLEARANCE);
+    const front = g.side === 'right' ? corners.x0 : corners.x1;
+    const inFront = g.side === 'right' ? me.x <= front + ARRIVE : me.x >= front - ARRIVE;
+    const middle = (g.z0 + g.z1) / 2;
+    const sideOf = (depth: number) => (depth < middle ? corners.z0 : corners.z1);
+    const corner = { x: front, z: sideOf(inFront ? z : me.z) };
+    // Already at that corner: the target's side corner is next, then the target.
+    if (Math.hypot(corner.x - me.x, corner.z - me.z) <= ARRIVE) return inFront ? { x, z } : { x: front, z: sideOf(z) };
+    return corner;
+  }
+  return { x, z };
+}
+
+function pickAim(w: World): Aim {
+  let r = w.rng();
+  for (const [aim, odds] of AIM_ODDS) {
+    if (r < odds) return aim;
+    r -= odds;
+  }
+  return 'straight';
+}
 
 function decide(brain: AiBrain, w: World, me: Player, them: Player): void {
   const { profile } = brain;
@@ -78,55 +214,75 @@ function decide(brain: AiBrain, w: World, me: Player, them: Player): void {
   const ball = w.ball;
   const low = ball.y <= BALL_LOW;
   const ahead = (ball.x - me.x) * dir;
-  const sprint = Math.abs(ball.x - me.x) > SPRINT_DISTANCE && me.stamina > SPRINT_MIN_STAMINA;
+  const inLine = Math.abs(ball.z - me.z) <= REACH_Z;
+  const dist = Math.hypot(ball.x - me.x, ball.z - me.z);
+  const sprint = dist > SPRINT_DISTANCE && me.stamina > SPRINT_MIN_STAMINA;
   const intent: PlayerIntent = { ...NO_INTENT, sprint };
+  const attacking = w.field.goals.find(g => g.side === (dir > 0 ? 'right' : 'left'))!;
+  const defending = w.field.goals.find(g => g !== attacking)!;
+  const moveTo = (x: number, z: number, aimZ = z): PlayerIntent => {
+    const spot = outOfGoals(w, x, z);
+    const next = route(w, me, spot.x, spot.z);
+    const [moveX, moveZ] = goRound(w, me, them, steer(me, next.x, next.z), aimZ);
+    return { ...intent, moveX, moveZ };
+  };
+  const toGoal = (attacking.lineX - me.x) * dir;
 
   // Has the ball: dribble at goal, and shoot once in range.
-  if (low && ahead >= 0 && ahead <= POSSESSION_RANGE) {
-    const goalLine = w.field.goals.find(g => g.side === (dir > 0 ? 'right' : 'left'))!.lineX;
+  if (low && ahead >= 0 && ahead <= POSSESSION_RANGE && inLine) {
     const charging = brain.plan === 'charge' && brain.intent.shootHeld;
     if (charging) return;
-    if ((goalLine - me.x) * dir <= profile.shootRange) {
-      const aim: Aim = w.rng() < 0.5 ? 'straight' : 'far';
+    if (toGoal > 0 && toGoal <= profile.shootRange) {
       brain.plan = 'charge';
       brain.chargeLeftS = CHARGE_MIN_S + w.rng() * CHARGE_SPREAD_S;
-      brain.intent = { ...intent, moveX: dir, shootHeld: true, aim };
+      brain.intent = { ...intent, moveX: dir, shootHeld: true, aim: pickAim(w) };
       return;
     }
     brain.plan = 'dribble';
-    brain.intent = { ...intent, moveX: dir };
+    const behindLine = (attacking.lineX - ball.x) * dir < 0;
+    brain.intent = behindLine ? moveTo(attacking.lineX - dir * OUT_FROM_BEHIND, goalCentreZ(attacking)) : moveTo(attacking.lineX, goalCentreZ(attacking));
     return;
   }
 
-  // The opponent has it: get goal-side, and slide in when close.
-  if (low && Math.abs(ball.x - them.x) <= POSSESSION_RANGE) {
+  // The opponent has it: get goal-side across the pitch, and slide in when close.
+  if (low && Math.hypot(ball.x - them.x, ball.z - them.z) <= POSSESSION_RANGE) {
     brain.plan = 'defend';
     const facingBall = Math.sign(ball.x - me.x) === me.facing;
-    const close = Math.abs(ball.x - me.x) <= SLIDE_RANGE;
+    const close = dist <= SLIDE_RANGE;
     if (close && !facingBall) {
       // Turn to face the ball, or it would stand on its spot facing away and never challenge.
       brain.intent = { ...intent, moveX: Math.sign(ball.x - me.x) };
       return;
     }
-    if (close && brain.slideReadyS === 0 && w.rng() < profile.aggression) {
+    if (close && inLine && brain.slideReadyS === 0 && w.rng() < profile.aggression) {
       brain.slideReadyS = SLIDE_COOLDOWN_S;
       brain.intent = { ...intent, chipHeld: true };
       return;
     }
-    brain.intent = { ...intent, moveX: toward(me.x, ball.x - dir * DEFEND_OFFSET) };
+    const spotZ = ball.z + (goalCentreZ(defending) - ball.z) * DEFEND_COVER;
+    brain.intent = moveTo(ball.x - dir * DEFEND_OFFSET, spotZ);
     return;
   }
 
   // Loose ball: head it if it's overhead, otherwise get behind it.
-  if (ball.y > HIGH_BALL && Math.abs(ball.x - me.x) <= HIGH_BALL_RANGE) {
+  if (ball.y > HIGH_BALL && Math.abs(ball.x - me.x) <= HIGH_BALL_RANGE && inLine) {
     brain.plan = 'jump';
-    brain.intent = { ...intent, moveX: toward(me.x, ball.x), jump: true, aim: 'straight' };
+    brain.intent = { ...intent, moveX: Math.sign(ball.x - me.x), jump: true, aim: 'straight' };
     return;
   }
   brain.plan = 'chase';
-  const target = predictBallX(w) - dir * CHASE_OFFSET;
-  const wrongSide = low && ahead < 0 && -ahead <= HOP_RANGE;
-  brain.intent = { ...intent, moveX: toward(me.x, target), jump: wrongSide };
+  const at = predictBall(w);
+  const behindX = at.x - dir * CHASE_OFFSET;
+  // Against a fence there's no room to get behind the ball: play it from where it is.
+  if (behindX < w.field.fenceL + PLAYER_R || behindX > w.field.fenceR - PLAYER_R) {
+    brain.intent = moveTo(at.x, at.z);
+    return;
+  }
+  // On the wrong side of the ball, pass it to one side instead of running it back toward its own goal.
+  const wrongSide = low && ahead < 0 && -ahead <= ROUND_BALL_RANGE;
+  const side = Math.sign(me.z - ball.z) || roomySide(w, ball.z, me.z);
+  const z = wrongSide ? Math.min(Math.max(ball.z + side * ROUND_BALL_Z, PLAYER_R), w.field.depth - PLAYER_R) : at.z;
+  brain.intent = moveTo(behindX, z, at.z);
 }
 
 /**
@@ -137,11 +293,16 @@ function decide(brain: AiBrain, w: World, me: Player, them: Player): void {
 export function think(brain: AiBrain, w: World, me: Player, them: Player, dt: number): PlayerIntent {
   brain.nextDecisionS -= dt;
   brain.slideReadyS = Math.max(0, brain.slideReadyS - dt);
+  let released = false;
   if (brain.plan === 'charge' && brain.intent.shootHeld) {
     brain.chargeLeftS -= dt;
-    if (brain.chargeLeftS <= 0) brain.intent = { ...brain.intent, shootHeld: false };
+    if (brain.chargeLeftS <= 0) {
+      brain.intent = { ...brain.intent, shootHeld: false };
+      released = true;
+    }
   }
-  if (brain.nextDecisionS <= 1e-9) {
+  // A decision on the release tick could start a new charge and swallow the shot, so it waits a tick.
+  if (!released && brain.nextDecisionS <= 1e-9) {
     decide(brain, w, me, them);
     brain.nextDecisionS = brain.profile.reactionS;
   }

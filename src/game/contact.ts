@@ -26,6 +26,8 @@ const SLIDE_BALL_VY = 80;
 /** A ball hitting his body keeps this fraction of its speed, reversed. */
 const BODY_RESTITUTION = 0.4;
 const PINNED_POP_VY = 160;
+/** A pinned ball also pops this fast toward the middle of the pitch, so it leaves the pocket it was in. */
+const PINNED_POP_SPEED = 60;
 /** Clears both players' heads (PLAYER_H) with room to spare. */
 const SQUEEZE_POP_VY = 300;
 const SQUEEZE_SQUIRT_VX = 60;
@@ -157,6 +159,15 @@ function bodyNormal(p: Player, ball: Ball): { nx: number; nz: number } {
   return d > 0 ? { nx: cx / d, nz: cz / d } : { nx: -p.facing, nz: 0 };
 }
 
+/** Pops a wedged ball up and out toward the middle of the pitch. */
+function pop(ball: Ball, field: Field): void {
+  const [dx, dz] = [field.width / 2 - ball.x, field.depth / 2 - ball.z];
+  const d = Math.hypot(dx, dz) || 1;
+  ball.vy = PINNED_POP_VY;
+  ball.vx = (dx / d) * PINNED_POP_SPEED;
+  ball.vz = (dz / d) * PINNED_POP_SPEED;
+}
+
 /**
  * His body is solid: a ball running into him bounces back off the side it
  * came from. A ball wedged between his body and a wall, a net or a post
@@ -168,7 +179,7 @@ function block(p: Player, ball: Ball, field: Field): void {
   const reach = PLAYER_R + BALL_R;
   const [x, z] = [p.x + nx * reach, p.z + nz * reach];
   if (!canPlace(ball, x, z, field)) {
-    if (!onRoof(ball, field) && ball.vy <= 0) ball.vy = PINNED_POP_VY;
+    if (!onRoof(ball, field) && ball.vy <= 0) pop(ball, field);
     return;
   }
   const closing = (ball.vx - p.vx) * nx + (ball.vz - p.vz) * nz;

@@ -1,14 +1,15 @@
 import { describe, expect, it } from 'vitest';
 import { DIFFICULTY, createBrain, think, type AiProfile } from './ai';
 import { BALL_REST_Y } from './ball';
-import { NO_INTENT } from './player';
+import { NO_INTENT, type Player } from './player';
+import type { Aim } from './kick';
 import { BASE_STATS } from './stats';
 import { createWorld, stepWorld, type World } from './world';
 
 const STEP = 1 / 60;
 
 /** A world in play with the ball and both players placed by hand. */
-function scene(ball: { x: number; y?: number; vx?: number; vy?: number }, home: number, away: number): World {
+function scene(ball: { x: number; y?: number; z?: number; vx?: number; vy?: number }, home: number, away: number): World {
   const w = createWorld(BASE_STATS, BASE_STATS, 3, { home: 4, away: DIFFICULTY.normal.aimErrorDeg });
   w.match.phase = 'playing';
   Object.assign(w.ball, { y: BALL_REST_Y, vx: 0, vy: 0, vz: 0, ...ball });
@@ -121,4 +122,149 @@ describe('think', () => {
     expect(w.match.result).not.toBeNull();
     expect(w.match.score.home + w.match.score.away).toBeLessThan(40);
   });
+
+  it('chases a ball off to the side in depth', () => {
+    const w = scene({ x: 420, z: 50 }, 100, 500);
+    w.away.z = 20;
+    const i = think(brainFor(), w, w.away, w.home, STEP);
+    expect(i.moveX).toBeLessThan(0);
+    expect(i.moveZ).toBeGreaterThan(0);
+  });
+
+  it('defends goal-side across the pitch', () => {
+    const w = scene({ x: 310, z: 50 }, 300, 450);
+    w.home.z = 50;
+    w.away.z = 10;
+    const brain = brainFor({ aggression: 0 });
+    const i = think(brain, w, w.away, w.home, STEP);
+    expect(brain.plan).toBe('defend');
+    expect(i.moveX).toBeLessThan(0);
+    expect(i.moveZ).toBeGreaterThan(0);
+    // Its spot: 20 px goal-side, a third of the way from the ball toward its goal's centre.
+    Object.assign(w.away, { x: 330, z: 50 + (32 - 50) / 3 });
+    brain.nextDecisionS = 0;
+    const there = think(brain, w, w.away, w.home, STEP);
+    expect([there.moveX, there.moveZ]).toEqual([0, 0]);
+  });
+
+  it('goes round a still Harrison between him and the ball', () => {
+    for (const z of [32, 10, 54]) {
+      const w = scene({ x: 300, z }, 330, 380);
+      w.home.z = z;
+      w.away.z = z;
+      const brain = brainFor();
+      let touched = false;
+      for (let t = 0; t < 3 * 60 && !touched; t++) {
+        stepWorld(w, NO_INTENT, think(brain, w, w.away, w.home, STEP), STEP);
+        const max = w.events.kicks[1]!;
+        touched = max.touched || max.kicked !== null || max.tackledBall;
+      }
+      expect(touched, `in line at z ${z}`).toBe(true);
+    }
+  });
+
+  it('reaches a ball beside a post from the far side of the goal', () => {
+    for (const [bx, bz, mx, mz, team] of [
+      [21, 14.6, 29, 51, 'away'],
+      [21, 14.6, 13, 51, 'home'],
+      [619, 50, 625, 8, 'away'],
+      [619, 50, 600, 6, 'home'],
+    ] as const) {
+      const w = scene({ x: bx, z: bz }, 320, 320);
+      const [me, them] = team === 'home' ? [w.home, w.away] : [w.away, w.home];
+      Object.assign(me, { x: mx, z: mz });
+      Object.assign(them, { x: 320, z: 32 });
+      const brain = brainFor();
+      let reached = false;
+      for (let t = 0; t < 4 * 60 && !reached; t++) {
+        const i = think(brain, w, me, them, STEP);
+        stepWorld(w, team === 'home' ? i : NO_INTENT, team === 'away' ? i : NO_INTENT, STEP);
+        reached = Math.hypot(w.ball.x - bx, w.ball.z - bz) > 4;
+      }
+      expect(reached, `${team} from (${mx}, ${mz}) to the ball at (${bx}, ${bz})`).toBe(true);
+    }
+  });
+
+  it('plays a ball it cannot get behind, against the fence it defends', () => {
+    const w = scene({ x: 7.2, z: 14.3 }, 9, 320);
+    w.home.z = 5;
+    const brain = brainFor();
+    for (let t = 0; t < 3 * 60; t++) stepWorld(w, think(brain, w, w.home, w.away, STEP), NO_INTENT, STEP);
+    expect(Math.hypot(w.ball.x - 7.2, w.ball.z - 14.3)).toBeGreaterThan(15);
+  });
+
+  it('aims at both posts over many shots', () => {
+    const aims: Record<Aim, number> = { far: 0, near: 0, straight: 0 };
+    for (let seed = 0; seed < 120; seed++) {
+      const w = scene({ x: 170 }, 500, 178);
+      w.rng = (() => {
+        let a = seed * 7919 + 1;
+        return () => ((a = (a * 16807) % 2147483647) / 2147483647);
+      })();
+      w.away.facing = -1;
+      aims[think(brainFor(), w, w.away, w.home, STEP).aim]++;
+    }
+    expect(aims.far).toBeGreaterThan(aims.near);
+    expect(aims.near).toBeGreaterThan(aims.straight);
+    expect(aims.straight).toBeGreaterThan(0);
+  });
+
+  it('a charge release is never swallowed by a same-tick decision', () => {
+    const w = scene({ x: 170 }, 500, 178);
+    w.away.facing = -1;
+    const brain = brainFor();
+    think(brain, w, w.away, w.home, STEP);
+    expect(brain.intent.shootHeld).toBe(true);
+    brain.chargeLeftS = STEP / 2;
+    brain.nextDecisionS = 0;
+    expect(think(brain, w, w.away, w.home, STEP).shootHeld).toBe(false);
+  });
+
+  it('Max scores against an idle Harrison on every difficulty', () => {
+    for (const difficulty of ['easy', 'normal', 'hard'] as const) {
+      const w = createWorld(BASE_STATS, BASE_STATS, 7, { home: 4, away: DIFFICULTY[difficulty].aimErrorDeg });
+      w.match.kickoffTeam = 'away';
+      const brain = createBrain(DIFFICULTY[difficulty]);
+      for (let t = 0; t < 30 * 60 && w.match.score.away === 0; t++) stepWorld(w, NO_INTENT, think(brain, w, w.away, w.home, STEP), STEP);
+      expect(w.match.score.away, difficulty).toBeGreaterThan(0);
+    }
+  });
+
+  it.each(['easy', 'normal', 'hard'] as const)(
+    'a whole AI-vs-AI match on %s: result, no NaN, both sides score, the ball never rests unreached for over 5 s, and nobody stands still for over 10 s in play',
+    difficulty => {
+      const goals = { home: 0, away: 0 };
+      for (const seed of [21, 22, 23]) {
+        const w = createWorld(BASE_STATS, BASE_STATS, seed, { home: DIFFICULTY[difficulty].aimErrorDeg, away: DIFFICULTY[difficulty].aimErrorDeg });
+        const home = createBrain(DIFFICULTY[difficulty]);
+        const away = createBrain(DIFFICULTY[difficulty]);
+        const still = new Map<Player, { x: number; z: number; s: number }>();
+        let unreachedS = 0;
+        for (let t = 0; w.match.phase !== 'fullTime' && t < 60 * 200; t++) {
+          stepWorld(w, think(home, w, w.home, w.away, STEP), think(away, w, w.away, w.home, STEP), STEP);
+          for (const v of [w.ball.x, w.ball.y, w.ball.z, w.home.x, w.home.z, w.away.x, w.away.z]) expect(Number.isFinite(v)).toBe(true);
+          if (w.match.phase !== 'playing') {
+            unreachedS = 0;
+            still.clear();
+            continue;
+          }
+          const resting = Math.hypot(w.ball.vx, w.ball.vz) < 1 && w.ball.y <= BALL_REST_Y + 0.5;
+          const near = [w.home, w.away].some(p => Math.hypot(p.x - w.ball.x, p.z - w.ball.z) < 16);
+          unreachedS = resting && !near ? unreachedS + STEP : 0;
+          expect(unreachedS, `seed ${seed}: ball resting unreached at (${w.ball.x.toFixed(1)}, ${w.ball.z.toFixed(1)})`).toBeLessThanOrEqual(5);
+          for (const p of [w.home, w.away]) {
+            const a = still.get(p);
+            if (!a || Math.hypot(p.x - a.x, p.z - a.z) > 2) still.set(p, { x: p.x, z: p.z, s: 0 });
+            else a.s += STEP;
+            expect(still.get(p)!.s, `seed ${seed}: ${p.team} stuck at (${p.x.toFixed(1)}, ${p.z.toFixed(1)})`).toBeLessThanOrEqual(10);
+          }
+        }
+        expect(w.match.result).not.toBeNull();
+        goals.home += w.match.score.home;
+        goals.away += w.match.score.away;
+      }
+      expect(goals.home).toBeGreaterThan(0);
+      expect(goals.away).toBeGreaterThan(0);
+    },
+  );
 });

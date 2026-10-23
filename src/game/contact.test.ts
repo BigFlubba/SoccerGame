@@ -189,6 +189,20 @@ describe('resolveContacts: pinned ball', () => {
     expect(b.vy).toBe(160);
   });
 
+  it('a pinned ball pops out toward the open pitch, not straight back into the pocket', () => {
+    const { p, opp } = setup(BACKYARD.fenceL + PLAYER_R);
+    p.z = 13;
+    const b = ball({ x: 7.2, z: 15 });
+    contact(p, opp, b);
+    expect(b.vy).toBeGreaterThan(0);
+    expect(b.vx).toBeGreaterThan(0);
+    for (let t = 0; t < 120; t++) {
+      stepBall(b, STEP, BACKYARD);
+      contact(p, opp, b);
+    }
+    expect(Math.hypot(b.x - 7.2, b.z - 15)).toBeGreaterThan(15);
+  });
+
   it('a body push never puts the ball outside the field', () => {
     for (const [px, pz, bx, bz] of [
       [BACKYARD.fenceR - PLAYER_R, PLAYER_R, BACKYARD.fenceR - BALL_R, BALL_R],
