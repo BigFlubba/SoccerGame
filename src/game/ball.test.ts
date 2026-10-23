@@ -258,6 +258,27 @@ describe('stepBall', () => {
     expect(b.vx).toBeGreaterThan(300);
   });
 
+  it('a ball resting on the roof exactly over a post (z 18 or 46) rolls off', () => {
+    for (const g of BACKYARD.goals) {
+      const into = g.side === 'right' ? 1 : -1;
+      for (const z of [g.z0, g.z1]) {
+        const b = ball({ x: g.lineX + 4 * into, y: g.barY + g.barThick + BALL_R, z });
+        run(b, 3);
+        expect(b.y, `${g.side} goal, z ${z}`).toBe(BALL_REST_Y);
+      }
+    }
+  });
+
+  it('a ball resting on a post top rolls off', () => {
+    for (const g of BACKYARD.goals) {
+      for (const z of [g.z0, g.z1]) {
+        const b = ball({ x: g.lineX, y: g.barY + g.barThick + BALL_R, z });
+        run(b, 3);
+        expect(b.y, `${g.side} goal, z ${z}`).toBe(BALL_REST_Y);
+      }
+    }
+  });
+
   it('a ball dropped onto the roof right by the fence rolls off into play', () => {
     const b = ball({ x: 632, y: 60 });
     run(b, 4);

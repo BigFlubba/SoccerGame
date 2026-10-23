@@ -252,6 +252,19 @@ function fall(p: Player, dt: number): void {
   p.vy -= GRAVITY * dt;
 }
 
+/**
+ * Against a fence he keeps his speed into it only while he pushes that way:
+ * once the stick lets go of the fence, that stale speed is gone, so he turns
+ * away at once.
+ */
+function dropWallSpeed(p: Player, intent: PlayerIntent, field: Field): void {
+  const [minX, maxX] = playerSpan(field);
+  if (p.x <= minX + PLAYER_R && p.vx < 0 && intent.moveX >= 0) p.vx = 0;
+  if (p.x >= maxX - PLAYER_R && p.vx > 0 && intent.moveX <= 0) p.vx = 0;
+  if (p.z <= PLAYER_R && p.vz < 0 && intent.moveZ >= 0) p.vz = 0;
+  if (p.z >= field.depth - PLAYER_R && p.vz > 0 && intent.moveZ <= 0) p.vz = 0;
+}
+
 export function stepPlayer(p: Player, intent: PlayerIntent, dt: number, field: Field, ballAtFeet: boolean): void {
   const shootPressed = intent.shootHeld && !p.held.shoot;
   const chipPressed = intent.chipHeld && !p.held.chip;
@@ -274,6 +287,7 @@ export function stepPlayer(p: Player, intent: PlayerIntent, dt: number, field: F
     }
   }
 
+  dropWallSpeed(p, intent, field);
   const moving = intent.moveX !== 0 || intent.moveZ !== 0;
   const sprinting = p.state === 'ground' && intent.sprint && !p.exhausted && moving;
   const target = intent.moveX * runSpeed(p.stats);
@@ -293,7 +307,8 @@ export function stepPlayer(p: Player, intent: PlayerIntent, dt: number, field: F
         p.stateT = 0;
       }
       if (p.kick?.kind === 'volley') p.kick.active = p.stateT <= VOLLEY_ACTIVE_S;
-      p.vx = approach(p.vx, target, dt, AIR_ACCEL, AIR_ACCEL);
+      // Normalised like the ground target, so a diagonal jump is no faster than a run.
+      p.vx = approach(p.vx, target / moveLen, dt, AIR_ACCEL, AIR_ACCEL);
       fall(p, dt);
       if (p.y <= 0 && p.vy <= 0) {
         p.y = 0;

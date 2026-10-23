@@ -139,6 +139,16 @@ describe('resolveContacts: headers and tackles', () => {
     expect(p.kick?.kind).toBe('header');
   });
 
+  it("header speed counts the ball's depth speed", () => {
+    const { p, opp } = setup();
+    p.state = 'air';
+    p.y = 10;
+    const b = ball({ x: 303, y: 47, vx: -400, vy: 0, vz: 300 });
+    const want = header(BASE_STATS, aimLine(b, 1, 'straight', BACKYARD), Math.hypot(400, 0, 300));
+    expect(contact(p, opp, b).kicked).toBe('header');
+    expect(Math.hypot(b.vx, b.vy, b.vz)).toBeCloseTo(Math.hypot(want.vx, want.vy, want.vz));
+  });
+
   it('does not head a fast ball flying away from him', () => {
     const { p, opp } = setup();
     p.state = 'air';

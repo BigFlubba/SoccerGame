@@ -71,6 +71,13 @@ function pushOut(b: Ball, closest: { x: number; y: number; z: number }, radius: 
   return { nx, ny, nz, vn };
 }
 
+/** A ball on top of the frame: the top is slightly rounded, so a resting ball always rolls off toward the field. */
+function rollOffTop(b: Ball, g: Goal): void {
+  if (Math.abs(b.vy) < SETTLE_SPEED) b.vy = 0;
+  const towardField = g.side === 'right' ? -1 : 1;
+  if (Math.abs(b.vx) < BAR_ROLL_SPEED) b.vx = towardField * BAR_ROLL_SPEED;
+}
+
 /**
  * The crossbar and the net roof: one slab from the goal line back to the end
  * fence, between the posts, so nothing drops into the gap behind the net.
@@ -80,12 +87,7 @@ function collideBar(b: Ball, g: Goal, field: Field): boolean {
   const closest = { x: clamp(b.x, x0, x1), y: clamp(b.y, g.barY, g.barY + g.barThick), z: clamp(b.z, g.z0, g.z1) };
   const hit = pushOut(b, closest, BALL_R, BAR_RESTITUTION);
   if (!hit) return false;
-  if (hit.ny > 0.7) {
-    if (Math.abs(b.vy) < SETTLE_SPEED) b.vy = 0;
-    // The top is slightly rounded: a resting ball always rolls off toward the field.
-    const towardField = g.side === 'right' ? -1 : 1;
-    if (Math.abs(b.vx) < BAR_ROLL_SPEED) b.vx = towardField * BAR_ROLL_SPEED;
-  }
+  if (hit.ny > 0.7) rollOffTop(b, g);
   return hit.vn < -SETTLE_SPEED;
 }
 
@@ -95,6 +97,8 @@ function collidePosts(b: Ball, g: Goal): boolean {
   for (const z of [g.z0, g.z1]) {
     const closest = { x: g.lineX, y: clamp(b.y, 0, g.barY + g.barThick), z };
     const h = pushOut(b, closest, BALL_R + POST_R, BAR_RESTITUTION);
+    // Its rounded top is part of the frame's top: nothing balances on it.
+    if (h && h.ny > 0.7) rollOffTop(b, g);
     if (h && h.vn < -SETTLE_SPEED) hit = true;
   }
   return hit;

@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { BACKYARD } from './field';
 import { TAP_CHARGE } from './kick';
 import { ACCEL, FALL_TIME, NO_INTENT, PLAYER_R, cancelCharge, createPlayer, isStriking, knockDown, stepPlayer, type Player, type PlayerIntent } from './player';
-import { BASE_STATS, SPRINT_MULTIPLIER, chargeTime } from './stats';
+import { BASE_STATS, SPRINT_MULTIPLIER, chargeTime, runSpeed } from './stats';
 
 const STEP = 1 / 60;
 const ticks = (s: number) => Math.round(s / STEP);
@@ -36,6 +36,22 @@ describe('stepPlayer: moving', () => {
     expect(p.x).toBeGreaterThanOrEqual(BACKYARD.fenceL + 4);
   });
 
+  it('a player pushed into the fence moves away on the first tick he turns', () => {
+    const p = harrison(BACKYARD.fenceL + PLAYER_R);
+    tick(p, { moveX: -1 }, ticks(0.5));
+    const x = p.x;
+    tick(p, { moveX: 1 });
+    expect(p.x).toBeGreaterThan(x);
+  });
+
+  it('a player pushed into the back fence moves away on the first tick he turns', () => {
+    const p = createPlayer('home', BASE_STATS, 320, 1, BACKYARD.depth - PLAYER_R);
+    tick(p, { moveZ: 1 }, ticks(0.5));
+    const z = p.z;
+    tick(p, { moveZ: -1 });
+    expect(p.z).toBeLessThan(z);
+  });
+
   it('turns to face where he runs', () => {
     const p = harrison();
     tick(p, { moveX: -1 });
@@ -59,12 +75,13 @@ describe('stepPlayer: depth', () => {
   });
 
   it('runs in depth and diagonally at the same speed', () => {
+    // A quarter second reaches full speed well before the back fence.
     const deep = harrison();
-    tick(deep, { moveZ: 1 }, ticks(1));
+    tick(deep, { moveZ: 1 }, ticks(0.25));
     expect(Math.abs(deep.vz)).toBeCloseTo(95);
     expect(deep.z).toBeGreaterThan(BACKYARD.depth / 2);
     const diagonal = harrison();
-    tick(diagonal, { moveX: 1, moveZ: 1 }, ticks(1));
+    tick(diagonal, { moveX: 1, moveZ: 1 }, ticks(0.25));
     expect(Math.hypot(diagonal.vx, diagonal.vz)).toBeCloseTo(95);
   });
 
@@ -76,7 +93,7 @@ describe('stepPlayer: depth', () => {
 
   it('sprints in depth too', () => {
     const p = harrison();
-    tick(p, { moveZ: 1, sprint: true }, ticks(1));
+    tick(p, { moveZ: 1, sprint: true }, ticks(0.25));
     expect(p.vz).toBeCloseTo(95 * SPRINT_MULTIPLIER);
   });
 
@@ -114,8 +131,8 @@ describe('stepPlayer: depth', () => {
   });
 
   it('keeps his jump’s depth direction in the air', () => {
-    const p = harrison();
-    tick(p, { moveZ: 1 }, ticks(1));
+    const p = createPlayer('home', BASE_STATS, 320, 1, PLAYER_R);
+    tick(p, { moveZ: 1 }, ticks(0.25));
     tick(p, { moveZ: 1, jump: true });
     const vz = p.vz;
     expect(vz).toBeGreaterThan(0);
@@ -125,10 +142,10 @@ describe('stepPlayer: depth', () => {
   });
 
   it('starts moving smoothly when a charge ends with up held', () => {
-    const p = harrison();
+    const p = createPlayer('home', BASE_STATS, 320, 1, PLAYER_R);
     tick(p, { shootHeld: true }, ticks(0.3));
     let last = p.vz;
-    for (let i = 0; i < ticks(1); i++) {
+    for (let i = 0; i < ticks(0.4); i++) {
       tick(p, { moveZ: 1 });
       expect(Math.abs(p.vz - last)).toBeLessThanOrEqual(ACCEL * STEP + 1e-9);
       last = p.vz;
@@ -152,6 +169,17 @@ describe('stepPlayer: depth', () => {
 });
 
 describe('stepPlayer: jumping', () => {
+  it('a diagonal jump is no faster than a run', () => {
+    const p = harrison();
+    tick(p, { moveX: 1, moveZ: 1 }, ticks(1));
+    tick(p, { moveX: 1, moveZ: 1, jump: true });
+    expect(p.state).toBe('air');
+    for (let n = 0; p.state === 'air' && n < ticks(3); n++) {
+      expect(Math.hypot(p.vx, p.vz)).toBeLessThanOrEqual(runSpeed(p.stats) + 1e-6);
+      tick(p, { moveX: 1, moveZ: 1 });
+    }
+  });
+
   it('jumps to the stat apex and lands', () => {
     const p = harrison();
     tick(p, { jump: true });

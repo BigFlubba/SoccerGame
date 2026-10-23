@@ -86,7 +86,7 @@ function strike(p: Player, ball: Ball, aimErrorDeg: number, rng: Rng, field: Fie
 /** A ball meeting his head mid-jump is a header, aimed by the stick. Once per jump. */
 function headBall(p: Player, ball: Ball, field: Field, ev: ContactEvents): void {
   if (p.state !== 'air' || p.kick || !ballIn(headZone(p), ball, BALL_R)) return;
-  const speed = Math.hypot(ball.vx, ball.vy);
+  const speed = Math.hypot(ball.vx, ball.vy, ball.vz);
   const comingAtHim = ball.vx * p.facing < 0;
   if (!comingAtHim && speed >= HEADER_MAX_AWAY_SPEED) return;
   hit(ball, header(p.stats, aimLine(ball, p.facing, p.aim, field), speed));
