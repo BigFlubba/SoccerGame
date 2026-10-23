@@ -376,6 +376,18 @@ describe('match scene: pause menu screens', () => {
       expect(audio.played.filter(c => c === 'roar')).toHaveLength(2);
     });
 
+    it('a hard shot leaves a trail, and a still ball none', () => {
+      const s = createMatchScene({ ...CTX, audio: recordingAudio(), rumble: recordingRumble() }, 1);
+      s.world.match.phase = 'playing';
+      Object.assign(s.world.away, { x: 100 });
+      Object.assign(s.world.ball, { x: 200, y: 20, z: 32, vx: 600, vy: 0, vz: 0 });
+      run(s, 0.1);
+      expect(s.trail.length).toBeGreaterThan(2);
+      Object.assign(s.world.ball, { x: 300, y: 3, z: 32, vx: 0, vy: 0, vz: 0 });
+      run(s, 0.2);
+      expect(s.trail).toHaveLength(0);
+    });
+
     it('holding shoot through the skip and the kickoff does not charge until a fresh press', () => {
       const { s } = scored();
       run(s, 0.6);

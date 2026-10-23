@@ -89,7 +89,7 @@ describe('homeClip', () => {
 
 describe('calloutLine', () => {
   it('shows the callout under GOAL!!! once the slam has settled, only during the moment', () => {
-    const hud = (t: number | null) => ({ perfect: null, moment: t === null ? null : { t, done: false }, callout: 'HEADER!' });
+    const hud = (t: number | null) => ({ perfect: null, moment: t === null ? null : { t, done: false }, callout: 'HEADER!', trail: [] });
     expect(calloutLine(hud(0.3))).toBeNull();
     expect(calloutLine(hud(0.7))).toBe('HEADER!');
     expect(calloutLine(hud(null))).toBeNull();

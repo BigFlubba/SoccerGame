@@ -10,6 +10,7 @@ import type { Player } from '../game/player';
 import type { World } from '../game/world';
 import type { GameArt } from './art';
 import { depthSorted, type Drawable } from './depthSort';
+import type { TrailPoint } from './shotTrail';
 import { BANNER_FROM_S, CELEBRATE_FROM_S, bannerShown, celebrating, flashing, shakeOffset, type GoalMoment } from './goalMoment';
 
 /** Overlay state the match scene keeps between frames. */
@@ -20,6 +21,8 @@ export interface MatchHud {
   moment: GoalMoment | null;
   /** The line under GOAL!!! naming his goal, if it was special. */
   callout: string | null;
+  /** Where a hard-hit ball has just been, newest first. */
+  trail: TrailPoint[];
 }
 
 export const HOME_NAME = 'HARRISON';
@@ -33,6 +36,8 @@ const GOLDEN_GOAL_BANNER_S = 1.5;
 /** GOAL!!! lands big, then bounces to rest. */
 const GOAL_SLAM = { scale: 4, forS: 0.1, settleS: 0.2, bouncePx: 6 };
 const FLASH_ALPHA = 0.6;
+/** The streak tapers from the ball back, fading as it goes. */
+const TRAIL_STYLE = { width: 3, alpha: 0.7 };
 /** The callout comes in under GOAL!!! once the slam has settled. */
 const CALLOUT = { fromS: 0.6, gapPx: 26 };
 /** The celebration's up-tall frame is drawn this far higher: a little hop. */
@@ -91,6 +96,24 @@ export function homeClip(w: World, moment: GoalMoment | null, withCard = false):
   if (!moment || !celebrating(moment) || withCard) return w.home.anim;
   const { fps, frameCount } = CLIPS.celebrate;
   return { name: 'celebrate', frame: Math.floor((moment.t - CELEBRATE_FROM_S) * fps) % frameCount };
+}
+
+/** A tapering, fading white streak along the trail, from the ball back. */
+function drawTrail(g: CanvasRenderingContext2D, cam: Camera, trail: readonly TrailPoint[]): void {
+  ink(g, 'white');
+  for (let i = 0; i + 1 < trail.length; i++) {
+    const [a, b] = [screen(cam, trail[i]!.x, trail[i]!.y, trail[i]!.z), screen(cam, trail[i + 1]!.x, trail[i + 1]!.y, trail[i + 1]!.z)];
+    const fade = 1 - i / (trail.length - 1);
+    const size = Math.max(1, Math.round(TRAIL_STYLE.width * fade));
+    g.globalAlpha = TRAIL_STYLE.alpha * fade;
+    const steps = Math.max(Math.abs(b.x - a.x), Math.abs(b.y - a.y), 1);
+    for (let s = 0; s < steps; s++) {
+      const x = Math.round(a.x + ((b.x - a.x) * s) / steps);
+      const y = Math.round(a.y + ((b.y - a.y) * s) / steps);
+      g.fillRect(x - Math.floor(size / 2), y - Math.floor(size / 2), size, size);
+    }
+  }
+  g.globalAlpha = 1;
 }
 
 function drawBall(g: CanvasRenderingContext2D, w: World, cam: Camera, art: GameArt): void {
@@ -212,6 +235,7 @@ export function drawMatch(g: CanvasRenderingContext2D, w: World, cam: Camera, ar
   drawLayers(g, cam, art);
   drawShadow(g, cam, w.ball.x, w.ball.z);
   for (const p of [w.away, w.home]) drawShadow(g, cam, p.x, p.z);
+  drawTrail(g, cam, hud.trail);
   for (const d of depthSorted(pitchDrawables(w, cam, art, homeClip(w, moment)))) d.draw(g);
   drawChargeBar(g, cam, w.away, nowS);
   drawChargeBar(g, cam, w.home, nowS);

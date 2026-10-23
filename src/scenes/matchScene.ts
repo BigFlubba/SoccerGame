@@ -13,6 +13,7 @@ import type { GameContext } from './context';
 import { drawMenu, menuCue, stepMenu, type MenuState } from './menu';
 import { HAT_TRICK_GOALS, goalCallout, noteKick, type LastKick } from './goalCallout';
 import { createGoalMoment, simScale, stepGoalMoment, type GoalMoment } from './goalMoment';
+import { stepTrail, type TrailPoint } from './shotTrail';
 import { drawMatch, type MatchHud } from './matchView';
 import type { Scene } from './scene';
 import { createHelpScene } from './helpScene';
@@ -28,6 +29,8 @@ export interface MatchScene extends Scene {
   readonly moment: GoalMoment | null;
   /** The line under GOAL!!! naming his goal (HEADER!, HAT-TRICK!...), while the moment runs. */
   readonly callout: string | null;
+  /** Where a hard-hit ball has just been, newest first. */
+  readonly trail: readonly TrailPoint[];
 }
 
 export const PAUSE_ITEMS = ['RESUME', 'RESTART', 'HELP', 'OPTIONS', 'QUIT TO TITLE'] as const;
@@ -64,7 +67,7 @@ export function createMatchScene(ctx: GameContext, seed: number): MatchScene {
   const world = createWorld(BASE_STATS, BASE_STATS, seed, { home: HUMAN_AIM_ERROR_DEG, away: profile.aimErrorDeg });
   const brain = createBrain(profile);
   const cam: Camera = { x: world.ball.x - BASE_W / 2 };
-  const hud: MatchHud = { perfect: null, moment: null, callout: null };
+  const hud: MatchHud = { perfect: null, moment: null, callout: null, trail: [] };
   let lastKick: LastKick | null = null;
   let pause: MenuState | null = null;
   let fullTime: MenuState | null = null;
@@ -110,6 +113,9 @@ export function createMatchScene(ctx: GameContext, seed: number): MatchScene {
     get callout() {
       return hud.callout;
     },
+    get trail() {
+      return hud.trail;
+    },
     onHidden() {
       if (!pause && world.match.phase !== 'fullTime') openPause();
     },
@@ -154,6 +160,7 @@ export function createMatchScene(ctx: GameContext, seed: number): MatchScene {
           if (k.perfect) hud.perfect = { team: i === 0 ? 'home' : 'away', untilS: t + PERFECT_SHOW_S };
         });
         updateCamera(cam, world.ball, simDt, world.field);
+        stepTrail(hud.trail, world.ball);
         lastKick = noteKick(lastKick, world);
         if (world.events.goal === 'home') {
           hud.moment = createGoalMoment();
