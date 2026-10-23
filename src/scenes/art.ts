@@ -6,6 +6,7 @@ import type { HeadFacing } from '../art/body/pose';
 import { HARRISON_BODY } from '../art/body/proportions';
 import { masterPalette, resolvePalette, type LookColors, type MasterColor, type ResolvedPalette } from '../art/colors';
 import { renderText, textPalette } from '../art/font';
+import { buttonGlyph, type ButtonName } from '../art/glyphs';
 import { HARRISON_HEADS } from '../art/harrison/head';
 import { harrisonLook } from '../art/harrison/look';
 import { harrisonPortrait } from '../art/harrison/portrait';
@@ -31,6 +32,8 @@ export interface GameArt {
   layers: Record<keyof VenueLayers, HTMLCanvasElement>;
   goal: Record<'left' | 'right', GoalCanvases>;
   ball: HTMLCanvasElement[];
+  /** Controller button pictures, for Help. */
+  buttons: Record<ButtonName, HTMLCanvasElement>;
   home: SpriteSet;
   away: SpriteSet;
   portrait: HTMLCanvasElement;
@@ -54,6 +57,8 @@ function goalCanvases(g: GoalArt, palette: ResolvedPalette): GoalCanvases {
   return { back: toCanvas(g.back, palette), nearPost: toCanvas(g.nearPost, palette), farPost: toCanvas(g.farPost, palette), origin: g.origin };
 }
 
+const BUTTONS: readonly ButtonName[] = ['A', 'B', 'X', 'RT', 'START'];
+
 /** Bakes and resolves every image the match needs, once, at boot. */
 export function loadGameArt(): GameArt {
   const master = masterPalette();
@@ -64,6 +69,7 @@ export function loadGameArt(): GameArt {
     layers: { far: toCanvas(L.far, master), mid: toCanvas(L.mid, master), near: toCanvas(L.near, master), ground: toCanvas(L.ground, master) },
     goal: { left: goalCanvases(goalSprites('left'), master), right: goalCanvases(goalSprites('right'), master) },
     ball: ballFrames().map(f => toCanvas(f, master)),
+    buttons: Object.fromEntries(BUTTONS.map(b => [b, toCanvas(buttonGlyph(b), master)])) as Record<ButtonName, HTMLCanvasElement>,
     home: spriteSet(cache, 'harrison', HARRISON_HEADS, harrisonLook('home')),
     away: spriteSet(cache, 'max', MAX_HEADS, maxLook()),
     portrait: toCanvas(harrisonPortrait('neutral'), resolvePalette(harrisonLook('home'))),

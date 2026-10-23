@@ -1,6 +1,7 @@
 import { BASE_W } from '../engine/viewport';
 import { drawBackdrop, drawTitle } from './backdrop';
 import type { GameContext } from './context';
+import { createHelpScene } from './helpScene';
 import { createMatchScene } from './matchScene';
 import { drawMenu, stepMenu, type MenuState } from './menu';
 import type { Scene } from './scene';
@@ -23,6 +24,7 @@ export function createTitleMenuScene(ctx: GameContext, index = 0): Scene {
       menu = r.m;
       if (r.back) return createPressStartScene(ctx);
       if (r.chosen === 'START GAME') return createMatchScene(ctx, newSeed());
+      if (r.chosen === 'HELP') return createHelpScene(ctx, () => createTitleMenuScene(ctx, menu.index));
       return null;
     },
     draw(g, nowS) {
