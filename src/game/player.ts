@@ -1,12 +1,16 @@
 import { CLIPS, SHOOT_CHARGE_FRAME, SHOOT_STRIKE_FRAME, SLIDE_HOLD_FRAME, type AnimName } from '../art/body/animations';
 import { GRAVITY } from './constants';
-import { playerSpan, type Field } from './field';
+import { BACKYARD, playerSpan, type Field } from './field';
 import { TAP_CHARGE, type Aim } from './kick';
 import { SPRINT_MULTIPLIER, chargeTime, jumpVelocity, runSpeed, type Stats } from './stats';
 
-/** jump is a one-tick pulse (pressed this tick); shootHeld/chipHeld are held states whose release fires the kick. */
+/**
+ * jump is a one-tick pulse (pressed this tick); shootHeld/chipHeld are held
+ * states whose release fires the kick. moveZ +1 is away from the camera.
+ */
 export interface PlayerIntent {
   moveX: number;
+  moveZ: number;
   aim: Aim;
   jump: boolean;
   shootHeld: boolean;
@@ -16,6 +20,7 @@ export interface PlayerIntent {
 
 export const NO_INTENT: Readonly<PlayerIntent> = Object.freeze({
   moveX: 0,
+  moveZ: 0,
   aim: 'straight',
   jump: false,
   shootHeld: false,
@@ -37,11 +42,13 @@ export interface Kick {
 export interface Player {
   team: 'home' | 'away';
   stats: Stats;
-  /** Feet position: x is the centre, y the height of the soles. */
+  /** Feet position: x along the pitch, z in depth, y the height of the soles. */
   x: number;
   y: number;
+  z: number;
   vx: number;
   vy: number;
+  vz: number;
   facing: 1 | -1;
   state: PlayerState;
   /** Seconds in the current state (in the air: since the volley started). */
@@ -66,9 +73,13 @@ export interface Player {
 
 export const PLAYER_W = 8,
   PLAYER_H = 40;
+/** Body radius on the ground plane. */
+export const PLAYER_R = 5;
 export const FALL_TIME = 0.9;
+/** Where a new player stands in depth: the centre line of the pitch. */
+const START_Z = BACKYARD.depth / 2;
 
-const ACCEL = 900;
+export const ACCEL = 900;
 const DECEL = 1200;
 const AIR_ACCEL = 400;
 const CHARGE_MOVE_FACTOR = 0.5;
@@ -90,14 +101,16 @@ const IDLE_SPEED = 5;
 const JUMP_RISE_FRAME = 1;
 const JUMP_FALL_FRAME = 2;
 
-export function createPlayer(team: 'home' | 'away', stats: Stats, x: number, facing: 1 | -1): Player {
+export function createPlayer(team: 'home' | 'away', stats: Stats, x: number, facing: 1 | -1, z = START_Z): Player {
   return {
     team,
     stats,
     x,
     y: 0,
+    z,
     vx: 0,
     vy: 0,
+    vz: 0,
     facing,
     state: 'ground',
     stateT: 0,
@@ -120,6 +133,21 @@ function approach(v: number, target: number, dt: number, accel: number, decel: n
   const speedingUp = Math.abs(target) > Math.abs(v) && Math.sign(target) !== -Math.sign(v);
   const step = (speedingUp ? accel : decel) * dt;
   return Math.abs(target - v) <= step ? target : v + Math.sign(target - v) * step;
+}
+
+/** Moves the velocity vector (vx, vz) toward (tx, tz): `accel` when speeding up along it, `decel` when slowing or turning. */
+function approach2(p: Player, tx: number, tz: number, dt: number, accel: number, decel: number): void {
+  const [dx, dz] = [tx - p.vx, tz - p.vz];
+  const gap = Math.hypot(dx, dz);
+  const speedingUp = Math.hypot(tx, tz) > Math.hypot(p.vx, p.vz) && tx * p.vx + tz * p.vz >= 0;
+  const step = (speedingUp ? accel : decel) * dt;
+  if (gap <= step) [p.vx, p.vz] = [tx, tz];
+  else [p.vx, p.vz] = [p.vx + (dx / gap) * step, p.vz + (dz / gap) * step];
+}
+
+/** Striking the ball: charging a shot or chip, or in the air. Up/down aims instead of moving him. */
+export function isStriking(p: Player): boolean {
+  return p.state === 'charging' || (p.state === 'chipping' && !p.kick) || p.state === 'air';
 }
 
 /** How long a kick's strike clip runs after release, and how long it can connect. */
@@ -171,6 +199,7 @@ export function knockDown(p: Player): void {
   p.overchargeS = 0;
   p.kick = null;
   p.vx = 0;
+  p.vz = 0;
 }
 
 /** Drops a shot or chip that is still charging, without kicking (used when the game pauses). */
@@ -211,7 +240,7 @@ function chooseAnim(p: Player, sprinting: boolean): { name: AnimName; frame: num
     case 'fallen':
       return { name: 'fall', frame: Math.min(CLIPS.fall.frameCount - 1, Math.floor((t / FALL_TIME) * CLIPS.fall.frameCount)) };
     default: {
-      const name: AnimName = Math.abs(p.vx) < IDLE_SPEED ? 'idle' : sprinting ? 'sprint' : 'run';
+      const name: AnimName = Math.hypot(p.vx, p.vz) < IDLE_SPEED ? 'idle' : sprinting ? 'sprint' : 'run';
       const time = name === p.anim.name ? p.animT : 0;
       return { name, frame: Math.floor(time * CLIPS[name].fps) % CLIPS[name].frameCount };
     }
@@ -246,14 +275,18 @@ export function stepPlayer(p: Player, intent: PlayerIntent, dt: number, field: F
     }
   }
 
-  const sprinting = p.state === 'ground' && intent.sprint && !p.exhausted && intent.moveX !== 0;
+  const moving = intent.moveX !== 0 || intent.moveZ !== 0;
+  const sprinting = p.state === 'ground' && intent.sprint && !p.exhausted && moving;
   const target = intent.moveX * runSpeed(p.stats);
+  // On the ground he runs the same speed in every direction, diagonals included.
+  const moveLen = Math.max(1, Math.hypot(intent.moveX, intent.moveZ));
+  const runTarget = (runSpeed(p.stats) * (sprinting ? SPRINT_MULTIPLIER : 1)) / moveLen;
   const canTurn = p.state === 'ground' || (p.state === 'air' && !p.kick);
   if (canTurn && intent.moveX !== 0) p.facing = intent.moveX > 0 ? 1 : -1;
 
   switch (p.state) {
     case 'ground':
-      p.vx = approach(p.vx, target * (sprinting ? SPRINT_MULTIPLIER : 1), dt, ACCEL, DECEL);
+      approach2(p, intent.moveX * runTarget, intent.moveZ * runTarget, dt, ACCEL, DECEL);
       break;
     case 'air':
       if (shootPressed && !p.kick) {
@@ -275,11 +308,11 @@ export function stepPlayer(p: Player, intent: PlayerIntent, dt: number, field: F
         release(p, 'shot', intent.aim);
       } else {
         addCharge(p, dt, true);
-        p.vx = approach(p.vx, target * CHARGE_MOVE_FACTOR, dt, ACCEL, DECEL);
+        approach2(p, target * CHARGE_MOVE_FACTOR, 0, dt, ACCEL, DECEL);
       }
       break;
     case 'kicking':
-      p.vx = approach(p.vx, 0, dt, ACCEL, DECEL);
+      approach2(p, 0, 0, dt, ACCEL, DECEL);
       strike(p, SHOT_TIMING);
       break;
     case 'chipping':
@@ -287,14 +320,15 @@ export function stepPlayer(p: Player, intent: PlayerIntent, dt: number, field: F
         release(p, 'chip', intent.aim);
       } else if (!p.kick) {
         addCharge(p, dt, false);
-        p.vx = approach(p.vx, target * CHARGE_MOVE_FACTOR, dt, ACCEL, DECEL);
+        approach2(p, target * CHARGE_MOVE_FACTOR, 0, dt, ACCEL, DECEL);
       } else {
-        p.vx = approach(p.vx, 0, dt, ACCEL, DECEL);
+        approach2(p, 0, 0, dt, ACCEL, DECEL);
         strike(p, CHIP_TIMING);
       }
       break;
     case 'sliding':
       p.vx = p.facing * SLIDE_SPEED * Math.max(0, 1 - p.stateT / SLIDE_TIME);
+      p.vz = approach(p.vz, 0, dt, DECEL, DECEL);
       if (p.stateT >= SLIDE_TIME) {
         p.kick = null;
         enter(p, 'ground');
@@ -302,6 +336,7 @@ export function stepPlayer(p: Player, intent: PlayerIntent, dt: number, field: F
       break;
     case 'fallen':
       p.vx = 0;
+      p.vz = 0;
       if (p.y > 0 || p.vy > 0) fall(p, dt);
       if (p.y <= 0) [p.y, p.vy] = [0, 0];
       if (p.stateT >= FALL_TIME) enter(p, 'ground');
@@ -309,7 +344,8 @@ export function stepPlayer(p: Player, intent: PlayerIntent, dt: number, field: F
   }
 
   const [minX, maxX] = playerSpan(field);
-  p.x = Math.min(Math.max(p.x + p.vx * dt, minX + PLAYER_W / 2), maxX - PLAYER_W / 2);
+  p.x = Math.min(Math.max(p.x + p.vx * dt, minX + PLAYER_R), maxX - PLAYER_R);
+  p.z = Math.min(Math.max(p.z + p.vz * dt, PLAYER_R), field.depth - PLAYER_R);
   updateStamina(p, sprinting, dt);
 
   const anim = chooseAnim(p, sprinting);

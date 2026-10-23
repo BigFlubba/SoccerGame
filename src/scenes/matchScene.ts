@@ -32,6 +32,8 @@ function harrisonIntent(input: InputFrame): PlayerIntent {
   const aim: Aim = input.moveY < -AIM_THRESHOLD ? 'far' : input.moveY > AIM_THRESHOLD ? 'near' : 'straight';
   return {
     moveX: input.moveX,
+    // The stick's up is away from the camera.
+    moveZ: -input.moveY,
     aim,
     jump: input.pressed.has('jump'),
     shootHeld: input.held.has('shoot'),

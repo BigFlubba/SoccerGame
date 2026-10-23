@@ -86,6 +86,15 @@ describe('match scene', () => {
     expect((next as Partial<MatchScene>).world).toBeUndefined();
   });
 
+  it('up on the stick runs away from the camera, down toward it', () => {
+    const s = live();
+    const z = s.world.home.z;
+    for (let i = 0; i < 20; i++) s.update({ ...frame(), moveY: -1 }, STEP);
+    expect(s.world.home.z).toBeGreaterThan(z);
+    for (let i = 0; i < 40; i++) s.update({ ...frame(), moveY: 1 }, STEP);
+    expect(s.world.home.z).toBeLessThan(z);
+  });
+
   it('the stick aims shots: up is the far post', () => {
     const s = live();
     run(s, 0.2, ['shoot']);

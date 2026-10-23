@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { BACKYARD } from './field';
 import { TAP_CHARGE } from './kick';
-import { FALL_TIME, NO_INTENT, cancelCharge, createPlayer, knockDown, stepPlayer, type Player, type PlayerIntent } from './player';
+import { ACCEL, FALL_TIME, NO_INTENT, PLAYER_R, cancelCharge, createPlayer, isStriking, knockDown, stepPlayer, type Player, type PlayerIntent } from './player';
 import { BASE_STATS, SPRINT_MULTIPLIER, chargeTime } from './stats';
 
 const STEP = 1 / 60;
@@ -50,6 +50,104 @@ describe('stepPlayer: moving', () => {
     expect(p.anim.name).toBe('run');
     tick(p, { moveX: 1, sprint: true }, 10);
     expect(p.anim.name).toBe('sprint');
+  });
+});
+
+describe('stepPlayer: depth', () => {
+  it('starts on the centre line of the pitch in depth', () => {
+    expect(harrison().z).toBe(BACKYARD.depth / 2);
+  });
+
+  it('runs in depth and diagonally at the same speed', () => {
+    const deep = harrison();
+    tick(deep, { moveZ: 1 }, ticks(1));
+    expect(Math.abs(deep.vz)).toBeCloseTo(95);
+    expect(deep.z).toBeGreaterThan(BACKYARD.depth / 2);
+    const diagonal = harrison();
+    tick(diagonal, { moveX: 1, moveZ: 1 }, ticks(1));
+    expect(Math.hypot(diagonal.vx, diagonal.vz)).toBeCloseTo(95);
+  });
+
+  it('down runs toward the camera', () => {
+    const p = harrison();
+    tick(p, { moveZ: -1 }, 10);
+    expect(p.vz).toBeLessThan(0);
+  });
+
+  it('sprints in depth too', () => {
+    const p = harrison();
+    tick(p, { moveZ: 1, sprint: true }, ticks(1));
+    expect(p.vz).toBeCloseTo(95 * SPRINT_MULTIPLIER);
+  });
+
+  it('runs and stands still by the speed of his whole run', () => {
+    const p = harrison();
+    tick(p, { moveZ: 1 }, 10);
+    expect(p.anim.name).toBe('run');
+  });
+
+  it('up/down aims instead of moving while charging', () => {
+    const p = harrison();
+    tick(p, { shootHeld: true });
+    const z = p.z;
+    tick(p, { shootHeld: true, moveZ: 1, aim: 'far' }, ticks(0.5));
+    expect(isStriking(p)).toBe(true);
+    expect([p.z, p.vz]).toEqual([z, 0]);
+    tick(p, { moveZ: 1, aim: 'far' });
+    expect(p.kick?.aim).toBe('far');
+  });
+
+  it('a charge stops his depth run', () => {
+    const p = harrison();
+    tick(p, { moveZ: 1 }, ticks(1));
+    tick(p, { shootHeld: true, moveZ: 1 }, ticks(0.5));
+    expect(p.vz).toBe(0);
+  });
+
+  it('up/down aims instead of moving while charging a chip', () => {
+    const p = harrison();
+    tick(p, { chipHeld: true }, 1, true);
+    expect(p.state).toBe('chipping');
+    const z = p.z;
+    tick(p, { chipHeld: true, moveZ: -1 }, ticks(0.3), true);
+    expect(p.z).toBe(z);
+  });
+
+  it('keeps his jump’s depth direction in the air', () => {
+    const p = harrison();
+    tick(p, { moveZ: 1 }, ticks(1));
+    tick(p, { moveZ: 1, jump: true });
+    const vz = p.vz;
+    expect(vz).toBeGreaterThan(0);
+    tick(p, { moveZ: -1 }, 10);
+    expect(p.state).toBe('air');
+    expect(p.vz).toBe(vz);
+  });
+
+  it('starts moving smoothly when a charge ends with up held', () => {
+    const p = harrison();
+    tick(p, { shootHeld: true }, ticks(0.3));
+    let last = p.vz;
+    for (let i = 0; i < ticks(1); i++) {
+      tick(p, { moveZ: 1 });
+      expect(Math.abs(p.vz - last)).toBeLessThanOrEqual(ACCEL * STEP + 1e-9);
+      last = p.vz;
+    }
+    expect(p.vz).toBeGreaterThan(0);
+  });
+
+  it('stays inside the pitch in depth', () => {
+    const p = harrison();
+    tick(p, { moveZ: 1 }, ticks(2));
+    expect(p.z).toBe(BACKYARD.depth - PLAYER_R);
+    tick(p, { moveZ: -1 }, ticks(2));
+    expect(p.z).toBe(PLAYER_R);
+  });
+
+  it('stays between the fences by his body radius', () => {
+    const p = harrison(600);
+    tick(p, { moveX: 1 }, ticks(2));
+    expect(p.x).toBe(BACKYARD.fenceR - PLAYER_R);
   });
 });
 
