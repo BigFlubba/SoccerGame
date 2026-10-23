@@ -103,7 +103,7 @@ export function resolvePalette(look: LookColors): ResolvedPalette {
   return palette;
 }
 
-export function toRGBA(img: IndexedImage, palette: ResolvedPalette): Uint8ClampedArray {
+export function toRGBA(img: IndexedImage, palette: ResolvedPalette): Uint8ClampedArray<ArrayBuffer> {
   const out = new Uint8ClampedArray(img.width * img.height * 4);
   img.data.forEach((id, i) => {
     out.set(palette[id] ?? TRANSPARENT, i * 4);
