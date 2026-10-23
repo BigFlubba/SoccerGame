@@ -1,0 +1,124 @@
+import { inGoalBox, playerSpan, type Field } from './field';
+import { PLAYER_R, type Player } from './player';
+
+/** Two players closer than this on the ground plane overlap. */
+const MIN_GAP = 2 * PLAYER_R;
+/** A jumper whose feet are this far above the other player clears him. */
+const JUMP_CLEARANCE = 20;
+/** Rounds of separating and confining per tick, so a push off a wall or goal settles. */
+const SOLVE_PASSES = 4;
+/** Overlap smaller than this is treated as touching. */
+const TOUCH_EPS = 1e-9;
+
+const overlapping = (a: Player, b: Player): boolean =>
+  Math.abs(a.y - b.y) <= JUMP_CLEARANCE && Math.hypot(b.x - a.x, b.z - a.z) < MIN_GAP - TOUCH_EPS;
+
+/** The unit vector from a to b on the ground plane, and their distance. On the same spot, b is ahead of a. */
+function centreLine(a: Player, b: Player): { nx: number; nz: number; d: number } {
+  const [dx, dz] = [b.x - a.x, b.z - a.z];
+  const d = Math.hypot(dx, dz);
+  return d > 0 ? { nx: dx / d, nz: dz / d, d } : { nx: a.facing, nz: 0, d: 0 };
+}
+
+/** Moves a back by `shareA` of the overlap and b on by the rest, along the line between them. */
+function pushApart(a: Player, b: Player, shareA: (nx: number, nz: number) => number): void {
+  if (Math.abs(a.y - b.y) > JUMP_CLEARANCE) return;
+  const { nx, nz, d } = centreLine(a, b);
+  const overlap = MIN_GAP - d;
+  if (overlap <= 0) return;
+  const share = shareA(nx, nz);
+  a.x -= nx * overlap * share;
+  a.z -= nz * overlap * share;
+  b.x += nx * overlap * (1 - share);
+  b.z += nz * overlap * (1 - share);
+}
+
+/**
+ * Solid bodies: removes any overlap along the centre line. Whoever is moving
+ * toward the other takes the correction, in proportion to how fast, so a
+ * runner can't bulldoze a standing player; if neither is, they share it.
+ */
+export function separatePlayers(a: Player, b: Player): void {
+  pushApart(a, b, (nx, nz) => {
+    const towardB = Math.max(0, a.vx * nx + a.vz * nz);
+    const towardA = Math.max(0, -(b.vx * nx + b.vz * nz));
+    return towardB + towardA > 0 ? towardB / (towardB + towardA) : 0.5;
+  });
+}
+
+/** Whether (x, z) is somewhere a player's centre may stand: inside the fences, the near board and the back fence. */
+function onPitch(field: Field, x: number, z: number): boolean {
+  const [x0, x1] = playerSpan(field);
+  return x >= x0 + PLAYER_R && x <= x1 - PLAYER_R && z >= PLAYER_R && z <= field.depth - PLAYER_R;
+}
+
+/**
+ * Goals are solid: a player inside one (grown by his radius) is pushed out
+ * the shortest way that fits: toward the field, or past either post. The
+ * gap behind the net is too narrow for him, so that way never counts.
+ */
+export function keepOutOfGoals(p: Player, field: Field): void {
+  for (const g of field.goals) {
+    if (!inGoalBox(g, p.x, p.z, PLAYER_R)) continue;
+    const toField = g.side === 'right' ? -1 : 1;
+    const exits = [
+      { x: g.lineX + toField * PLAYER_R, z: p.z },
+      { x: p.x, z: g.z0 - PLAYER_R },
+      { x: p.x, z: g.z1 + PLAYER_R },
+      { x: g.backX - toField * PLAYER_R, z: p.z },
+    ].filter(e => onPitch(field, e.x, e.z));
+    const best = exits.reduce((m, e) => (Math.hypot(e.x - p.x, e.z - p.z) < Math.hypot(m.x - p.x, m.z - p.z) ? e : m));
+    p.x = best.x;
+    p.z = best.z;
+  }
+}
+
+/** Keeps a player on the pitch and out of the goals. Returns whether that moved him. */
+function confine(p: Player, field: Field): boolean {
+  const [x, z] = [p.x, p.z];
+  const [x0, x1] = playerSpan(field);
+  p.x = Math.min(Math.max(p.x, x0 + PLAYER_R), x1 - PLAYER_R);
+  p.z = Math.min(Math.max(p.z, PLAYER_R), field.depth - PLAYER_R);
+  keepOutOfGoals(p, field);
+  return p.x !== x || p.z !== z;
+}
+
+/**
+ * Both players are pinned along their centre line (say, between the near
+ * board and a goal): slide one along the pitch, toward the middle, until
+ * they no longer overlap.
+ */
+function sidestep(a: Player, b: Player, field: Field): void {
+  const middle = field.width / 2;
+  const order = Math.abs(a.x - middle) <= Math.abs(b.x - middle) ? [a, b] : [b, a];
+  for (const [mover, other] of [order, [order[1]!, order[0]!]] as const) {
+    const dz = Math.abs(mover.z - other.z);
+    const needX = Math.sqrt(Math.max(0, MIN_GAP * MIN_GAP - dz * dz));
+    const dir = mover.x === other.x ? Math.sign(middle - mover.x) || 1 : Math.sign(mover.x - other.x);
+    const [x, z] = [mover.x, mover.z];
+    mover.x = other.x + dir * needX;
+    confine(mover, field);
+    if (!overlapping(a, b)) return;
+    [mover.x, mover.z] = [x, z];
+  }
+}
+
+/**
+ * One tick's body resolution: players apart, on the pitch and out of the
+ * goals. When a wall or goal stops one giving way, the other takes the rest
+ * of the push, so nobody is left overlapping or wedged.
+ */
+export function resolveBodies(a: Player, b: Player, field: Field): void {
+  for (let pass = 0; pass < SOLVE_PASSES; pass++) {
+    separatePlayers(a, b);
+    const pinnedA = confine(a, field);
+    const pinnedB = confine(b, field);
+    if (!overlapping(a, b)) return;
+    if (pinnedA !== pinnedB) {
+      pushApart(a, b, () => (pinnedA ? 0 : 1));
+      confine(pinnedA ? b : a, field);
+      if (!overlapping(a, b)) return;
+    }
+  }
+  sidestep(a, b, field);
+}
