@@ -18,6 +18,8 @@ export interface MatchHud {
   perfect: null | { team: Team; untilS: number };
   /** Harrison's goal moment, while it runs. */
   moment: GoalMoment | null;
+  /** The line under GOAL!!! naming his goal, if it was special. */
+  callout: string | null;
 }
 
 export const HOME_NAME = 'HARRISON';
@@ -31,6 +33,8 @@ const GOLDEN_GOAL_BANNER_S = 1.5;
 /** GOAL!!! lands big, then bounces to rest. */
 const GOAL_SLAM = { scale: 4, forS: 0.1, settleS: 0.2, bouncePx: 6 };
 const FLASH_ALPHA = 0.6;
+/** The callout comes in under GOAL!!! once the slam has settled. */
+const CALLOUT = { fromS: 0.6, gapPx: 26 };
 /** The celebration's up-tall frame is drawn this far higher: a little hop. */
 const CELEBRATE_HOP_PX = 2;
 /** Blinks per second for the overcharge flash. */
@@ -169,6 +173,11 @@ export function banner(w: World, moment: GoalMoment | null): { text: string; sca
   return null;
 }
 
+/** The callout naming Harrison's goal, once it's time to show it. */
+export function calloutLine(hud: MatchHud): string | null {
+  return hud.moment && hud.callout && hud.moment.t >= CALLOUT.fromS ? hud.callout : null;
+}
+
 /** GOAL!!! slams in at a bigger scale, then drops in and bounces to rest. */
 function drawGoalBanner(g: CanvasRenderingContext2D, art: GameArt, moment: GoalMoment, scale: number): void {
   const s = moment.t - BANNER_FROM_S;
@@ -223,5 +232,7 @@ export function drawMatch(g: CanvasRenderingContext2D, w: World, cam: Camera, ar
   const b = banner(w, moment);
   if (b && moment) drawGoalBanner(g, art, moment, b.scale);
   else if (b) drawText(g, art, b.text, VIEW_W / 2, BANNER_Y, b.scale);
+  const callout = calloutLine(hud);
+  if (callout) drawText(g, art, callout, VIEW_W / 2, BANNER_Y + CALLOUT.gapPx, 2);
   drawArrow(g, w, cam);
 }

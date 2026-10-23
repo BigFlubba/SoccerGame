@@ -11,6 +11,7 @@ import { endGoalPause } from '../game/match';
 import { createWorld, stepWorld, type World } from '../game/world';
 import type { GameContext } from './context';
 import { drawMenu, menuCue, stepMenu, type MenuState } from './menu';
+import { HAT_TRICK_GOALS, goalCallout, noteKick, type LastKick } from './goalCallout';
 import { createGoalMoment, simScale, stepGoalMoment, type GoalMoment } from './goalMoment';
 import { drawMatch, type MatchHud } from './matchView';
 import type { Scene } from './scene';
@@ -25,6 +26,8 @@ export interface MatchScene extends Scene {
   readonly difficulty: Difficulty;
   /** Harrison's goal moment, while it runs. */
   readonly moment: GoalMoment | null;
+  /** The line under GOAL!!! naming his goal (HEADER!, HAT-TRICK!...), while the moment runs. */
+  readonly callout: string | null;
 }
 
 export const PAUSE_ITEMS = ['RESUME', 'RESTART', 'HELP', 'OPTIONS', 'QUIT TO TITLE'] as const;
@@ -35,6 +38,8 @@ const PERFECT_SHOW_S = 0.6;
 /** How far the stick must lean up or down to aim a shot. */
 const AIM_THRESHOLD = 0.5;
 const RESULT_TEXT = { win: 'YOU WIN!', lose: 'YOU LOSE', draw: 'DRAW' } as const;
+/** A hat-trick's second roar comes in this long (real seconds) into the moment. */
+const HAT_TRICK_ROAR_S = 1.2;
 
 /** Harrison's intent from the controller: the stick moves and aims, buttons act. */
 function harrisonIntent(input: InputFrame): PlayerIntent {
@@ -59,7 +64,8 @@ export function createMatchScene(ctx: GameContext, seed: number): MatchScene {
   const world = createWorld(BASE_STATS, BASE_STATS, seed, { home: HUMAN_AIM_ERROR_DEG, away: profile.aimErrorDeg });
   const brain = createBrain(profile);
   const cam: Camera = { x: world.ball.x - BASE_W / 2 };
-  const hud: MatchHud = { perfect: null, moment: null };
+  const hud: MatchHud = { perfect: null, moment: null, callout: null };
+  let lastKick: LastKick | null = null;
   let pause: MenuState | null = null;
   let fullTime: MenuState | null = null;
   let t = 0;
@@ -100,6 +106,9 @@ export function createMatchScene(ctx: GameContext, seed: number): MatchScene {
     },
     get moment() {
       return hud.moment;
+    },
+    get callout() {
+      return hud.callout;
     },
     onHidden() {
       if (!pause && world.match.phase !== 'fullTime') openPause();
@@ -145,18 +154,26 @@ export function createMatchScene(ctx: GameContext, seed: number): MatchScene {
           if (k.perfect) hud.perfect = { team: i === 0 ? 'home' : 'away', untilS: t + PERFECT_SHOW_S };
         });
         updateCamera(cam, world.ball, simDt, world.field);
+        lastKick = noteKick(lastKick, world);
         if (world.events.goal === 'home') {
           hud.moment = createGoalMoment();
+          hud.callout = goalCallout(lastKick, world.match.score.home);
           // The roar cue swells; the crowd holds it through the celebration.
           ctx.audio.setCrowd('roar');
         }
+        if (world.events.goal) lastKick = null;
       }
       if (moment) {
+        const before = moment.t;
         // A fresh press skips it; the held shot that scored doesn't, since presses are edges.
         stepGoalMoment(moment, dt, input.pressed.has('confirm') || input.pressed.has('shoot'));
+        if (world.match.score.home === HAT_TRICK_GOALS && hud.callout && before < HAT_TRICK_ROAR_S && moment.t >= HAT_TRICK_ROAR_S) {
+          ctx.audio.play('roar');
+        }
         if (moment.done) {
           endGoalPause(world.match);
           hud.moment = null;
+          hud.callout = null;
           ctx.audio.setCrowd('match');
         }
       }

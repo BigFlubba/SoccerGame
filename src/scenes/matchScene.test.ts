@@ -347,6 +347,35 @@ describe('match scene: pause menu screens', () => {
       expect(s.moment).not.toBeNull();
     });
 
+    it("Harrison's header shows HEADER! with the moment, and it clears after", () => {
+      const audio = recordingAudio();
+      const s = createMatchScene({ ...CTX, audio, rumble: recordingRumble() }, 1);
+      s.world.match.phase = 'playing';
+      Object.assign(s.world.away, { x: 300 });
+      Object.assign(s.world.home, { x: 540, z: 32, y: 10, state: 'air', vy: 0, facing: 1, kick: null });
+      Object.assign(s.world.ball, { x: 543, y: 40, z: 32, vx: -50, vy: -100, vz: 0 });
+      let n = 0;
+      while (!s.moment && n++ < 60) s.update(frame(), STEP);
+      expect(s.moment).not.toBeNull();
+      expect(s.callout).toBe('HEADER!');
+      run(s, 4);
+      expect(s.callout).toBeNull();
+    });
+
+    it('a third goal is a HAT-TRICK! with an extra roar', () => {
+      const { s, audio } = (() => {
+        const audio = recordingAudio();
+        const s = createMatchScene({ ...CTX, audio, rumble: recordingRumble() }, 1);
+        Object.assign(s.world.match, { phase: 'playing', score: { home: 2, away: 0 } });
+        Object.assign(s.world.ball, { x: 616, y: 3, z: 32, vx: 100 });
+        s.update(frame(), STEP);
+        return { s, audio };
+      })();
+      expect(s.callout).toBe('HAT-TRICK!');
+      run(s, 1.5);
+      expect(audio.played.filter(c => c === 'roar')).toHaveLength(2);
+    });
+
     it('holding shoot through the skip and the kickoff does not charge until a fresh press', () => {
       const { s } = scored();
       run(s, 0.6);

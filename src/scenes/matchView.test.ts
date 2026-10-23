@@ -3,7 +3,7 @@ import { BASE_STATS } from '../game/stats';
 import { createWorld } from '../game/world';
 import type { GameArt } from './art';
 import { depthSorted } from './depthSort';
-import { banner, homeClip, pitchDrawables } from './matchView';
+import { banner, calloutLine, homeClip, pitchDrawables } from './matchView';
 
 /** Building the list never touches the art; only drawing does. */
 const NO_ART = {} as GameArt;
@@ -87,3 +87,12 @@ describe('homeClip', () => {
   });
 });
 
+describe('calloutLine', () => {
+  it('shows the callout under GOAL!!! once the slam has settled, only during the moment', () => {
+    const hud = (t: number | null) => ({ perfect: null, moment: t === null ? null : { t, done: false }, callout: 'HEADER!' });
+    expect(calloutLine(hud(0.3))).toBeNull();
+    expect(calloutLine(hud(0.7))).toBe('HEADER!');
+    expect(calloutLine(hud(null))).toBeNull();
+    expect(calloutLine({ ...hud(1), callout: null })).toBeNull();
+  });
+});
