@@ -67,6 +67,22 @@ describe('bakeAll', () => {
   });
 });
 
+describe('bakeAll for other bodies', () => {
+  it.each([
+    ['longer', 1],
+    ['shorter', -1],
+  ])('plants the feet on the ground with %s legs', (_, delta) => {
+    const body = { ...HARRISON_BODY, thigh: HARRISON_BODY.thigh + delta, shin: HARRISON_BODY.shin + delta };
+    const clips = bakeAll(body, HARRISON_HEADS);
+    for (const clip of [clips.idle, clips.shoot, clips.powerUp]) {
+      for (const f of clip.frames) {
+        const b = opaqueBounds(f)!;
+        expect(b.y + b.h - 1, `${clip.name} sole + outline row`).toBe(53 + 1);
+      }
+    }
+  });
+});
+
 describe('CLIPS', () => {
   it('jump starts in a crouch', () => {
     expect(CLIPS.jump.keys[0]!.hipHeight).toBeLessThan(standingHipHeight(HARRISON_BODY));

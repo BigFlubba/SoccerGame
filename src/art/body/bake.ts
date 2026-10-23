@@ -1,6 +1,6 @@
 import type { HeadSprite } from '../harrison/head';
 import type { IndexedImage } from '../indexedImage';
-import { CLIPS, type AnimationClip, type AnimName } from './animations';
+import { clipsFor, type AnimationClip, type AnimName } from './animations';
 import { drawFigure } from './drawFigure';
 import { lerpPose, mirrorPose, type HeadFacing, type Pose } from './pose';
 import type { BodyProportions } from './proportions';
@@ -35,7 +35,8 @@ export function bakeClip(clip: AnimationClip, body: BodyProportions, heads: Reco
 }
 
 export function bakeAll(body: BodyProportions, heads: Record<HeadFacing, HeadSprite>): Record<AnimName, BakedClip> {
-  const entries = (Object.keys(CLIPS) as AnimName[]).map(name => [name, bakeClip(CLIPS[name], body, heads)] as const);
+  const clips = clipsFor(body);
+  const entries = (Object.keys(clips) as AnimName[]).map(name => [name, bakeClip(clips[name], body, heads)] as const);
   return Object.fromEntries(entries) as Record<AnimName, BakedClip>;
 }
 
