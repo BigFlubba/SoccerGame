@@ -10,6 +10,7 @@ import { HARRISON_BODY } from '../src/art/body/proportions';
 import { C, MASTER, resolvePalette, toRGBA } from '../src/art/colors';
 import { HARRISON_HEADS, HARRISON_POWER_HEADS } from '../src/art/harrison/head';
 import { harrisonLook, type PowerForm } from '../src/art/harrison/look';
+import { harrisonPortrait } from '../src/art/harrison/portrait';
 import { IndexedImage, blit } from '../src/art/indexedImage';
 import type { KitId } from '../src/art/kits';
 import { addOutline } from '../src/art/raster';
@@ -47,7 +48,10 @@ const baked = bakeAll(HARRISON_BODY, HARRISON_HEADS);
 const powered = bakeAll(HARRISON_BODY, HARRISON_POWER_HEADS);
 const clipRows = (kit: KitId) => Object.values(baked).map(clip => clip.frames.map(f => item(f, kit)));
 
+const EXPRESSIONS = ['neutral', 'celebrate', 'determined', 'disappointed'] as const;
+
 const rows: SheetItem[][] = [
+  [...EXPRESSIONS.map(e => item(harrisonPortrait(e))), item(harrisonPortrait('celebrate'), 'home', 'golden')],
   ...clipRows('home'),
   powered.powerUp.frames.map(f => item(f, 'home', 'golden')),
   powered.powerUp.frames.map(f => item(f, 'home', 'ultra')),
