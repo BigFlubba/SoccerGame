@@ -82,7 +82,7 @@ export function startSpriteViewer(canvas: HTMLCanvasElement, status: HTMLElement
 
   const held = new Set<number>();
   const pollGamepad = () => {
-    const pad = navigator.getGamepads().find(p => p);
+    const pad = navigator.getGamepads?.().find(p => p);
     if (!pad) return;
     const pressed = (b: number) => pad.buttons[b]?.pressed ?? false;
     const edge = (b: number, act: () => void) => {
