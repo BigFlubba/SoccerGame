@@ -1,7 +1,7 @@
 import { MASTER } from '../art/colors';
 import type { Expression } from '../art/harrison/portrait';
 import { BASE_W } from '../engine/viewport';
-import { addXp, xpToNext } from '../meta/economy';
+import { addXp, canUpgrade, xpToNext } from '../meta/economy';
 import type { MatchReward } from '../meta/progress';
 import { drawBackdrop } from './backdrop';
 import type { GameContext } from './context';
@@ -16,6 +16,8 @@ export interface ResultsScene extends Scene {
   readonly tallyDone: boolean;
   /** NEXT MATCH (or TRY AGAIN), SHOP, HUB: null until the tally is done. */
   readonly menu: MenuState | null;
+  /** He can afford an upgrade now: after a trip to the Shop, too. */
+  readonly upgradeReady: boolean;
 }
 
 /** The tally's beats, in seconds: one reward line every LINE_S, then the XP bar fills over XP_FILL_S. */
@@ -92,12 +94,14 @@ export function createResultsScene(ctx: GameContext, reward: MatchReward, skipTa
   let t = 0;
   let tally = tallyAt(reward, 0);
   let menu: MenuState | null = null;
-  const finish = () => {
-    if (end.levelUp && !tally.levelUp) ctx.audio.play('levelUp');
+  /** Jumps to the end of the tally. A skip still sounds a level-up the tally hadn't reached. */
+  const finish = (fanfare: boolean) => {
+    if (fanfare && end.levelUp && !tally.levelUp) ctx.audio.play('levelUp');
     tally = end;
     menu = { items: resultsItems(reward), index };
   };
-  if (skipTally) finish();
+  // Reopened from the Shop: it was all heard the first time.
+  if (skipTally) finish(false);
   else ctx.audio.playMusic(reward.summary.result);
 
   const choose = (item: string): Scene | null => {
@@ -114,6 +118,9 @@ export function createResultsScene(ctx: GameContext, reward: MatchReward, skipTa
     get menu() {
       return menu;
     },
+    get upgradeReady() {
+      return canUpgrade(ctx.profile);
+    },
     update(input, dt) {
       if (!menu) {
         if (input.pressed.has('back')) {
@@ -121,7 +128,7 @@ export function createResultsScene(ctx: GameContext, reward: MatchReward, skipTa
           return createHubScene(ctx);
         }
         if (input.pressed.has('confirm') || input.pressed.has('shoot') || input.pressed.has('pause')) {
-          finish();
+          finish(true);
           return null;
         }
         t += dt;
@@ -129,7 +136,7 @@ export function createResultsScene(ctx: GameContext, reward: MatchReward, skipTa
         if (next.lines > tally.lines || (next.total && !tally.total)) ctx.audio.play('coin');
         if (next.levelUp && !tally.levelUp) ctx.audio.play('levelUp');
         tally = next;
-        if (tally.done) finish();
+        if (tally.done) finish(true);
         return null;
       }
       // Start confirms here, as on the Hub; Esc (pause plus back) backs out.
@@ -176,7 +183,7 @@ export function createResultsScene(ctx: GameContext, reward: MatchReward, skipTa
 
       if (tally.done) {
         centre(art.text(ladderLine(reward), 1, reward.ladder.beaten ? 'energyGold' : 'white', 'outline'), LADDER_Y);
-        if (reward.upgradeReady) centre(art.text('UPGRADE READY IN THE SHOP!', 1, 'volt', 'outline'), LADDER_Y + 9);
+        if (scene.upgradeReady) centre(art.text('UPGRADE READY IN THE SHOP!', 1, 'volt', 'outline'), LADDER_Y + 9);
       }
       if (menu) drawMenu(g, art, menu, BASE_W / 2, MENU_TOP);
       else drawButtonHint(g, art, art.buttons.A, 'SKIP', BASE_W / 2, SKIP_Y);

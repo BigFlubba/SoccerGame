@@ -91,6 +91,12 @@ export function cheapestUpgrade(p: Profile): number | null {
   return prices.length ? Math.min(...prices) : null;
 }
 
+/** He can afford at least one upgrade now. */
+export function canUpgrade(p: Profile): boolean {
+  const cheapest = cheapestUpgrade(p);
+  return cheapest !== null && p.coins >= cheapest;
+}
+
 /** The profile after buying one level of `stat`, or null when it's maxed or he can't afford it. Never changes `p`. */
 export function buyStat(p: Profile, stat: StatName): Profile | null {
   const price = statPrice(p.stats[stat]);

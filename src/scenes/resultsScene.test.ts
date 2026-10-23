@@ -139,6 +139,37 @@ describe('results screen', () => {
     expect(ctx.savedProfiles).toHaveLength(0);
   });
 
+  it('coming back from the Shop does not replay the level-up fanfare', () => {
+    const { ctx, reward } = after(WIN_3_0);
+    let s = createResultsScene(ctx, reward);
+    run(s, 5);
+    for (let trip = 0; trip < 2; trip++) {
+      s.update(frame(['down']), STEP);
+      const shop = s.update(frame(['confirm']), STEP)!;
+      s = shop.update(frame(['back']), STEP) as ResultsScene;
+      s.update(frame(['up']), STEP);
+    }
+    expect(ctx.audio.played.filter(c => c === 'levelUp')).toHaveLength(1);
+  });
+
+  it('UPGRADE READY follows what he can afford now, after the Shop too', () => {
+    const { ctx, reward } = after(WIN_3_0);
+    const s = createResultsScene(ctx, reward);
+    run(s, 5);
+    expect(s.upgradeReady).toBe(true);
+    s.update(frame(['down']), STEP);
+    const shop = s.update(frame(['confirm']), STEP)!;
+    shop.update(frame(['confirm']), STEP);
+    expect(ctx.profile.coins).toBe(60);
+    const back = shop.update(frame(['back']), STEP) as ResultsScene;
+    expect(back.upgradeReady).toBe(false);
+  });
+
+  it('no UPGRADE READY when he cannot afford one', () => {
+    const { ctx, reward } = after(LOSS_0_2);
+    expect(createResultsScene(ctx, reward, true).upgradeReady).toBe(false);
+  });
+
   it('B goes to the Hub with the back blip, even mid-tally', () => {
     for (const pressed of [['back'], ['pause', 'back']] as const) {
       const { ctx, reward } = after(WIN_3_0);

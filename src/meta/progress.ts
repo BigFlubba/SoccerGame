@@ -1,4 +1,4 @@
-import { LEVEL_UP_COINS, addXp, cheapestUpgrade, matchLines, matchXp, type MatchSummary, type RewardLine } from './economy';
+import { LEVEL_UP_COINS, addXp, matchLines, matchXp, type MatchSummary, type RewardLine } from './economy';
 import { isChampion, nextMatch } from './ladder';
 import type { Profile } from './profile';
 
@@ -22,8 +22,6 @@ export interface MatchReward {
   after: Standing;
   /** The ladder match played, whether this result beat it, and whether he's champion now. */
   ladder: { match: number; beaten: boolean; champion: boolean };
-  /** He can afford at least one upgrade now. */
-  upgradeReady: boolean;
 }
 
 const standing = (p: Profile): Standing => ({ coins: p.coins, level: p.level, xp: p.xp });
@@ -59,7 +57,6 @@ export function applyMatch(p: Profile, s: MatchSummary, match: number, today: st
       xpEarned: t.xpEarned + xp,
     },
   };
-  const cheapest = cheapestUpgrade(profile);
   return {
     profile,
     reward: {
@@ -71,7 +68,6 @@ export function applyMatch(p: Profile, s: MatchSummary, match: number, today: st
       before: standing(p),
       after: standing(profile),
       ladder: { match, beaten, champion: isChampion(ladderWins) },
-      upgradeReady: cheapest !== null && profile.coins >= cheapest,
     },
   };
 }

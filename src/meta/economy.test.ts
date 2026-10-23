@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { STAT_NAMES } from '../game/stats';
-import { STAT_INFO, addXp, buyStat, cheapestUpgrade, matchLines, matchXp, statPrice, xpToNext, type MatchSummary } from './economy';
+import { STAT_INFO, addXp, buyStat, canUpgrade, cheapestUpgrade, matchLines, matchXp, statPrice, xpToNext, type MatchSummary } from './economy';
 import { newProfile } from './profile';
 
 const pairs = (s: MatchSummary, dailyWin = false) => matchLines(s, dailyWin).map(l => [l.label, l.coins]);
@@ -94,6 +94,12 @@ describe('the shop', () => {
     const p = { ...newProfile(), coins: 500 };
     buyStat(p, 'jump');
     expect(p).toEqual({ ...newProfile(), coins: 500 });
+  });
+
+  it('canUpgrade when he can afford any stat that is not maxed', () => {
+    expect(canUpgrade({ ...newProfile(), coins: 150 })).toBe(true);
+    expect(canUpgrade({ ...newProfile(), coins: 149 })).toBe(false);
+    expect(canUpgrade({ ...newProfile(), coins: 99999, stats: { speed: 10, power: 10, jump: 10, control: 10 } })).toBe(false);
   });
 
   it('cheapestUpgrade ignores maxed stats', () => {

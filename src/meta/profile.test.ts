@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { LADDER_MATCHES, PROFILE_KEY, loadProfile, newProfile, saveProfile, type Profile } from './profile';
+import { LADDER_MATCHES, PROFILE_KEY, followProfile, loadProfile, newProfile, saveProfile, type Profile } from './profile';
 import type { KeyValueStore } from './storage';
 
 /** An in-memory store, standing in for localStorage. */
@@ -123,5 +123,35 @@ describe('profile', () => {
     n.totals.matches = 3;
     expect(newProfile().stats.power).toBe(1);
     expect(newProfile().totals.matches).toBe(0);
+  });
+});
+
+describe('followProfile', () => {
+  /** A stand-in for window: keeps the storage listener so a test can fire it. */
+  function fakeWindow() {
+    let listener: ((e: { key: string | null }) => void) | null = null;
+    return {
+      addEventListener: (_type: 'storage', cb: (e: { key: string | null }) => void) => void (listener = cb),
+      fire: (key: string | null) => listener?.({ key }),
+    };
+  }
+
+  it('another tab saving the profile reloads it here', () => {
+    const store = memoryStore();
+    const win = fakeWindow();
+    const seen: Profile[] = [];
+    followProfile(win, store, p => seen.push(p));
+    saveProfile(store, SOME);
+    win.fire(PROFILE_KEY);
+    expect(seen).toEqual([SOME]);
+  });
+
+  it('ignores other keys and a cleared store', () => {
+    const win = fakeWindow();
+    const seen: Profile[] = [];
+    followProfile(win, memoryStore(), p => seen.push(p));
+    win.fire('harrisons-road-to-the-cup/settings');
+    win.fire(null);
+    expect(seen).toEqual([]);
   });
 });

@@ -72,13 +72,6 @@ describe('applyMatch', () => {
     expect(reward.levelBonus).toBe(100);
   });
 
-  it('upgradeReady when he can afford any stat', () => {
-    expect(applyMatch(newProfile(), win30, 1, TODAY).reward.upgradeReady).toBe(true);
-    expect(applyMatch(newProfile(), loss03, 1, TODAY).reward.upgradeReady).toBe(false);
-    const maxed = { ...newProfile(), coins: 99999, stats: { speed: 10, power: 10, jump: 10, control: 10 } };
-    expect(applyMatch(maxed, win30, 1, TODAY).reward.upgradeReady).toBe(false);
-  });
-
   it('applyMatch does not change its input', () => {
     const p = { ...newProfile(), coins: 40 };
     const copy = structuredClone(p);

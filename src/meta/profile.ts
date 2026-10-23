@@ -89,6 +89,20 @@ export function loadProfile(store: KeyValueStore | null): Profile {
   };
 }
 
+/**
+ * Calls `apply` with the stored profile whenever another tab saves it, so a
+ * tab left open never writes stale progress over a newer one.
+ */
+export function followProfile(
+  target: { addEventListener(type: 'storage', cb: (e: { key: string | null }) => void): void },
+  store: KeyValueStore | null,
+  apply: (p: Profile) => void,
+): void {
+  target.addEventListener('storage', e => {
+    if (e.key === PROFILE_KEY) apply(loadProfile(store));
+  });
+}
+
 /** Saves at once. Never throws, and never writes over a newer build's save. */
 export function saveProfile(store: KeyValueStore | null, p: Profile): void {
   writeUnlessNewer(store, PROFILE_KEY, p);

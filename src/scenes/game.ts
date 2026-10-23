@@ -4,7 +4,7 @@ import { createInput, type InputFrame } from '../engine/input';
 import { createStepper, startLoop } from '../engine/loop';
 import { createRumble } from '../engine/rumble';
 import { createScreen } from '../engine/screen';
-import { loadProfile, saveProfile as storeProfile } from '../meta/profile';
+import { followProfile, loadProfile, saveProfile as storeProfile } from '../meta/profile';
 import { localDate } from '../meta/progress';
 import { loadSettings, saveSettings } from '../meta/settings';
 import type { KeyValueStore } from '../meta/storage';
@@ -57,6 +57,7 @@ export function startGame(canvas: HTMLCanvasElement): void {
   };
   audio.setVolumes(ctx.settings.musicVolume, ctx.settings.sfxVolume);
   rumble.enabled = ctx.settings.rumble;
+  followProfile(window, store, p => (ctx.profile = p));
   // Browsers only allow sound after a key press, click or tap. Chrome doesn't count a gamepad press.
   const unlock = () => audio.unlock();
   window.addEventListener('keydown', unlock);
