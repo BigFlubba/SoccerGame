@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { DIFFICULTY, createBrain, think, type AiProfile } from './ai';
 import { BALL_REST_Y } from './ball';
+import { NO_INTENT } from './player';
 import { BASE_STATS } from './stats';
 import { createWorld, stepWorld, type World } from './world';
 
@@ -62,6 +63,20 @@ describe('think', () => {
     let again = 0;
     for (let t = 0; t < 1.1 * 60; t++) if (think(brain, w, w.away, w.home, STEP).chipHeld) again++;
     expect(again).toBe(0);
+  });
+
+  it('turns to face a ball carrier it is close to but facing away from', () => {
+    const w = scene({ x: 310 }, 300, 330);
+    w.away.facing = 1;
+    expect(think(brainFor({ aggression: 1 }), w, w.away, w.home, STEP).moveX).toBeLessThan(0);
+  });
+
+  it.each(['easy', 'normal', 'hard'] as const)('on %s it never freezes on its defend spot facing away from an idle Harrison', difficulty => {
+    const w = scene({ x: 310 }, 300, 330);
+    w.away.facing = 1;
+    const brain = createBrain(DIFFICULTY[difficulty]);
+    for (let t = 0; t < 5 * 60; t++) stepWorld(w, NO_INTENT, think(brain, w, w.away, w.home, STEP), STEP);
+    expect(Math.abs(w.ball.x - 310) > 20 || w.match.score.away > 0).toBe(true);
   });
 
   it('only changes its mind every reactionS', () => {

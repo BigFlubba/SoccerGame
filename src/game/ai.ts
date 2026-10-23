@@ -102,7 +102,13 @@ function decide(brain: AiBrain, w: World, me: Player, them: Player): void {
   if (low && Math.abs(ball.x - them.x) <= POSSESSION_RANGE) {
     brain.plan = 'defend';
     const facingBall = Math.sign(ball.x - me.x) === me.facing;
-    if (Math.abs(ball.x - me.x) <= SLIDE_RANGE && brain.slideReadyS === 0 && facingBall && w.rng() < profile.aggression) {
+    const close = Math.abs(ball.x - me.x) <= SLIDE_RANGE;
+    if (close && !facingBall) {
+      // Turn to face the ball, or it would stand on its spot facing away and never challenge.
+      brain.intent = { ...intent, moveX: Math.sign(ball.x - me.x) };
+      return;
+    }
+    if (close && brain.slideReadyS === 0 && w.rng() < profile.aggression) {
       brain.slideReadyS = SLIDE_COOLDOWN_S;
       brain.intent = { ...intent, chipHeld: true };
       return;
