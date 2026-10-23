@@ -1,23 +1,20 @@
 import { describe, expect, it } from 'vitest';
-import { createPlayer } from '../game/player';
 import { BASE_STATS } from '../game/stats';
-import { CROSSING_DEPTH_PX, crossingDepth } from './matchView';
+import { createWorld } from '../game/world';
+import type { GameArt } from './art';
+import { pitchDrawables } from './matchView';
 
-const at = (homeX: number, awayX: number) =>
-  crossingDepth(createPlayer('home', BASE_STATS, homeX, 1), createPlayer('away', BASE_STATS, awayX, -1));
+/** Building the list never touches the art; only drawing does. */
+const NO_ART = {} as GameArt;
 
-describe('crossingDepth', () => {
-  it('is 0 while the players are apart', () => {
-    expect(at(100, 200)).toBe(0);
-  });
-
-  it('steps Max fully behind Harrison when they overlap', () => {
-    expect(at(300, 300)).toBe(CROSSING_DEPTH_PX);
-  });
-
-  it('eases in as they close', () => {
-    const depths = [30, 20, 15, 10, 5, 0].map(gap => at(300, 300 + gap));
-    expect(depths).toEqual([...depths].sort((a, b) => a - b));
-    expect(new Set(depths).size).toBeGreaterThan(2);
+describe('pitchDrawables', () => {
+  it('puts both players and the ball at their depths, and every post at its own', () => {
+    const w = createWorld(BASE_STATS, BASE_STATS, 1, { home: 4, away: 6 });
+    Object.assign(w.home, { z: 10 });
+    Object.assign(w.away, { z: 50 });
+    Object.assign(w.ball, { z: 27 });
+    const zs = pitchDrawables(w, { x: 0 }, NO_ART).map(d => d.z);
+    expect(zs).toEqual(expect.arrayContaining([10, 50, 27, 18, 46, 18, 46]));
+    expect(zs).toHaveLength(7);
   });
 });
