@@ -1,3 +1,4 @@
+import { BALL_REST_Y } from './ball';
 import { GRAVITY } from './constants';
 import type { Aim } from './kick';
 import { NO_INTENT, type Player, type PlayerIntent } from './player';
@@ -63,8 +64,9 @@ const attackDir = (me: Player): 1 | -1 => (me.team === 'home' ? 1 : -1);
 /** Where a loose ball will be: its landing spot if airborne, a little ahead if rolling. */
 function predictBallX(w: World): number {
   const b = w.ball;
-  const airborne = b.y > 1 || b.vy > 0;
-  const t = airborne ? (b.vy + Math.sqrt(b.vy * b.vy + 2 * GRAVITY * b.y)) / GRAVITY : LEAD_S;
+  const drop = b.y - BALL_REST_Y;
+  const airborne = drop > 1 || b.vy > 0;
+  const t = airborne ? (b.vy + Math.sqrt(b.vy * b.vy + 2 * GRAVITY * Math.max(drop, 0))) / GRAVITY : LEAD_S;
   return Math.min(Math.max(b.x + b.vx * t, w.field.fenceL), w.field.fenceR);
 }
 

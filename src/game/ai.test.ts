@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { DIFFICULTY, createBrain, think, type AiProfile } from './ai';
+import { BALL_REST_Y } from './ball';
 import { BASE_STATS } from './stats';
 import { createWorld, stepWorld, type World } from './world';
 
@@ -9,7 +10,7 @@ const STEP = 1 / 60;
 function scene(ball: { x: number; y?: number; vx?: number; vy?: number }, home: number, away: number): World {
   const w = createWorld(BASE_STATS, BASE_STATS, 3, { home: 4, away: DIFFICULTY.normal.aimErrorDeg });
   w.match.phase = 'playing';
-  Object.assign(w.ball, { y: 0, vx: 0, vy: 0, ...ball });
+  Object.assign(w.ball, { y: BALL_REST_Y, vx: 0, vy: 0, ...ball });
   w.home.x = home;
   w.away.x = away;
   return w;

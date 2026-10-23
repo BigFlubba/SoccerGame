@@ -1,12 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import { BALL_R } from '../art/ball';
-import { stepBall, type Ball, type BallEvents } from './ball';
+import { BALL_REST_Y, stepBall, type Ball, type BallEvents } from './ball';
 import { BACKYARD, goalScored } from './field';
 
 const STEP = 1 / 60;
 
 function ball(p: Partial<Ball>): Ball {
-  return { x: 320, y: 0, vx: 0, vy: 0, spin: 0, spinAngle: 0, ...p };
+  return { x: 320, y: BALL_REST_Y, vx: 0, vy: 0, spin: 0, spinAngle: 0, ...p };
 }
 
 /** Steps the ball at 60 Hz against the Backyard; returns every tick's events. */
@@ -20,6 +20,12 @@ function run(b: Ball, seconds: number, each?: (b: Ball) => void): BallEvents[] {
 }
 
 describe('stepBall', () => {
+  it('comes to rest sitting on the grass, its centre one radius up', () => {
+    const b = ball({ y: 40 });
+    run(b, 3);
+    expect([b.y, b.vy]).toEqual([BALL_R, 0]);
+  });
+
   it('falls and bounces lower each time', () => {
     const b = ball({ y: 60 });
     const peaks: number[] = [];
@@ -30,7 +36,7 @@ describe('stepBall', () => {
     });
     expect(peaks.length).toBeGreaterThanOrEqual(2);
     for (let i = 1; i < peaks.length; i++) expect(peaks[i]!).toBeLessThan(peaks[i - 1]!);
-    expect([b.y, b.vy]).toEqual([0, 0]);
+    expect([b.y, b.vy]).toEqual([BALL_REST_Y, 0]);
   });
 
   it('reports a bounce when it hits the ground', () => {
@@ -112,7 +118,7 @@ describe('stepBall', () => {
     const b = ball({ x: 560, y: 45, vx: 700, vy: 50 });
     run(b, 4);
     expect(b.x).toBeLessThan(612);
-    expect([b.y, b.vy]).toEqual([0, 0]);
+    expect([b.y, b.vy]).toEqual([BALL_REST_Y, 0]);
   });
 
   it('a 700 px/s shot under the bar is caught by the net, not the fence', () => {
@@ -134,7 +140,7 @@ describe('stepBall', () => {
   it('a ball resting on top of the crossbar rolls off', () => {
     const b = ball({ x: 620, y: 30 + 3, vx: 0, vy: 0 });
     run(b, 3);
-    expect(b.y).toBe(0);
+    expect(b.y).toBe(BALL_REST_Y);
   });
 
   it('a fast ball skimming the roof keeps its pace', () => {
@@ -146,7 +152,7 @@ describe('stepBall', () => {
   it('a ball dropped onto the roof right by the fence rolls off into play', () => {
     const b = ball({ x: 632, y: 60 });
     run(b, 4);
-    expect([b.y, b.vy]).toEqual([0, 0]);
+    expect([b.y, b.vy]).toEqual([BALL_REST_Y, 0]);
     expect(b.x).toBeLessThan(612);
   });
 });

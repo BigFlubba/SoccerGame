@@ -1,6 +1,6 @@
 import { BALL_R } from '../art/ball';
 import { seeded, type Rng } from '../engine/random';
-import { stepBall, type Ball, type BallEvents } from './ball';
+import { BALL_REST_Y, stepBall, type Ball, type BallEvents } from './ball';
 import { resolveContacts, type ContactEvents } from './contact';
 import { BACKYARD, goalScored, type Field } from './field';
 import { createMatch, stepMatch, type MatchState, type Team } from './match';
@@ -40,7 +40,7 @@ export function createWorld(homeStats: Stats, awayStats: Stats, seed: number, ai
   const centre = BACKYARD.width / 2;
   const w: World = {
     field: BACKYARD,
-    ball: { x: centre, y: 0, vx: 0, vy: 0, spin: 0, spinAngle: 0 },
+    ball: { x: centre, y: BALL_REST_Y, vx: 0, vy: 0, spin: 0, spinAngle: 0 },
     home: createPlayer('home', homeStats, centre, 1),
     away: createPlayer('away', awayStats, centre, -1),
     match: createMatch(),
@@ -62,7 +62,7 @@ function reset(p: Player, x: number): void {
 /** Ball on the centre spot, the kicking-off player just behind it, the other back in his own half. */
 export function placeForKickoff(w: World): void {
   const centre = w.field.width / 2;
-  Object.assign(w.ball, { x: centre, y: 0, vx: 0, vy: 0, spin: 0 });
+  Object.assign(w.ball, { x: centre, y: BALL_REST_Y, vx: 0, vy: 0, spin: 0 });
   for (const p of [w.home, w.away]) {
     const dir = attackDir(p.team);
     reset(p, p.team === w.match.kickoffTeam ? centre - KICKOFF_GAP * dir : centre - KICKOFF_DEFENDER_DEPTH * dir);
@@ -70,7 +70,7 @@ export function placeForKickoff(w: World): void {
 }
 
 /** The ball is at his feet when it's on the ground in reach of his foot. */
-const ballAtFeet = (p: Player, ball: Ball): boolean => p.y === 0 && ball.y <= BALL_R && ballIn(footZone(p), ball, BALL_R);
+const ballAtFeet = (p: Player, ball: Ball): boolean => p.y === 0 && ball.y <= BALL_REST_Y && ballIn(footZone(p), ball, BALL_R);
 
 /** One fixed tick: players, ball, contacts, then the match rules. Intents only count while the ball is in play. */
 export function stepWorld(w: World, homeIntent: PlayerIntent, awayIntent: PlayerIntent, dt: number): void {

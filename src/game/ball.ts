@@ -16,7 +16,10 @@ import {
 } from './constants';
 import type { Field, Goal } from './field';
 
-/** World: x right, y = height above the ground (up). */
+/** Height of a resting ball's centre: it sits on the grass. */
+export const BALL_REST_Y = BALL_R;
+
+/** World: x right, y up; (x, y) is the ball's centre. */
 export interface Ball {
   x: number;
   y: number;
@@ -97,7 +100,7 @@ function collideNet(b: Ball, g: Goal): boolean {
 }
 
 function substep(b: Ball, h: number, field: Field, ev: BallEvents): void {
-  const airborne = b.y > 0 || b.vy > 0;
+  const airborne = b.y > BALL_REST_Y || b.vy > 0;
   if (airborne) {
     b.vy -= (GRAVITY + Math.max(b.spin, 0) * SPIN_DIP) * h;
     const drag = 1 - AIR_DRAG * h;
@@ -111,8 +114,8 @@ function substep(b: Ball, h: number, field: Field, ev: BallEvents): void {
   b.y += b.vy * h;
   b.spinAngle += (b.vx * h) / BALL_R;
 
-  if (b.y < 0) {
-    b.y = 0;
+  if (b.y < BALL_REST_Y) {
+    b.y = BALL_REST_Y;
     if (b.vy < 0) {
       const up = -b.vy * BALL_RESTITUTION;
       if (up < SETTLE_SPEED) {

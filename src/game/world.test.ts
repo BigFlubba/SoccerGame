@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { NO_INTENT, type PlayerIntent } from './player';
 import { BASE_STATS } from './stats';
+import { BALL_REST_Y } from './ball';
 import { createWorld, placeForKickoff, stepWorld } from './world';
 
 const STEP = 1 / 60;
@@ -10,7 +11,7 @@ const move = (moveX: number): PlayerIntent => ({ ...NO_INTENT, moveX });
 describe('world', () => {
   it('places players for kickoff: home kicks off from beside the ball', () => {
     const w = createWorld(BASE_STATS, BASE_STATS, 1, ERR);
-    expect([w.ball.x, w.ball.y]).toEqual([320, 0]);
+    expect([w.ball.x, w.ball.y]).toEqual([320, BALL_REST_Y]);
     expect([w.home.x, w.home.facing]).toEqual([308, 1]);
     expect([w.away.x, w.away.facing]).toEqual([390, -1]);
   });
@@ -28,7 +29,7 @@ describe('world', () => {
     stepWorld(w, move(1), move(-1), STEP);
     expect(w.match.phase).toBe('kickoff');
     expect(w.home.x).toBe(308);
-    expect([w.ball.x, w.ball.y]).toEqual([320, 0]);
+    expect([w.ball.x, w.ball.y]).toEqual([320, BALL_REST_Y]);
   });
 
   it('follows intents once play starts', () => {
@@ -51,7 +52,7 @@ describe('world', () => {
     expect(w.match.score).toEqual({ home: 1, away: 0 });
     for (let i = 0; i < 2.1 * 60; i++) stepWorld(w, NO_INTENT, NO_INTENT, STEP);
     expect(w.match.phase).toBe('kickoff');
-    expect([w.ball.x, w.ball.y, w.ball.vx]).toEqual([320, 0, 0]);
+    expect([w.ball.x, w.ball.y, w.ball.vx]).toEqual([320, BALL_REST_Y, 0]);
     expect(w.away.x).toBe(332);
   });
 
@@ -71,7 +72,7 @@ describe('world', () => {
       w.match.phase = 'playing';
       Object.assign(w.home, { x: 300, vx: 95 });
       Object.assign(w.away, { x: 316, vx: -95, facing: -1 });
-      Object.assign(w.ball, { x: 308, y: 0 });
+      Object.assign(w.ball, { x: 308, y: BALL_REST_Y });
       for (let i = 0; i < 30; i++) stepWorld(w, move(1), move(-1), STEP);
       sides.add(Math.sign(w.ball.x - (w.home.x + w.away.x) / 2));
     }

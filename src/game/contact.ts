@@ -1,6 +1,6 @@
 import { BALL_R } from '../art/ball';
 import type { Rng } from '../engine/random';
-import type { Ball } from './ball';
+import { BALL_REST_Y, type Ball } from './ball';
 import type { Field } from './field';
 import { chip, header, shot, volley } from './kick';
 import { PLAYER_W, knockDown, type Player } from './player';
@@ -126,7 +126,7 @@ const squeezed = (p: Player, opponent: Player, ball: Ball): boolean =>
  */
 function squirt(p: Player, opponent: Player, ball: Ball, rng: Rng): void {
   ball.x = (p.x + opponent.x) / 2;
-  if (ball.vy > 0 || ball.y > BALL_R) return;
+  if (ball.vy > 0 || ball.y > BALL_REST_Y) return;
   ball.vy = SQUEEZE_POP_VY;
   ball.vx = (p.vx + opponent.vx) / 2 + (rng() < 0.5 ? -1 : 1) * SQUEEZE_SQUIRT_VX;
 }
