@@ -228,13 +228,28 @@ describe('resolveContacts: pinned ball', () => {
     expect([b.x, b.z, b.vx, b.vy]).toEqual([620, 20, -20, 0]);
   });
 
-  it('a ball squeezed between two players pops up over their heads and squirts out sideways', () => {
+  it('a ball squeezed between two players pops up over their heads and squirts out to one side of them', () => {
     const { p, opp } = setup(300);
     opp.x = 313;
     const b = ball({ x: 306.5, vx: 50 });
     contact(p, opp, b);
     expect((b.vy * b.vy) / (2 * 900)).toBeGreaterThan(40);
-    expect(b.vx).not.toBe(0);
+    expect(Math.abs(b.vz)).toBeGreaterThan(0);
+  });
+
+  it('a squirted ball leaves between the two bodies without bouncing off either', () => {
+    const { p, opp } = setup(300);
+    opp.x = 310;
+    const b = ball({ x: 305 });
+    contact(p, opp, b);
+    const vz = b.vz;
+    for (let t = 0; t < 20; t++) {
+      stepBall(b, STEP, BACKYARD);
+      contact(p, opp, b);
+      contact(opp, p, b);
+    }
+    expect(Math.sign(b.vz)).toBe(Math.sign(vz));
+    expect(Math.abs(b.z - p.z)).toBeGreaterThan(PLAYER_R + BALL_R);
   });
 });
 

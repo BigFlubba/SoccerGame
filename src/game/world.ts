@@ -1,6 +1,7 @@
 import { BALL_R } from '../art/ball';
 import { seeded, type Rng } from '../engine/random';
 import { BALL_REST_Y, stepBall, type Ball, type BallEvents } from './ball';
+import { resolveBodies } from './bodies';
 import { resolveContacts, type ContactEvents } from './contact';
 import { BACKYARD, goalScored, type Field } from './field';
 import { createMatch, stepMatch, type MatchState, type Team } from './match';
@@ -53,10 +54,10 @@ export function createWorld(homeStats: Stats, awayStats: Stats, seed: number, ai
   return w;
 }
 
-/** Puts a player back on his feet at x, keeping his stamina and held buttons. */
-function reset(p: Player, x: number): void {
+/** Puts a player back on his feet at (x, z), keeping his stamina and held buttons. */
+function reset(p: Player, x: number, z: number): void {
   const { stamina, held, exhausted } = p;
-  Object.assign(p, createPlayer(p.team, p.stats, x, attackDir(p.team)), { stamina, held, exhausted });
+  Object.assign(p, createPlayer(p.team, p.stats, x, attackDir(p.team), z), { stamina, held, exhausted });
 }
 
 /** Ball on the centre spot, the kicking-off player just behind it, the other back in his own half. */
@@ -65,19 +66,33 @@ export function placeForKickoff(w: World): void {
   Object.assign(w.ball, { x: centre, y: BALL_REST_Y, z: w.field.depth / 2, vx: 0, vy: 0, vz: 0, spin: 0 });
   for (const p of [w.home, w.away]) {
     const dir = attackDir(p.team);
-    reset(p, p.team === w.match.kickoffTeam ? centre - KICKOFF_GAP * dir : centre - KICKOFF_DEFENDER_DEPTH * dir);
+    reset(p, p.team === w.match.kickoffTeam ? centre - KICKOFF_GAP * dir : centre - KICKOFF_DEFENDER_DEPTH * dir, w.field.depth / 2);
   }
 }
 
 /** The ball is at his feet when it's on the ground in reach of his foot. */
 const ballAtFeet = (p: Player, ball: Ball): boolean => p.y === 0 && ball.y <= BALL_REST_Y && ballIn(footZone(p), ball, BALL_R);
 
-/** One fixed tick: players, ball, contacts, then the match rules. Intents only count while the ball is in play. */
+/**
+ * Steps a player on his intent while the ball is in play, standing still
+ * otherwise. Buttons held outside play still count as held, so one held
+ * through a goal pause or kickoff needs a fresh press.
+ */
+function stepOne(p: Player, intent: PlayerIntent, live: boolean, w: World, dt: number): void {
+  stepPlayer(p, live ? intent : NO_INTENT, dt, w.field, ballAtFeet(p, w.ball));
+  if (!live) p.held = { shoot: intent.shootHeld, chip: intent.chipHeld };
+}
+
+/**
+ * One fixed tick: players, then their bodies kept apart and out of the
+ * goals, then the ball, contacts and the match rules. Intents only count
+ * while the ball is in play.
+ */
 export function stepWorld(w: World, homeIntent: PlayerIntent, awayIntent: PlayerIntent, dt: number): void {
   const live = w.match.phase === 'playing';
-  stepPlayer(w.home, live ? homeIntent : NO_INTENT, dt, w.field, ballAtFeet(w.home, w.ball));
-  // Players run past each other (drawn one behind the other); only the ball is contested.
-  stepPlayer(w.away, live ? awayIntent : NO_INTENT, dt, w.field, ballAtFeet(w.away, w.ball));
+  stepOne(w.home, homeIntent, live, w, dt);
+  stepOne(w.away, awayIntent, live, w, dt);
+  resolveBodies(w.home, w.away, w.field);
 
   const ball = stepBall(w.ball, dt, w.field);
   // The second player to act on the ball has the last word, so take turns going first.

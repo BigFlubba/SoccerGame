@@ -31,6 +31,11 @@ function pushApart(a: Player, b: Player, shareA: (nx: number, nz: number) => num
   a.z -= nz * overlap * share;
   b.x += nx * overlap * (1 - share);
   b.z += nz * overlap * (1 - share);
+  // Bodies stop each other: neither keeps any speed into the other, only along him.
+  const intoB = a.vx * nx + a.vz * nz;
+  if (intoB > 0) [a.vx, a.vz] = [a.vx - intoB * nx, a.vz - intoB * nz];
+  const intoA = b.vx * nx + b.vz * nz;
+  if (intoA < 0) [b.vx, b.vz] = [b.vx - intoA * nx, b.vz - intoA * nz];
 }
 
 /**

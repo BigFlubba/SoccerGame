@@ -84,7 +84,20 @@ describe('stepMatch', () => {
     expect([m.phase, m.goldenGoal]).toEqual(['playing', true]);
     run(m, 10);
     stepMatch(m, STEP, 'left');
+    expect([m.phase, m.result]).toEqual(['goal', 'lose']);
+    run(m, GOAL_PAUSE_S);
     expect([m.phase, m.result]).toEqual(['fullTime', 'lose']);
+  });
+
+  it('a golden goal gets its GOAL! moment, then full time', () => {
+    const m = playing({ clockS: 90, goldenGoal: true, goldenS: 5 });
+    expect(stepMatch(m, STEP, 'right').resetForKickoff).toBe(false);
+    expect([m.phase, m.result, m.score.home]).toEqual(['goal', 'win', 1]);
+    const resets: boolean[] = [];
+    for (let i = 0; i < ticks(GOAL_PAUSE_S); i++) resets.push(stepMatch(m, STEP, 'right').resetForKickoff);
+    expect(m.phase).toBe('fullTime');
+    expect(resets).not.toContain(true);
+    expect(m.score.home).toBe(1);
   });
 
   it('golden goal times out to a draw at 45 s', () => {
@@ -100,7 +113,7 @@ describe('stepMatch', () => {
   it('a golden goal on the timeout tick still wins', () => {
     const m = playing({ clockS: 90, goldenGoal: true, goldenS: 45 - STEP / 2 });
     stepMatch(m, STEP, 'right');
-    expect([m.phase, m.result]).toEqual(['fullTime', 'win']);
+    expect([m.phase, m.result]).toEqual(['goal', 'win']);
   });
 
   it('nothing changes after full time', () => {

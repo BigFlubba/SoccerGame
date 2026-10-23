@@ -194,15 +194,21 @@ const squeezed = (p: Player, opponent: Player, ball: Ball): boolean => ballInBod
 
 /**
  * A 50/50: a ball squeezed between both players on the ground pops up over
- * their heads midway between them and squirts out to a random side, so
- * neither body shoves it through the other and neither side always wins.
+ * their heads midway between them and squirts out to a random side of the
+ * line between them, so it leaves both bodies at once, neither shoves it
+ * through the other, and neither side always wins.
  */
 function squirt(p: Player, opponent: Player, ball: Ball, rng: Rng, field: Field): void {
   if (ball.vy > 0 || ball.y > BALL_REST_Y) return;
   placeBall(ball, (p.x + opponent.x) / 2, (p.z + opponent.z) / 2, field);
+  const [dx, dz] = [opponent.x - p.x, opponent.z - p.z];
+  const d = Math.hypot(dx, dz);
+  // Square to the line between them: pitch-wise that's in depth when they meet head-on.
+  const [sx, sz] = d > 0 ? [-dz / d, dx / d] : [0, 1];
+  const side = rng() < 0.5 ? -1 : 1;
   ball.vy = SQUEEZE_POP_VY;
-  ball.vx = (p.vx + opponent.vx) / 2 + (rng() < 0.5 ? -1 : 1) * SQUEEZE_SQUIRT_VX;
-  ball.vz = (p.vz + opponent.vz) / 2;
+  ball.vx = (p.vx + opponent.vx) / 2 + side * sx * SQUEEZE_SQUIRT_VX;
+  ball.vz = (p.vz + opponent.vz) / 2 + side * sz * SQUEEZE_SQUIRT_VX;
 }
 
 /** Everything player `p` does to the ball (and to the opponent's feet) this tick. */

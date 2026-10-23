@@ -42,9 +42,14 @@ function enter(m: MatchState, phase: Phase): void {
   m.phaseT = 0;
 }
 
-function finish(m: MatchState): void {
+/** Decides the result from the score. */
+function settle(m: MatchState): void {
   const { home, away } = m.score;
   m.result = home > away ? 'win' : home < away ? 'lose' : 'draw';
+}
+
+function finish(m: MatchState): void {
+  settle(m);
   enter(m, 'fullTime');
 }
 
@@ -59,8 +64,9 @@ function play(m: MatchState, dt: number, goal: 'left' | 'right' | null): void {
     m.score[scorer]++;
     m.lastScorer = scorer;
     m.kickoffTeam = scorer === 'home' ? 'away' : 'home';
-    if (m.goldenGoal) return finish(m);
     enter(m, 'goal');
+    // A golden goal decides the match now, but still gets its GOAL! moment before full time.
+    if (m.goldenGoal) return settle(m);
   }
 
   if (m.goldenGoal) {
@@ -79,11 +85,13 @@ export function stepMatch(m: MatchState, dt: number, goal: 'left' | 'right' | nu
       play(m, dt, goal);
       break;
     case 'goal':
-      if (m.phaseT >= GOAL_PAUSE_S - TIME_EPS) {
-        enter(m, 'kickoff');
-        return { resetForKickoff: true };
+      if (m.phaseT < GOAL_PAUSE_S - TIME_EPS) break;
+      if (m.result) {
+        enter(m, 'fullTime');
+        break;
       }
-      break;
+      enter(m, 'kickoff');
+      return { resetForKickoff: true };
     case 'kickoff':
       if (m.phaseT >= KICKOFF_S - TIME_EPS) enter(m, 'playing');
       break;

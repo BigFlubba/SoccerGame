@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { NO_INTENT, type PlayerIntent } from './player';
+import { inGoalBox } from './field';
+import { NO_INTENT, PLAYER_R, type PlayerIntent } from './player';
 import { BASE_STATS } from './stats';
 import { BALL_REST_Y } from './ball';
 import { createWorld, placeForKickoff, stepWorld } from './world';
@@ -65,7 +66,7 @@ describe('world', () => {
     expect(w.ball.vx).toBeGreaterThan(100);
   });
 
-  it('a ball contested from both sides squirts out to either side, not always to whoever resolves last', () => {
+  it('a ball contested from both sides squirts out to either side of them, not always to whoever resolves last', () => {
     const sides = new Set<number>();
     for (let seed = 1; seed <= 8; seed++) {
       const w = createWorld(BASE_STATS, BASE_STATS, seed, ERR);
@@ -74,19 +75,51 @@ describe('world', () => {
       Object.assign(w.away, { x: 316, vx: -95, facing: -1 });
       Object.assign(w.ball, { x: 308, y: BALL_REST_Y });
       for (let i = 0; i < 30; i++) stepWorld(w, move(1), move(-1), STEP);
-      sides.add(Math.sign(w.ball.x - (w.home.x + w.away.x) / 2));
+      // Head-on along x, the sides are in depth.
+      sides.add(Math.sign(w.ball.z - (w.home.z + w.away.z) / 2));
     }
     expect(sides).toEqual(new Set([-1, 1]));
   });
 
-  it('players can run past each other', () => {
+  it('players are solid: running head-on, neither passes through the other', () => {
     const w = createWorld(BASE_STATS, BASE_STATS, 1, ERR);
     w.match.phase = 'playing';
     Object.assign(w.ball, { x: 100 });
     Object.assign(w.home, { x: 300 });
     Object.assign(w.away, { x: 330 });
     for (let i = 0; i < 60; i++) stepWorld(w, move(1), move(-1), STEP);
+    expect(w.away.x - w.home.x).toBeGreaterThanOrEqual(2 * PLAYER_R - 0.01);
+  });
+
+  it('players a little apart in depth go round each other', () => {
+    const w = createWorld(BASE_STATS, BASE_STATS, 1, ERR);
+    w.match.phase = 'playing';
+    Object.assign(w.ball, { x: 100 });
+    Object.assign(w.home, { x: 300, z: 30 });
+    Object.assign(w.away, { x: 330, z: 34 });
+    for (let i = 0; i < 60; i++) stepWorld(w, move(1), move(-1), STEP);
     expect(w.home.x).toBeGreaterThan(w.away.x + 40);
+  });
+
+  it('kickoff puts everyone on the centre line in depth', () => {
+    const w = createWorld(BASE_STATS, BASE_STATS, 1, ERR);
+    Object.assign(w.home, { z: 10 });
+    Object.assign(w.away, { z: 50 });
+    Object.assign(w.ball, { z: 5, vz: 40 });
+    placeForKickoff(w);
+    expect([w.ball.z, w.ball.vz, w.home.z, w.away.z, w.home.vz]).toEqual([32, 0, 32, 32, 0]);
+  });
+
+  it('a shot held through the kickoff needs a fresh press', () => {
+    const w = createWorld(BASE_STATS, BASE_STATS, 1, ERR);
+    const held = { ...NO_INTENT, shootHeld: true, chipHeld: true };
+    while (w.match.phase === 'kickoff') stepWorld(w, held, held, STEP);
+    stepWorld(w, held, held, STEP);
+    expect([w.home.state, w.home.charge]).toEqual(['ground', 0]);
+    expect(w.away.state).toBe('ground');
+    stepWorld(w, NO_INTENT, NO_INTENT, STEP);
+    stepWorld(w, held, NO_INTENT, STEP);
+    expect(w.home.state).toBe('charging');
   });
 
   it.each([604, 606, 608, 610, 612, 618, 624])('a ball resting on the net roof comes down past a player standing at x %i', x => {
@@ -109,12 +142,12 @@ describe('world', () => {
     expect(w.ball.y).toBe(BALL_REST_Y);
   });
 
-  it('players cannot run behind the nets', () => {
+  it('nobody can run into a goal', () => {
     const w = createWorld(BASE_STATS, BASE_STATS, 1, ERR);
     w.match.phase = 'playing';
+    Object.assign(w.away, { z: 40 });
     for (let i = 0; i < 10 * 60; i++) stepWorld(w, move(1), move(-1), STEP);
-    expect(w.home.x).toBeLessThanOrEqual(628 - 4);
-    expect(w.away.x).toBeGreaterThanOrEqual(12 + 4);
+    for (const p of [w.home, w.away]) for (const g of w.field.goals) expect(inGoalBox(g, p.x, p.z, PLAYER_R - 0.01)).toBe(false);
   });
 
   it('knows when the ball is at a player’s feet so B chips', () => {

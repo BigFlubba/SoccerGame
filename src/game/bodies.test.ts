@@ -60,6 +60,15 @@ describe('separatePlayers', () => {
     expect(gap(a, b)).toBeCloseTo(2 * PLAYER_R);
   });
 
+  it('stops the runner\u2019s speed into the other player, keeping his speed along him', () => {
+    const a = home(300, 32);
+    const b = away(306, 32);
+    [a.vx, a.vz] = [95, 20];
+    separatePlayers(a, b);
+    expect([a.vx, a.vz]).toEqual([0, 20]);
+    expect([b.vx, b.vz]).toEqual([0, 0]);
+  });
+
   it('a runner cannot push straight through a still player', () => {
     const a = home(300, 32);
     const b = away(320, 32);
