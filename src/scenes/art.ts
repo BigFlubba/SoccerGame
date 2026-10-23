@@ -4,14 +4,13 @@ import { bakeAll, type BakedClip } from '../art/body/bake';
 import type { HeadSprite } from '../art/body/head';
 import type { HeadFacing } from '../art/body/pose';
 import { HARRISON_BODY } from '../art/body/proportions';
-import { masterPalette, resolvePalette, type LookColors, type MasterColor } from '../art/colors';
+import { masterPalette, resolvePalette, type LookColors, type MasterColor, type ResolvedPalette } from '../art/colors';
 import { renderText, textPalette } from '../art/font';
 import { HARRISON_HEADS } from '../art/harrison/head';
 import { harrisonLook } from '../art/harrison/look';
 import { harrisonPortrait } from '../art/harrison/portrait';
-import { flipX } from '../art/indexedImage';
 import { MAX_HEADS, maxLook } from '../art/opponents/max';
-import { backyardLayers, goalSprites, type VenueLayers } from '../art/venues/backyard';
+import { backyardLayers, goalSprites, type GoalArt, type VenueLayers } from '../art/venues/backyard';
 import { toCanvas } from '../engine/bitmaps';
 import { SpriteCache } from '../engine/sprites';
 
@@ -20,9 +19,17 @@ export interface SpriteSet {
   left: Record<AnimName, HTMLCanvasElement[]>;
 }
 
+/** A goal's sprites, placed at project(lineX, 0, 0, cam) + origin. */
+export interface GoalCanvases {
+  back: HTMLCanvasElement;
+  nearPost: HTMLCanvasElement;
+  farPost: HTMLCanvasElement;
+  origin: { x: number; y: number };
+}
+
 export interface GameArt {
   layers: Record<keyof VenueLayers, HTMLCanvasElement>;
-  goal: { back: HTMLCanvasElement; front: HTMLCanvasElement; backFlipped: HTMLCanvasElement; frontFlipped: HTMLCanvasElement };
+  goal: Record<'left' | 'right', GoalCanvases>;
   ball: HTMLCanvasElement[];
   home: SpriteSet;
   away: SpriteSet;
@@ -43,21 +50,19 @@ function spriteSet(cache: SpriteCache, who: string, heads: Record<HeadFacing, He
   return set;
 }
 
+function goalCanvases(g: GoalArt, palette: ResolvedPalette): GoalCanvases {
+  return { back: toCanvas(g.back, palette), nearPost: toCanvas(g.nearPost, palette), farPost: toCanvas(g.farPost, palette), origin: g.origin };
+}
+
 /** Bakes and resolves every image the match needs, once, at boot. */
 export function loadGameArt(): GameArt {
   const master = masterPalette();
   const cache = new SpriteCache();
   const L = backyardLayers();
-  const goal = goalSprites();
   const texts = new Map<string, HTMLCanvasElement>();
   return {
     layers: { far: toCanvas(L.far, master), mid: toCanvas(L.mid, master), near: toCanvas(L.near, master), ground: toCanvas(L.ground, master) },
-    goal: {
-      back: toCanvas(goal.back, master),
-      front: toCanvas(goal.front, master),
-      backFlipped: toCanvas(flipX(goal.back), master),
-      frontFlipped: toCanvas(flipX(goal.front), master),
-    },
+    goal: { left: goalCanvases(goalSprites('left'), master), right: goalCanvases(goalSprites('right'), master) },
     ball: ballFrames().map(f => toCanvas(f, master)),
     home: spriteSet(cache, 'harrison', HARRISON_HEADS, harrisonLook('home')),
     away: spriteSet(cache, 'max', MAX_HEADS, maxLook()),

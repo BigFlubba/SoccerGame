@@ -1,18 +1,61 @@
 import { describe, expect, it } from 'vitest';
+import { DEPTH_SHEAR, NEAR_SY, VIEW_W, project } from '../../game/camera';
+import { BACKYARD } from '../../game/field';
 import { M } from '../colors';
-import { backyardLayers, goalSprites } from './backyard';
+import type { IndexedImage } from '../indexedImage';
+import { backyardLayers, goalSprites, type GoalArt } from './backyard';
+
+const FENCE = [M.wood, M.hair, M.hairShadow];
+const GRASS = [M.grass, M.grassLight, M.grassDark];
+const MAX_CAM = BACKYARD.width + BACKYARD.depth * DEPTH_SHEAR - VIEW_W;
 
 describe('backyardLayers', () => {
-  it('builds layers at the documented widths and full height', () => {
+  it('builds layers wide enough for the whole camera range, all full height', () => {
     const L = backyardLayers();
-    expect([L.far.width, L.ground.width, L.ground.height]).toEqual([320, 640, 180]);
-    expect(L.mid.width).toBeGreaterThanOrEqual(480);
-    expect(L.near.width).toBeGreaterThanOrEqual(576);
+    expect(L.far.width).toBe(320);
+    expect(L.mid.width).toBeGreaterThanOrEqual(Math.max(480, Math.ceil(MAX_CAM * 0.5 + VIEW_W)));
+    expect(L.near.width).toBeGreaterThanOrEqual(Math.max(576, Math.ceil(MAX_CAM * 0.8 + VIEW_W)));
+    expect(L.ground.width).toBeGreaterThanOrEqual(640 + Math.ceil(64 * DEPTH_SHEAR));
+    for (const layer of Object.values(L)) expect(layer.height).toBe(180);
   });
 
-  it('ground layer is opaque grass from the ground line down', () => {
+  it('puts the back fence foot on the far touchline', () => {
+    const near = backyardLayers().near;
+    for (let x = 0; x < near.width; x++) {
+      expect(FENCE, `x ${x}`).toContain(near.get(x, 111));
+      expect(near.get(x, 113), `x ${x}`).toBe(0);
+    }
+  });
+
+  it('ground layer is grass across the whole pitch', () => {
     const g = backyardLayers().ground;
-    for (const x of [0, 200, 639]) expect([M.grass, M.grassLight, M.grassDark, M.wood]).toContain(g.get(x, 170));
+    for (let y = 112; y < 180; y++) {
+      for (let x = 0; x <= 658; x++) {
+        const id = g.get(x, y);
+        if (FENCE.includes(id)) continue; // the end fences, drawn across the depth
+        expect(GRASS, `(${x}, ${y})`).toContain(id);
+      }
+    }
+  });
+
+  it('draws the end fences slanted across the depth', () => {
+    const g = backyardLayers().ground;
+    const at = (x: number, z: number) => g.get(Math.round(project(x, 1, z, 0).sx), Math.round(project(x, 1, z, 0).sy));
+    for (const z of [0, 32, 63]) {
+      expect(FENCE, `left, z ${z}`).toContain(at(2, z));
+      expect(FENCE, `right, z ${z}`).toContain(at(638, z));
+    }
+  });
+
+  it('leaves the sky open above the pitch in the ground layer, away from the end fences', () => {
+    const g = backyardLayers().ground;
+    expect(g.get(320, 111)).toBe(0);
+    expect(g.get(320, 40)).toBe(0);
+  });
+
+  it('marks the invisible near board with a darker grass line', () => {
+    const g = backyardLayers().ground;
+    for (const x of [40, 320, 600]) expect(g.get(x, NEAR_SY + 1)).toBe(M.grassDark);
   });
 
   it('the far layer is an opaque sky', () => {
@@ -29,34 +72,73 @@ describe('backyardLayers', () => {
     }
   });
 
-  it('only the ground layer covers the field below the ground line', () => {
+  it('only the ground layer covers the pitch', () => {
     const { mid, near } = backyardLayers();
-    expect(mid.get(100, 170)).toBe(0);
-    expect(near.get(100, 170)).toBe(0);
+    for (const y of [113, 150, 179]) {
+      expect(mid.get(100, y)).toBe(0);
+      expect(near.get(100, y)).toBe(0);
+    }
   });
 });
 
+/** Opaque columns of a sprite, in screen x at camera 0. */
+function opaqueColumns(art: GoalArt, img: IndexedImage, lineX: number): number[] {
+  const cols = new Set<number>();
+  for (let y = 0; y < img.height; y++) for (let x = 0; x < img.width; x++) if (img.get(x, y) !== 0) cols.add(lineX + art.origin.x + x);
+  return [...cols];
+}
+
+/** The id at a world point, read from a sprite placed for camera 0. */
+function pixelAt(art: GoalArt, img: IndexedImage, lineX: number, x: number, y: number, z: number): number {
+  const p = project(x, y, z, 0);
+  return img.get(Math.round(p.sx) - (lineX + art.origin.x), Math.round(p.sy) - (NEAR_SY + art.origin.y));
+}
+
 describe('goalSprites', () => {
-  it('goal crossbar sits at height 28–30', () => {
-    const { back } = goalSprites(); // sprite origin: bottom-left at world (12, 0); row = spriteHeight − 1 − height
-    expect(back.get(8, back.height - 1 - 29)).toBe(M.white);
-    expect(back.get(8, back.height - 1 - 28)).toBe(M.white);
-    expect(back.get(8, back.height - 1 - 27)).not.toBe(M.white);
-  });
+  for (const goal of BACKYARD.goals) {
+    describe(`${goal.side} goal`, () => {
+      const art = goalSprites(goal.side);
 
-  it('spans the goal from the net back to the goal line', () => {
-    const { back, front } = goalSprites();
-    expect(back.width).toBe(28 - 12 + 1);
-    expect(back.get(0, back.height - 1)).toBe(M.white); // back post at x 12
-    expect(front.get(16, front.height - 1)).toBe(M.white); // front post on the goal line
-    expect(front.get(8, front.height - 1)).toBe(0);
-  });
+      it('posts land on the projected post positions', () => {
+        for (const [img, z] of [
+          [art.nearPost, goal.z0],
+          [art.farPost, goal.z1],
+        ] as const) {
+          const sx = Math.round(project(goal.lineX, 0, z, 0).sx);
+          const cols = opaqueColumns(art, img, goal.lineX);
+          expect(cols).toContain(sx);
+          for (const c of cols) expect(Math.abs(c - sx)).toBeLessThanOrEqual(1);
+          expect(pixelAt(art, img, goal.lineX, goal.lineX, 0, z)).toBe(M.white); // the foot
+          expect(pixelAt(art, img, goal.lineX, goal.lineX, goal.barY + 1, z)).toBe(M.white); // the top
+          expect(pixelAt(art, img, goal.lineX, goal.lineX, goal.barY + goal.barThick + 1, z)).toBe(0);
+        }
+      });
 
-  it('has a net mesh inside the frame', () => {
-    const { back } = goalSprites();
-    const inside = [];
-    for (let y = 2; y < back.height; y++) for (let x = 1; x < back.width - 1; x++) inside.push(back.get(x, y));
-    expect(inside).toContain(M.silver);
-    expect(inside).toContain(0);
+      it('the crossbar runs between the post tops at height 28–30', () => {
+        for (const z of [24, 32, 40]) {
+          expect(pixelAt(art, art.back, goal.lineX, goal.lineX, 28, z)).toBe(M.white);
+          expect(pixelAt(art, art.back, goal.lineX, goal.lineX, 29, z)).toBe(M.white);
+        }
+        expect(pixelAt(art, art.back, goal.lineX, goal.lineX, 20, 32)).not.toBe(M.white);
+      });
+
+      it('has a net mesh between the frame', () => {
+        const ids = new Set(art.back.data);
+        expect(ids.has(M.silver)).toBe(true);
+        expect(ids.has(0)).toBe(true);
+      });
+    });
+  }
+
+  it('the two goals are drawn from the geometry, not mirrored', () => {
+    const left = goalSprites('left');
+    const right = goalSprites('right');
+    // The slant is global: both goals lean the same way, so the far post is right of the near post on both.
+    const nearL = Math.min(...opaqueColumns(left, left.nearPost, 28));
+    const farL = Math.min(...opaqueColumns(left, left.farPost, 28));
+    const nearR = Math.min(...opaqueColumns(right, right.nearPost, 612));
+    const farR = Math.min(...opaqueColumns(right, right.farPost, 612));
+    expect(farL).toBeGreaterThan(nearL);
+    expect(farR).toBeGreaterThan(nearR);
   });
 });

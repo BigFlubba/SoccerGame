@@ -19,8 +19,6 @@ export interface MatchHud {
 export const HOME_NAME = 'HARRISON';
 export const AWAY_NAME = 'MAX';
 
-const GOAL_LEFT_X = 12;
-const GOAL_RIGHT_X = 612;
 const BALL_SPRITE_R = 3;
 const CHARGE_BAR = { w: 12, h: 2, above: 46 };
 const STAMINA_BAR = { x: 4, y: 172, w: 30, h: 3 };
@@ -54,12 +52,14 @@ function drawLayers(g: CanvasRenderingContext2D, cam: Camera, art: GameArt): voi
   for (const name of ['mid', 'near', 'ground'] as const) g.drawImage(art.layers[name], -Math.round(cam.x * PARALLAX[name]), 0);
 }
 
-function drawGoals(g: CanvasRenderingContext2D, cam: Camera, art: GameArt, part: 'back' | 'front'): void {
-  const left = art.goal[part];
-  const right = part === 'back' ? art.goal.backFlipped : art.goal.frontFlipped;
-  const top = screen(cam, 0, 0).y - (left.height - 1);
-  g.drawImage(left, screen(cam, GOAL_LEFT_X, 0).x, top);
-  g.drawImage(right, screen(cam, GOAL_RIGHT_X, 0).x, top);
+function drawGoals(g: CanvasRenderingContext2D, w: World, cam: Camera, art: GameArt, part: 'back' | 'posts'): void {
+  for (const goal of w.field.goals) {
+    const sprites = art.goal[goal.side];
+    const at = project(goal.lineX, 0, 0, cam.x);
+    const [x, y] = [Math.round(at.sx + sprites.origin.x), Math.round(at.sy + sprites.origin.y)];
+    if (part === 'back') g.drawImage(sprites.back, x, y);
+    else for (const post of [sprites.farPost, sprites.nearPost]) g.drawImage(post, x, y);
+  }
 }
 
 /**
@@ -148,11 +148,11 @@ function drawArrow(g: CanvasRenderingContext2D, w: World, cam: Camera): void {
 /** Draws one frame of the match: scenery, goals, players, ball, bars, HUD and banners. */
 export function drawMatch(g: CanvasRenderingContext2D, w: World, cam: Camera, art: GameArt, nowS: number, hud: MatchHud): void {
   drawLayers(g, cam, art);
-  drawGoals(g, cam, art, 'back');
+  drawGoals(g, w, cam, art, 'back');
   drawPlayer(g, cam, w.away, art, crossingDepth(w.home, w.away));
   drawPlayer(g, cam, w.home, art);
   drawBall(g, w, cam, art);
-  drawGoals(g, cam, art, 'front');
+  drawGoals(g, w, cam, art, 'posts');
   drawChargeBar(g, cam, w.away, nowS);
   drawChargeBar(g, cam, w.home, nowS);
   drawHud(g, w, art);
