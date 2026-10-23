@@ -79,6 +79,16 @@ describe('world', () => {
     expect(sides).toEqual(new Set([-1, 1]));
   });
 
+  it('players can run past each other', () => {
+    const w = createWorld(BASE_STATS, BASE_STATS, 1, ERR);
+    w.match.phase = 'playing';
+    Object.assign(w.ball, { x: 100 });
+    Object.assign(w.home, { x: 300 });
+    Object.assign(w.away, { x: 330 });
+    for (let i = 0; i < 60; i++) stepWorld(w, move(1), move(-1), STEP);
+    expect(w.home.x).toBeGreaterThan(w.away.x + 40);
+  });
+
   it('knows when the ball is at a player’s feet so B chips', () => {
     const w = createWorld(BASE_STATS, BASE_STATS, 1, ERR);
     w.match.phase = 'playing';

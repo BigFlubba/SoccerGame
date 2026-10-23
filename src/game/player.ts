@@ -173,6 +173,15 @@ export function knockDown(p: Player): void {
   p.vx = 0;
 }
 
+/** Drops a shot or chip that is still charging, without kicking (used when the game pauses). */
+export function cancelCharge(p: Player): void {
+  const charging = p.state === 'charging' || (p.state === 'chipping' && !p.kick);
+  if (!charging) return;
+  enter(p, 'ground');
+  p.charge = 0;
+  p.overchargeS = 0;
+}
+
 function updateStamina(p: Player, sprinting: boolean, dt: number): void {
   p.stamina = Math.min(1, Math.max(0, p.stamina + (sprinting ? -STAMINA_DRAIN : STAMINA_REGEN) * dt));
   if (p.stamina === 0) p.exhausted = true;
@@ -305,15 +314,4 @@ export function stepPlayer(p: Player, intent: PlayerIntent, dt: number, field: F
   const anim = chooseAnim(p, sprinting);
   p.animT = anim.name === p.anim.name ? p.animT + dt : 0;
   p.anim = anim;
-}
-
-/** Pushes overlapping grounded players apart equally. */
-export function separatePlayers(a: Player, b: Player): void {
-  if (a.y > 0 || b.y > 0) return;
-  const dx = b.x - a.x;
-  const overlap = PLAYER_W - Math.abs(dx);
-  if (overlap <= 0) return;
-  const dir = dx === 0 ? 1 : Math.sign(dx);
-  a.x -= (dir * overlap) / 2;
-  b.x += (dir * overlap) / 2;
 }

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { BACKYARD } from './field';
 import { TAP_CHARGE } from './kick';
-import { FALL_TIME, NO_INTENT, createPlayer, knockDown, separatePlayers, stepPlayer, type Player, type PlayerIntent } from './player';
+import { FALL_TIME, NO_INTENT, cancelCharge, createPlayer, knockDown, stepPlayer, type Player, type PlayerIntent } from './player';
 import { BASE_STATS, SPRINT_MULTIPLIER, chargeTime } from './stats';
 
 const STEP = 1 / 60;
@@ -161,6 +161,23 @@ describe('stepPlayer: shooting', () => {
     expect(kicks).toBe(1);
   });
 
+  it('cancelCharge drops a shot or chip charge without kicking', () => {
+    const p = harrison();
+    tick(p, { shootHeld: true }, 20);
+    cancelCharge(p);
+    expect([p.state, p.charge, p.kick]).toEqual(['ground', 0, null]);
+    tick(p, {}, 5);
+    expect(p.kick).toBeNull();
+  });
+
+  it('cancelCharge leaves a kick already in flight alone', () => {
+    const p = harrison();
+    tick(p, { shootHeld: true }, 5);
+    tick(p, {});
+    cancelCharge(p);
+    expect(p.state).toBe('kicking');
+  });
+
   it('facing is locked while charging', () => {
     const p = harrison();
     tick(p, { shootHeld: true }, 5);
@@ -238,23 +255,5 @@ describe('stepPlayer: stamina and falls', () => {
     expect(p.vx).toBe(0);
     tick(p, { moveX: 1 }, ticks(FALL_TIME));
     expect(p.state).toBe('ground');
-  });
-});
-
-describe('separatePlayers', () => {
-  it('separatePlayers removes overlap between grounded players', () => {
-    const a = harrison(100);
-    const b = createPlayer('away', BASE_STATS, 104, -1);
-    separatePlayers(a, b);
-    expect(b.x - a.x).toBeCloseTo(8);
-    expect((a.x + b.x) / 2).toBeCloseTo(102);
-  });
-
-  it('leaves an airborne player alone', () => {
-    const a = harrison(100);
-    const b = createPlayer('away', BASE_STATS, 104, -1);
-    b.y = 20;
-    separatePlayers(a, b);
-    expect([a.x, b.x]).toEqual([100, 104]);
   });
 });

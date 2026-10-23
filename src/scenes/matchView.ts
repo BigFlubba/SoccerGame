@@ -28,6 +28,10 @@ const GOLDEN_GOAL_BANNER_S = 1.5;
 /** Blinks per second for the overcharge flash. */
 const BLINK_HZ = 8;
 const ARROW_Y = 16;
+/** How far up Max is drawn (further back) while the players cross. */
+export const CROSSING_DEPTH_PX = 3;
+/** Within this gap the sprites overlap and the crossing step-back eases in. */
+const CROSSING_RANGE = 20;
 
 const ink = (g: CanvasRenderingContext2D, c: MasterColor) => (g.fillStyle = MASTER[c]);
 
@@ -51,11 +55,20 @@ function drawGoals(g: CanvasRenderingContext2D, cam: Camera, art: GameArt, part:
   g.drawImage(right, GOAL_RIGHT_X - Math.round(cam.x), top);
 }
 
-function drawPlayer(g: CanvasRenderingContext2D, cam: Camera, p: Player, art: GameArt): void {
+/**
+ * Players run through each other, so while they cross Max steps a few
+ * pixels "back" (drawn higher, behind Harrison), like a belt-scroller lane.
+ */
+export function crossingDepth(home: Player, away: Player): number {
+  const closeness = 1 - Math.abs(home.x - away.x) / CROSSING_RANGE;
+  return Math.round(CROSSING_DEPTH_PX * Math.min(Math.max(closeness, 0), 1));
+}
+
+function drawPlayer(g: CanvasRenderingContext2D, cam: Camera, p: Player, art: GameArt, lift = 0): void {
   const set = p.team === 'home' ? art.home : art.away;
   const frames = (p.facing === 1 ? set.right : set.left)[p.anim.name];
   const s = screen(cam, p.x, p.y);
-  g.drawImage(frames[Math.min(p.anim.frame, frames.length - 1)]!, s.x - ANCHOR.x, s.y - ANCHOR.y);
+  g.drawImage(frames[Math.min(p.anim.frame, frames.length - 1)]!, s.x - ANCHOR.x, s.y - ANCHOR.y - lift);
 }
 
 function drawBall(g: CanvasRenderingContext2D, w: World, cam: Camera, art: GameArt): void {
@@ -129,7 +142,7 @@ function drawArrow(g: CanvasRenderingContext2D, w: World, cam: Camera): void {
 export function drawMatch(g: CanvasRenderingContext2D, w: World, cam: Camera, art: GameArt, nowS: number, hud: MatchHud): void {
   drawLayers(g, cam, art);
   drawGoals(g, cam, art, 'back');
-  drawPlayer(g, cam, w.away, art);
+  drawPlayer(g, cam, w.away, art, crossingDepth(w.home, w.away));
   drawPlayer(g, cam, w.home, art);
   drawBall(g, w, cam, art);
   drawGoals(g, cam, art, 'front');

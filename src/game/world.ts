@@ -4,7 +4,7 @@ import { BALL_REST_Y, stepBall, type Ball, type BallEvents } from './ball';
 import { resolveContacts, type ContactEvents } from './contact';
 import { BACKYARD, goalScored, type Field } from './field';
 import { createMatch, stepMatch, type MatchState, type Team } from './match';
-import { NO_INTENT, createPlayer, separatePlayers, stepPlayer, type Player, type PlayerIntent } from './player';
+import { NO_INTENT, createPlayer, stepPlayer, type Player, type PlayerIntent } from './player';
 import type { Stats } from './stats';
 import { ballIn, footZone } from './zones';
 
@@ -76,8 +76,8 @@ const ballAtFeet = (p: Player, ball: Ball): boolean => p.y === 0 && ball.y <= BA
 export function stepWorld(w: World, homeIntent: PlayerIntent, awayIntent: PlayerIntent, dt: number): void {
   const live = w.match.phase === 'playing';
   stepPlayer(w.home, live ? homeIntent : NO_INTENT, dt, w.field, ballAtFeet(w.home, w.ball));
+  // Players run past each other (drawn one behind the other); only the ball is contested.
   stepPlayer(w.away, live ? awayIntent : NO_INTENT, dt, w.field, ballAtFeet(w.away, w.ball));
-  separatePlayers(w.home, w.away);
 
   const ball = stepBall(w.ball, dt, w.field);
   // The second player to act on the ball has the last word, so take turns going first.
