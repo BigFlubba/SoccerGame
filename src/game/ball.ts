@@ -14,7 +14,7 @@ import {
   SPIN_SKIP,
   WALL_RESTITUTION,
 } from './constants';
-import type { Field, Goal } from './field';
+import { roofSpan, type Field, type Goal } from './field';
 
 /** Height of a resting ball's centre: it sits on the grass. */
 export const BALL_REST_Y = BALL_R;
@@ -40,12 +40,9 @@ export interface BallEvents {
 
 const towardZero = (v: number, by: number): number => (v > 0 ? Math.max(0, v - by) : Math.min(0, v + by));
 
-/**
- * The crossbar as a solid box. Its top (the net roof) runs on from the bar to
- * the end fence, so nothing can drop into the gap behind the net and stick.
- */
+/** The crossbar as a solid box, with the net roof running on to the fence. */
 function barBox(g: Goal, field: Field) {
-  const [x0, x1] = g.side === 'right' ? [g.lineX, field.fenceR] : [field.fenceL, g.lineX];
+  const [x0, x1] = roofSpan(field, g);
   return { x0, x1, y0: g.barY, y1: g.barY + g.barThick };
 }
 

@@ -1,7 +1,7 @@
 import { BALL_R } from '../art/ball';
 import type { Rng } from '../engine/random';
 import { BALL_REST_Y, type Ball } from './ball';
-import type { Field } from './field';
+import { roofSpan, type Field } from './field';
 import { chip, header, shot, volley } from './kick';
 import { PLAYER_W, knockDown, type Player } from './player';
 import { touchPush } from './stats';
@@ -96,13 +96,17 @@ function dribble(p: Player, ball: Ball, ev: ContactEvents): void {
   ev.touched = true;
 }
 
-/** His body is solid: a ball running into him bounces back off the side it came from. */
-function block(p: Player, ball: Ball): void {
+/**
+ * His body is solid: a ball running into him bounces back off the side it
+ * came from, unless that would put it back up on a net roof.
+ */
+function block(p: Player, ball: Ball, field: Field): void {
   if (!ballIn(bodyBox(p), ball, BALL_R)) return;
   const side = ball.x === p.x ? -p.facing : Math.sign(ball.x - p.x);
   const closing = (ball.vx - p.vx) * side < 0;
-  if (!closing) return;
-  ball.x = p.x + side * (PLAYER_W / 2 + BALL_R);
+  const x = p.x + side * (PLAYER_W / 2 + BALL_R);
+  if (!closing || onRoof({ x, y: ball.y }, field)) return;
+  ball.x = x;
   ball.vx = p.vx - BODY_RESTITUTION * (ball.vx - p.vx);
 }
 
@@ -116,6 +120,17 @@ function unpin(p: Player, ball: Ball, field: Field): void {
   if (atFence || atNet) ball.vy = PINNED_POP_VY;
 }
 
+/**
+ * A ball sitting on a net roof, or rolling over its edge, is on top of the
+ * goal, out of reach of the players' bodies under it.
+ */
+function onRoof(ball: { x: number; y: number }, field: Field): boolean {
+  return field.goals.some(g => {
+    const [x0, x1] = roofSpan(field, g);
+    return ball.x >= x0 - BALL_R && ball.x <= x1 + BALL_R && ball.y >= g.barY + g.barThick;
+  });
+}
+
 const squeezed = (p: Player, opponent: Player, ball: Ball): boolean =>
   ballIn(bodyBox(p), ball, BALL_R) && ballIn(bodyBox(opponent), ball, BALL_R);
 
@@ -125,8 +140,8 @@ const squeezed = (p: Player, opponent: Player, ball: Ball): boolean =>
  * neither body shoves it through the other and neither side always wins.
  */
 function squirt(p: Player, opponent: Player, ball: Ball, rng: Rng): void {
-  ball.x = (p.x + opponent.x) / 2;
   if (ball.vy > 0 || ball.y > BALL_REST_Y) return;
+  ball.x = (p.x + opponent.x) / 2;
   ball.vy = SQUEEZE_POP_VY;
   ball.vx = (p.vx + opponent.vx) / 2 + (rng() < 0.5 ? -1 : 1) * SQUEEZE_SQUIRT_VX;
 }
@@ -137,10 +152,10 @@ export function resolveContacts(p: Player, opponent: Player, ball: Ball, aimErro
   slide(p, opponent, ball, ev);
   strike(p, ball, aimErrorDeg, rng, ev);
   if (!ev.kicked) headBall(p, ball, ev);
-  if (ev.kicked || ev.tackledBall) return ev;
+  if (ev.kicked || ev.tackledBall || onRoof(ball, field)) return ev;
   if (!squeezed(p, opponent, ball)) {
     dribble(p, ball, ev);
-    block(p, ball);
+    block(p, ball, field);
     unpin(p, ball, field);
   }
   // Also catches a block that pushed the ball out into the other player.

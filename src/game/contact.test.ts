@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { seeded } from '../engine/random';
 import { BALL_REST_Y, stepBall, type Ball } from './ball';
 import { resolveContacts } from './contact';
-import { BACKYARD } from './field';
+import { BACKYARD, type Field } from './field';
 import { header, shot } from './kick';
 import { NO_INTENT, createPlayer, stepPlayer, type Kick, type Player } from './player';
 import { BASE_STATS, touchPush } from './stats';
@@ -177,10 +177,25 @@ describe('resolveContacts: headers and tackles', () => {
 
 describe('resolveContacts: pinned ball', () => {
   it('a ball pinned between a player and the fence pops free', () => {
+    // In the Backyard the nets cover the fences at ground level, so use a pitch whose goals stand clear of them.
+    const open: Field = {
+      ...BACKYARD,
+      goals: [
+        { ...BACKYARD.goals[0], lineX: 60, backX: 44 },
+        { ...BACKYARD.goals[1], lineX: 580, backX: 596 },
+      ],
+    };
     const { p, opp } = setup(628);
-    const b = ball({ x: 633, y: 33 }); // resting on the net roof against the fence
-    contact(p, opp, b);
+    const b = ball({ x: 633 });
+    resolveContacts(p, opp, b, 4, seeded(5), open);
     expect(b.vy).toBe(160);
+  });
+
+  it('a ball resting on the net roof is out of reach of a body under the bar', () => {
+    const { p, opp } = setup(618);
+    const b = ball({ x: 620, y: 33, vx: -20 });
+    contact(p, opp, b);
+    expect([b.x, b.vx, b.vy]).toEqual([620, -20, 0]);
   });
 
   it('a ball squeezed between two players pops up over their heads and squirts out sideways', () => {

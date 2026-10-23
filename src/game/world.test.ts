@@ -89,6 +89,34 @@ describe('world', () => {
     expect(w.home.x).toBeGreaterThan(w.away.x + 40);
   });
 
+  it.each([604, 606, 608, 610, 612, 618, 624])('a ball resting on the net roof comes down past a player standing at x %i', x => {
+    const w = createWorld(BASE_STATS, BASE_STATS, 1, ERR);
+    w.match.phase = 'playing';
+    Object.assign(w.home, { x });
+    Object.assign(w.away, { x: 100 });
+    Object.assign(w.ball, { x: 620, y: 33 });
+    for (let i = 0; i < 5 * 60; i++) stepWorld(w, NO_INTENT, NO_INTENT, STEP);
+    expect(w.ball.y).toBeLessThan(28);
+  });
+
+  it('two players under a roof ball do not pin it there', () => {
+    const w = createWorld(BASE_STATS, BASE_STATS, 1, ERR);
+    w.match.phase = 'playing';
+    Object.assign(w.home, { x: 616 });
+    Object.assign(w.away, { x: 622 });
+    Object.assign(w.ball, { x: 619, y: 33 });
+    for (let i = 0; i < 5 * 60; i++) stepWorld(w, NO_INTENT, NO_INTENT, STEP);
+    expect(w.ball.y).toBe(BALL_REST_Y);
+  });
+
+  it('players cannot run behind the nets', () => {
+    const w = createWorld(BASE_STATS, BASE_STATS, 1, ERR);
+    w.match.phase = 'playing';
+    for (let i = 0; i < 10 * 60; i++) stepWorld(w, move(1), move(-1), STEP);
+    expect(w.home.x).toBeLessThanOrEqual(628 - 4);
+    expect(w.away.x).toBeGreaterThanOrEqual(12 + 4);
+  });
+
   it('knows when the ball is at a player’s feet so B chips', () => {
     const w = createWorld(BASE_STATS, BASE_STATS, 1, ERR);
     w.match.phase = 'playing';

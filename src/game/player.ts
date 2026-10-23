@@ -1,6 +1,6 @@
 import { CLIPS, SHOOT_CHARGE_FRAME, SHOOT_STRIKE_FRAME, SLIDE_HOLD_FRAME, type AnimName } from '../art/body/animations';
 import { GRAVITY } from './constants';
-import type { Field } from './field';
+import { playerSpan, type Field } from './field';
 import { TAP_CHARGE, type Aim } from './kick';
 import { SPRINT_MULTIPLIER, chargeTime, jumpVelocity, runSpeed, type Stats } from './stats';
 
@@ -308,7 +308,8 @@ export function stepPlayer(p: Player, intent: PlayerIntent, dt: number, field: F
       break;
   }
 
-  p.x = Math.min(Math.max(p.x + p.vx * dt, field.fenceL + PLAYER_W / 2), field.fenceR - PLAYER_W / 2);
+  const [minX, maxX] = playerSpan(field);
+  p.x = Math.min(Math.max(p.x + p.vx * dt, minX + PLAYER_W / 2), maxX - PLAYER_W / 2);
   updateStamina(p, sprinting, dt);
 
   const anim = chooseAnim(p, sprinting);

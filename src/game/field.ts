@@ -29,6 +29,20 @@ export const BACKYARD: Field = {
   ],
 };
 
+/**
+ * The x span of a goal's crossbar box. Its top (the net roof) runs on from
+ * the bar to the end fence, so nothing can drop into the gap behind the net.
+ */
+export function roofSpan(field: Field, g: Goal): [x0: number, x1: number] {
+  return g.side === 'right' ? [g.lineX, field.fenceR] : [field.fenceL, g.lineX];
+}
+
+/** Where players may stand: between the backs of the two nets. */
+export function playerSpan(field: Field): [x0: number, x1: number] {
+  const backs = field.goals.map(g => g.backX);
+  return [Math.max(field.fenceL, Math.min(...backs)), Math.min(field.fenceR, Math.max(...backs))];
+}
+
 /** Which goal the ball is in: the whole ball past the line and under the bar. */
 export function goalScored(field: Field, b: { x: number; y: number }): 'left' | 'right' | null {
   for (const g of field.goals) {
