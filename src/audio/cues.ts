@@ -16,7 +16,11 @@ export type Cue =
   | 'ooh'
   | 'menuMove'
   | 'menuConfirm'
-  | 'menuBack';
+  | 'menuBack'
+  | 'coin'
+  | 'buy'
+  | 'levelUp'
+  | 'nope';
 
 export type Wave = 'square' | 'triangle' | 'noise';
 
@@ -126,4 +130,25 @@ export const CUES: Readonly<Record<Cue, CueRecipe>> = {
     minGapS: 0.05,
   },
   menuBack: { voices: [{ wave: 'square', dur: 0.08, gain: 0.08, freq: 660, toFreq: 440 }], minGapS: 0.05 },
+  /** One tick per Results line: quiet, so a run of them never grates. */
+  coin: { voices: [{ wave: 'square', dur: 0.05, gain: 0.06, freq: 1760 }], minGapS: 0.04 },
+  buy: {
+    voices: [
+      { wave: 'noise', dur: 0.04, gain: 0.08, freq: 4000, filter: { type: 'highpass' } },
+      { wave: 'square', dur: 0.06, gain: 0.1, freq: 1319 },
+      { wave: 'square', at: 0.06, dur: 0.22, gain: 0.1, freq: 1976 },
+    ],
+    minGapS: 0.1,
+  },
+  /** C, E, G, C: short enough to sit over the result jingle. */
+  levelUp: {
+    voices: [
+      { wave: 'square', dur: 0.1, gain: 0.1, freq: 523 },
+      { wave: 'square', at: 0.1, dur: 0.1, gain: 0.1, freq: 659 },
+      { wave: 'square', at: 0.2, dur: 0.1, gain: 0.1, freq: 784 },
+      { wave: 'square', at: 0.3, dur: 0.4, gain: 0.1, hold: 0.15, freq: 1047 },
+    ],
+    minGapS: 1,
+  },
+  nope: { voices: [{ wave: 'square', dur: 0.16, gain: 0.1, freq: 140, toFreq: 110, filter: { type: 'lowpass' } }], minGapS: 0.15 },
 };

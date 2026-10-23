@@ -196,4 +196,57 @@ describe('createAudio', () => {
     const holdEnd = (v.attack ?? 0) + (v.hold ?? 0);
     expect(env.gain.events).toContainEqual([v.gain, expect.closeTo(holdEnd, 6)]);
   });
+
+  describe('suspend and resume', () => {
+    /** buildGraph makes master, music, sfx, then the crowd. */
+    const crowdGain = (f: ReturnType<typeof fakeContext>) => f.made.gains[3]!.gain;
+
+    it('suspend then resume restarts the crowd and music', async () => {
+      const f = fakeContext();
+      const a = createAudio(f.make);
+      a.unlock();
+      await settle();
+      a.setCrowd('match');
+      a.playMusic('title');
+      a.suspend();
+      await settle();
+      // While hidden the match pauses and the crowd drops; nothing plays until the tab is back.
+      a.setCrowd('low');
+      a.playMusic(null);
+      a.playMusic('title');
+      const notes = f.made.oscillators;
+      expect(crowdGain(f).value).toBe(CROWD_GAIN.match);
+      a.resume();
+      await settle();
+      expect(f.ctx.state).toBe('running');
+      expect(crowdGain(f).value).toBe(CROWD_GAIN.low);
+      expect(f.made.oscillators).toBeGreaterThan(notes);
+      a.playMusic(null);
+    });
+
+    it('resume without a suspend does nothing', async () => {
+      const f = fakeContext();
+      const a = createAudio(f.make);
+      a.unlock();
+      await settle();
+      let resumes = 0;
+      const resume = f.ctx.resume;
+      f.ctx.resume = () => {
+        resumes++;
+        return resume();
+      };
+      a.resume();
+      await settle();
+      expect(resumes).toBe(0);
+    });
+
+    it('suspending while locked does not unlock on resume', async () => {
+      const f = fakeContext();
+      const a = createAudio(f.make);
+      a.suspend();
+      a.resume();
+      await settle();
+      expect(a.unlocked).toBe(false);
+    });
+  });
 });

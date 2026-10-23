@@ -40,4 +40,19 @@ describe('cue recipes', () => {
   it('a dribble tap is at most a quarter as loud as a hard kick', () => {
     expect(loudest('tap')).toBeLessThanOrEqual(loudest('kickHard') / 4);
   });
+
+  it('coin ticks are quiet and rate-limited', () => {
+    for (const v of CUES.coin.voices) expect(v.gain).toBeLessThanOrEqual(0.1);
+    expect(CUES.coin.minGapS).toBeGreaterThanOrEqual(0.04);
+  });
+
+  it('the level-up fanfare ends within 1.5 s', () => {
+    for (const v of CUES.levelUp.voices) expect((v.at ?? 0) + v.dur).toBeLessThanOrEqual(1.5);
+  });
+
+  it('the shop has a ka-ching and a nope', () => {
+    expect(CUES.buy.voices.length).toBeGreaterThanOrEqual(2);
+    expect(Math.max(...CUES.nope.voices.map(v => v.freq))).toBeLessThan(CUES.menuBack.voices[0]!.freq);
+  });
 });
+

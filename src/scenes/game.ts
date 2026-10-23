@@ -1,4 +1,5 @@
 import { createAudio } from '../audio/synth';
+import { padMayUnlock } from '../audio/unlock';
 import { createInput, type InputFrame } from '../engine/input';
 import { createStepper, startLoop } from '../engine/loop';
 import { createRumble } from '../engine/rumble';
@@ -47,10 +48,11 @@ export function startGame(canvas: HTMLCanvasElement): void {
   };
   audio.setVolumes(ctx.settings.musicVolume, ctx.settings.sfxVolume);
   rumble.enabled = ctx.settings.rumble;
-  // Browsers only allow sound after a key press or click. Chrome doesn't count a gamepad press, but trying is harmless.
+  // Browsers only allow sound after a key press, click or tap. Chrome doesn't count a gamepad press.
   const unlock = () => audio.unlock();
   window.addEventListener('keydown', unlock);
   window.addEventListener('pointerdown', unlock);
+  window.addEventListener('pointerup', unlock);
   let scene: Scene = createPressStartScene(ctx);
   let latest = input.poll();
   let pending: InputFrame | null = null;
@@ -60,7 +62,8 @@ export function startGame(canvas: HTMLCanvasElement): void {
   const stepper = createStepper(dt => {
     const frame = pending ?? { ...latest, pressed: NONE, released: NONE };
     pending = null;
-    if (frame.pressed.size > 0) audio.unlock();
+    // Only where the browser says it would be allowed, so a refused start doesn't log a warning.
+    if (frame.pressed.size > 0 && padMayUnlock(navigator)) audio.unlock();
     scene = scene.update(frame, dt) ?? scene;
   });
 
