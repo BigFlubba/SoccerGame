@@ -6,9 +6,9 @@ import { DIFFICULTY, createBrain, think, type Difficulty } from '../game/ai';
 import { updateCamera, type Camera } from '../game/camera';
 import { HUMAN_AIM_ERROR_DEG, type Aim } from '../game/kick';
 import { cancelCharge, type PlayerIntent } from '../game/player';
-import { BASE_STATS } from '../game/stats';
 import { endGoalPause } from '../game/match';
 import { createWorld, stepWorld, type World } from '../game/world';
+import { maxStats, nextMatch } from '../meta/ladder';
 import type { GameContext } from './context';
 import { drawMenu, menuCue, stepMenu, type MenuState } from './menu';
 import { HAT_TRICK_GOALS, goalCallout, noteKick, type LastKick } from './goalCallout';
@@ -18,6 +18,7 @@ import { drawMatch, type MatchHud } from './matchView';
 import type { Scene } from './scene';
 import { createHelpScene } from './helpScene';
 import { createOptionsScene } from './optionsScene';
+import { createHubScene } from './hubScene';
 import { createPressStartScene } from './titleScene';
 
 export interface MatchScene extends Scene {
@@ -31,11 +32,13 @@ export interface MatchScene extends Scene {
   readonly callout: string | null;
   /** Where a hard-hit ball has just been, newest first. */
   readonly trail: readonly TrailPoint[];
+  /** The Backyard Ladder match being played, fixed when the match is made. */
+  readonly ladderMatch: number;
   /** The goal flash is owed to the next drawn frame. */
   readonly flash: boolean;
 }
 
-export const PAUSE_ITEMS = ['RESUME', 'RESTART', 'HELP', 'OPTIONS', 'QUIT TO TITLE'] as const;
+export const PAUSE_ITEMS = ['RESUME', 'RESTART', 'HELP', 'OPTIONS', 'QUIT TO HUB'] as const;
 const FULL_TIME_ITEMS = ['PLAY AGAIN', 'TITLE'] as const;
 /** The FULL TIME banner shows this long before the result and menu. */
 const RESULT_DELAY_S = 1.5;
@@ -45,6 +48,9 @@ const AIM_THRESHOLD = 0.5;
 const RESULT_TEXT = { win: 'YOU WIN!', lose: 'YOU LOSE', draw: 'DRAW' } as const;
 /** A hat-trick's second roar comes in this long (real seconds) into the moment. */
 const HAT_TRICK_ROAR_S = 1.2;
+
+/** A fresh seed per match so every game plays differently. */
+export const newSeed = (): number => Math.floor(Math.random() * 2 ** 32);
 
 /** Harrison's intent from the controller: the stick moves and aims, buttons act. */
 function harrisonIntent(input: InputFrame): PlayerIntent {
@@ -61,13 +67,14 @@ function harrisonIntent(input: InputFrame): PlayerIntent {
   };
 }
 
-/** A 90-second match against Max, with pause and full-time menus. */
+/** A 90-second ladder match against Max: Harrison with his bought stats, Max with the match's. Pause and full-time menus. */
 export function createMatchScene(ctx: GameContext, seed: number): MatchScene {
   const { art } = ctx;
   let difficulty = ctx.settings.difficulty;
-  const profile = DIFFICULTY[difficulty];
-  const world = createWorld(BASE_STATS, BASE_STATS, seed, { home: HUMAN_AIM_ERROR_DEG, away: profile.aimErrorDeg });
-  const brain = createBrain(profile);
+  const thinking = DIFFICULTY[difficulty];
+  const ladderMatch = nextMatch(ctx.profile.ladderWins);
+  const world = createWorld({ ...ctx.profile.stats }, maxStats(ladderMatch), seed, { home: HUMAN_AIM_ERROR_DEG, away: thinking.aimErrorDeg });
+  const brain = createBrain(thinking);
   const cam: Camera = { x: world.ball.x - BASE_W / 2 };
   const hud: MatchHud = { perfect: null, moment: null, callout: null, trail: [], flash: false };
   let lastKick: LastKick | null = null;
@@ -118,6 +125,7 @@ export function createMatchScene(ctx: GameContext, seed: number): MatchScene {
     get trail() {
       return hud.trail;
     },
+    ladderMatch,
     get flash() {
       return hud.flash;
     },
@@ -131,7 +139,7 @@ export function createMatchScene(ctx: GameContext, seed: number): MatchScene {
         if (r.chosen === 'RESTART') return restart();
         if (r.chosen === 'HELP') return createHelpScene(ctx, backHere);
         if (r.chosen === 'OPTIONS') return createOptionsScene(ctx, backHere);
-        if (r.chosen === 'QUIT TO TITLE') return createPressStartScene(ctx);
+        if (r.chosen === 'QUIT TO HUB') return createHubScene(ctx);
         if (r.chosen === 'RESUME' || r.back || (!r.chosen && input.pressed.has('pause'))) {
           pause = null;
           ctx.audio.setCrowd(hud.moment ? 'roar' : 'match');

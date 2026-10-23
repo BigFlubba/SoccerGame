@@ -7,7 +7,7 @@ import { frame } from './testInput';
 
 const STEP = 1 / 60;
 const CTX = testContext();
-const BEHIND: Scene = { kind: 'titleMenu', update: () => null, draw: () => {} };
+const BEHIND: Scene = { kind: 'hub', update: () => null, draw: () => {} };
 const allText = () => HELP_PAGES.flatMap(p => [p.title, ...p.lines]).join('\n');
 
 describe('help', () => {

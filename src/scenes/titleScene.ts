@@ -2,7 +2,7 @@ import { BASE_H, BASE_W } from '../engine/viewport';
 import { drawBackdrop, drawTitle } from './backdrop';
 import type { GameContext } from './context';
 import type { Scene } from './scene';
-import { createTitleMenuScene } from './titleMenuScene';
+import { createHubScene } from './hubScene';
 
 const BLINK_HZ = 2;
 const PRESS_START_FROM_BOTTOM = 22;
@@ -28,7 +28,7 @@ export function createPressStartScene(ctx: GameContext): PressStartScene {
       const goOn = input.pressed.has('confirm') || (input.pressed.has('pause') && !input.pressed.has('back'));
       if (!goOn) return null;
       ctx.audio.play('menuConfirm');
-      return createTitleMenuScene(ctx);
+      return createHubScene(ctx);
     },
     draw(g, nowS) {
       drawBackdrop(g, ctx.art, nowS);

@@ -7,7 +7,7 @@ import { testContext } from './testContext';
 import { frame } from './testInput';
 
 const STEP = 1 / 60;
-const BEHIND: Scene = { kind: 'titleMenu', update: () => null, draw: () => {} };
+const BEHIND: Scene = { kind: 'hub', update: () => null, draw: () => {} };
 
 const context = () => testContext();
 

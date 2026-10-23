@@ -4,6 +4,9 @@ import { recordingRumble } from '../engine/testRumble';
 import type { GameContext } from './context';
 import { DIFFICULTY } from '../game/ai';
 import { GOAL_PAUSE_S } from '../game/match';
+import { BASE_STATS } from '../game/stats';
+import { maxStats } from '../meta/ladder';
+import { newProfile } from '../meta/profile';
 import { DEFAULT_SETTINGS } from '../meta/settings';
 import { PAUSE_ITEMS, createMatchScene, type MatchScene } from './matchScene';
 import type { Scene } from './scene';
@@ -82,13 +85,38 @@ describe('match scene', () => {
     expect(next?.world.match.clockS).toBe(0);
   });
 
-  it('quit from the pause menu goes back to the title', () => {
-    const s = live();
+  it('QUIT TO HUB goes to the Hub with the crowd off and saves nothing', () => {
+    const ctx = testContext();
+    const s = createMatchScene(ctx, 1);
+    s.world.match.phase = 'playing';
+    run(s, 1);
     s.update(frame(['pause']), STEP);
     s.update(frame(['up']), STEP);
-    const next = s.update(frame(['confirm']), STEP);
-    expect(next).not.toBeNull();
-    expect((next as Partial<MatchScene>).world).toBeUndefined();
+    expect(s.update(frame(['confirm']), STEP)?.kind).toBe('hub');
+    expect(ctx.audio.crowd).toBe('off');
+    expect(ctx.savedProfiles).toHaveLength(0);
+  });
+
+  it('Harrison plays with his bought stats', () => {
+    const s = createMatchScene(testContext({ profile: { ...newProfile(), stats: { speed: 4, power: 2, jump: 3, control: 1 } } }), 1);
+    expect(s.world.home.stats).toEqual({ speed: 4, power: 2, jump: 3, control: 1 });
+  });
+
+  it('Max plays with the next ladder match’s stats', () => {
+    const s = createMatchScene(testContext({ profile: { ...newProfile(), ladderWins: 2 } }), 1);
+    expect(s.ladderMatch).toBe(3);
+    expect(s.world.away.stats).toEqual(maxStats(3));
+  });
+
+  it('a new profile plays match 1, Harrison and Max both as they were', () => {
+    const s = live();
+    expect(s.ladderMatch).toBe(1);
+    expect(s.world.home.stats).toEqual(BASE_STATS);
+    expect(s.world.away.stats).toEqual(BASE_STATS);
+  });
+
+  it('a champion gets match 10', () => {
+    expect(createMatchScene(testContext({ profile: { ...newProfile(), ladderWins: 10 } }), 1).ladderMatch).toBe(10);
   });
 
   it('up on the stick runs away from the camera, down toward it', () => {
@@ -116,8 +144,8 @@ describe('match scene', () => {
     expect(next?.world.match.phase).toBe('kickoff');
   });
 
-  it('pause menu lists RESUME, RESTART, HELP, OPTIONS, QUIT TO TITLE', () => {
-    expect(PAUSE_ITEMS).toEqual(['RESUME', 'RESTART', 'HELP', 'OPTIONS', 'QUIT TO TITLE']);
+  it('pause menu lists RESUME, RESTART, HELP, OPTIONS, QUIT TO HUB', () => {
+    expect(PAUSE_ITEMS).toEqual(['RESUME', 'RESTART', 'HELP', 'OPTIONS', 'QUIT TO HUB']);
   });
 });
 
@@ -186,8 +214,8 @@ describe('match scene: pause menu screens', () => {
     expect(s.world.home.state).toBe('ground');
   });
 
-  it('quit to title opens the Press Start screen', () => {
-    expect(pick(live(), 'QUIT TO TITLE')?.kind).toBe('pressStart');
+  it('quit to hub opens the Hub', () => {
+    expect(pick(live(), 'QUIT TO HUB')?.kind).toBe('hub');
   });
 
   describe('sound', () => {
@@ -215,11 +243,11 @@ describe('match scene: pause menu screens', () => {
       expect(audio.crowd).toBe('match');
     });
 
-    it('quit to title turns the crowd off', () => {
+    it('quit to hub turns the crowd off', () => {
       const { s, audio } = withAudio();
       s.update(frame(['pause']), STEP);
       s.update(frame(['up']), STEP);
-      expect(s.update(frame(['confirm']), STEP)?.kind).toBe('pressStart');
+      expect(s.update(frame(['confirm']), STEP)?.kind).toBe('hub');
       expect(audio.crowd).toBe('off');
     });
 
