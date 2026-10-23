@@ -40,15 +40,18 @@ export function startGame(canvas: HTMLCanvasElement): void {
   // Dev server only (stripped from builds): lets a playtester inspect and stage the current scene.
   if (import.meta.env.DEV) Object.assign(window, { __soccer: { scene: () => scene } });
 
+  // Losing the window or the controller pauses the match (and drops a held charge) before play can go on without him.
   document.addEventListener('visibilitychange', () => {
     if (!document.hidden) return;
     input.releaseAll();
     scene.onHidden?.();
   });
+  window.addEventListener('blur', () => scene.onHidden?.());
 
   startLoop(
     dt => {
       nowS += dt;
+      if (input.takePadLost()) scene.onHidden?.();
       latest = input.poll();
       pending = carry(pending, latest);
       stepper.advance(dt);

@@ -106,10 +106,13 @@ export class InputTracker {
 /**
  * Polls the first connected gamepad and the keyboard once per frame. Keys
  * are released on window blur so alt-tabbing never leaves one stuck down.
+ * takePadLost() reports, once, that a gamepad was disconnected.
  */
-export function createInput(target: Window): { poll(): InputFrame; releaseAll(): void } {
+export function createInput(target: Window): { poll(): InputFrame; releaseAll(): void; takePadLost(): boolean } {
   const keysDown = new Set<string>();
   const tracker = new InputTracker();
+  let padLost = false;
+  target.addEventListener('gamepaddisconnected', () => (padLost = true));
 
   target.addEventListener('keydown', e => {
     if (!KEYS[e.code]) return;
@@ -127,5 +130,10 @@ export function createInput(target: Window): { poll(): InputFrame; releaseAll():
       return tracker.next(merged.held, merged.moveX, merged.moveY);
     },
     releaseAll,
+    takePadLost() {
+      const lost = padLost;
+      padLost = false;
+      return lost;
+    },
   };
 }

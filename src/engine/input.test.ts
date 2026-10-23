@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { InputTracker, keyActions, mergeActions, padActions, type PadSnapshot } from './input';
+import { InputTracker, createInput, keyActions, mergeActions, padActions, type PadSnapshot } from './input';
 
 /** A 17-button standard-mapping pad: `buttons` pressed, `values` analog (triggers). */
 function fakePad(buttons: Record<number, boolean>, axes: number[] = [0, 0], values: Record<number, number> = {}): PadSnapshot {
@@ -81,5 +81,19 @@ describe('InputTracker', () => {
     const t = new InputTracker();
     t.next(padActions(fakePad({ 2: true })).held, 0, 0);
     expect(t.next(padActions(null).held, 0, 0).released.has('shoot')).toBe(true);
+  });
+});
+
+describe('createInput', () => {
+  /** Enough of a Window for createInput: events plus a pad-less navigator. */
+  const fakeWindow = () => Object.assign(new EventTarget(), { navigator: { getGamepads: () => [] } }) as unknown as Window;
+
+  it('reports a disconnected gamepad once, so the game can pause', () => {
+    const target = fakeWindow();
+    const input = createInput(target);
+    expect(input.takePadLost()).toBe(false);
+    target.dispatchEvent(new Event('gamepaddisconnected'));
+    expect(input.takePadLost()).toBe(true);
+    expect(input.takePadLost()).toBe(false);
   });
 });
