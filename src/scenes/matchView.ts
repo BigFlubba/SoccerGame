@@ -51,15 +51,6 @@ function goalAt(cam: Camera, lineX: number, origin: { x: number; y: number }): {
   return { x: Math.round(at.sx + origin.x), y: Math.round(at.sy + origin.y) };
 }
 
-/** The nets, roofs and crossbars: behind everything on the pitch. */
-function drawGoalBacks(g: CanvasRenderingContext2D, w: World, cam: Camera, art: GameArt): void {
-  for (const goal of w.field.goals) {
-    const sprites = art.goal[goal.side];
-    const at = goalAt(cam, goal.lineX, sprites.origin);
-    g.drawImage(sprites.back, at.x, at.y);
-  }
-}
-
 /** A 5×1 patch of dark grass on the ground under (x, z): shows how far back something is. */
 function drawShadow(g: CanvasRenderingContext2D, cam: Camera, x: number, z: number): void {
   const s = screen(cam, x, 0, z);
@@ -83,10 +74,14 @@ function drawBall(g: CanvasRenderingContext2D, w: World, cam: Camera, art: GameA
   g.drawImage(art.ball[frame]!, s.x - BALL_SPRITE_R, s.y - BALL_SPRITE_R);
 }
 
-/** Everything standing on the pitch, ready for the depth sort: both players, the ball and all four posts. */
+/**
+ * Everything standing on the pitch, ready for the depth sort: both players,
+ * the ball, and each goal's nets and posts. The nets come first, so at the
+ * same depth a post is drawn over its net.
+ */
 export function pitchDrawables(w: World, cam: Camera, art: GameArt): Drawable[] {
-  const posts = w.field.goals.flatMap(goal => {
-    const post = (z: number, which: 'nearPost' | 'farPost'): Drawable => ({
+  const goals = w.field.goals.flatMap(goal => {
+    const part = (z: number, which: 'farNet' | 'nearNet' | 'nearPost' | 'farPost'): Drawable => ({
       z,
       draw: g => {
         const sprites = art.goal[goal.side];
@@ -94,10 +89,10 @@ export function pitchDrawables(w: World, cam: Camera, art: GameArt): Drawable[] 
         g.drawImage(sprites[which], at.x, at.y);
       },
     });
-    return [post(goal.z0, 'nearPost'), post(goal.z1, 'farPost')];
+    return [part(goal.z1, 'farNet'), part(goal.z0, 'nearNet'), part(goal.z0, 'nearPost'), part(goal.z1, 'farPost')];
   });
   return [
-    ...posts,
+    ...goals,
     { z: w.home.z, draw: g => drawPlayer(g, cam, w.home, art) },
     { z: w.away.z, draw: g => drawPlayer(g, cam, w.away, art) },
     // Last among equals: at his feet, the ball is drawn over his boots.
@@ -159,10 +154,9 @@ function drawArrow(g: CanvasRenderingContext2D, w: World, cam: Camera): void {
   g.fillRect(x, ARROW_Y + 2, 1, 1);
 }
 
-/** Draws one frame of the match: scenery, goal backs, shadows, then everything on the pitch far to near, bars, HUD and banners. */
+/** Draws one frame of the match: scenery, shadows, then everything on the pitch far to near, bars, HUD and banners. */
 export function drawMatch(g: CanvasRenderingContext2D, w: World, cam: Camera, art: GameArt, nowS: number, hud: MatchHud): void {
   drawLayers(g, cam, art);
-  drawGoalBacks(g, w, cam, art);
   drawShadow(g, cam, w.ball.x, w.ball.z);
   for (const p of [w.away, w.home]) drawShadow(g, cam, p.x, p.z);
   for (const d of depthSorted(pitchDrawables(w, cam, art))) d.draw(g);

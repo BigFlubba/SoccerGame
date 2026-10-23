@@ -52,6 +52,10 @@ describe('keyActions', () => {
     expect(keyActions(new Set(['ArrowLeft'])).moveX).toBe(-1);
   });
 
+  it('maps Escape to pause and back', () => {
+    expect([...keyActions(new Set(['Escape'])).held].sort()).toEqual(['back', 'pause']);
+  });
+
   it('maps Enter to pause and confirm, Backspace to back', () => {
     expect([...keyActions(new Set(['Enter', 'Backspace'])).held].sort()).toEqual(['back', 'confirm', 'pause']);
   });

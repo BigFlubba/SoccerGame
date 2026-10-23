@@ -22,7 +22,8 @@ export interface SpriteSet {
 
 /** A goal's sprites, placed at project(lineX, 0, 0, cam) + origin. */
 export interface GoalCanvases {
-  back: HTMLCanvasElement;
+  farNet: HTMLCanvasElement;
+  nearNet: HTMLCanvasElement;
   nearPost: HTMLCanvasElement;
   farPost: HTMLCanvasElement;
   origin: { x: number; y: number };
@@ -54,7 +55,7 @@ function spriteSet(cache: SpriteCache, who: string, heads: Record<HeadFacing, He
 }
 
 function goalCanvases(g: GoalArt, palette: ResolvedPalette): GoalCanvases {
-  return { back: toCanvas(g.back, palette), nearPost: toCanvas(g.nearPost, palette), farPost: toCanvas(g.farPost, palette), origin: g.origin };
+  return { farNet: toCanvas(g.farNet, palette), nearNet: toCanvas(g.nearNet, palette), nearPost: toCanvas(g.nearPost, palette), farPost: toCanvas(g.farPost, palette), origin: g.origin };
 }
 
 const BUTTONS: readonly ButtonName[] = ['A', 'B', 'X', 'RT', 'START'];

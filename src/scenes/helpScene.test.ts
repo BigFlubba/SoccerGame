@@ -52,4 +52,10 @@ describe('help', () => {
     expect(s.update(frame([]), STEP)).toBeNull();
     expect(s.update(frame(['back']), STEP)).toBe(BEHIND);
   });
+
+  it('Start or Esc goes back too, but Enter does not', () => {
+    expect(createHelpScene(CTX, () => BEHIND).update(frame(['pause']), STEP)).toBe(BEHIND);
+    expect(createHelpScene(CTX, () => BEHIND).update(frame(['pause', 'back']), STEP)).toBe(BEHIND);
+    expect(createHelpScene(CTX, () => BEHIND).update(frame(['pause', 'confirm']), STEP)).toBeNull();
+  });
 });

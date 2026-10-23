@@ -181,10 +181,13 @@ export function backyardLayers(): VenueLayers {
 /**
  * A goal's art, drawn from its geometry. Every sprite shares one origin: it is
  * placed with its top-left at project(lineX, 0, 0, cam) + origin. The posts
- * are separate so the match can depth-sort them against the players.
+ * and the nets are separate so the match can depth-sort them against the
+ * players: `farNet` (back net, far side net, roof and crossbar) sorts at the
+ * far post's depth, `nearNet` (the near side net) at the near post's.
  */
 export interface GoalArt {
-  back: IndexedImage;
+  farNet: IndexedImage;
+  nearNet: IndexedImage;
   nearPost: IndexedImage;
   farPost: IndexedImage;
   origin: { x: number; y: number };
@@ -207,30 +210,33 @@ export function goalSprites(side: 'left' | 'right'): GoalArt {
     for (let v = from; v <= to + 1e-9; v += NET_CELL) visit(v);
   };
 
-  const back = sprite();
+  const [farNet, nearNet] = [sprite(), sprite()];
   // The net is a dotted mesh, so the white frame stands out in front of it.
-  const mesh = (x: number, y: number, z: number) => {
+  const mesh = (img: IndexedImage, x: number, y: number, z: number) => {
     const p = project(x, y, z, 0);
-    if ((Math.round(p.sx) + Math.round(p.sy)) % 2 === 0) put(back, x, y, z, M.silver);
+    if ((Math.round(p.sx) + Math.round(p.sy)) % 2 === 0) put(img, x, y, z, M.silver);
   };
   // Net back.
-  grid(g.z0, g.z1, z => along(0, top, y => mesh(g.backX, y, z)));
-  grid(0, top, y => along(g.z0, g.z1, z => mesh(g.backX, y, z)));
-  along(g.z0, g.z1, z => mesh(g.backX, top, z));
+  grid(g.z0, g.z1, z => along(0, top, y => mesh(farNet, g.backX, y, z)));
+  grid(0, top, y => along(g.z0, g.z1, z => mesh(farNet, g.backX, y, z)));
+  along(g.z0, g.z1, z => mesh(farNet, g.backX, top, z));
   // Side nets.
-  for (const z of [g.z1, g.z0]) {
-    grid(xa, xb, x => along(0, top, y => mesh(x, y, z)));
-    grid(0, top, y => along(xa, xb, x => mesh(x, y, z)));
-    along(xa, xb, x => mesh(x, top, z));
+  for (const [z, img] of [
+    [g.z1, farNet],
+    [g.z0, nearNet],
+  ] as const) {
+    grid(xa, xb, x => along(0, top, y => mesh(img, x, y, z)));
+    grid(0, top, y => along(xa, xb, x => mesh(img, x, y, z)));
+    along(xa, xb, x => mesh(img, x, top, z));
   }
   // Roof.
-  grid(xa, xb, x => along(g.z0, g.z1, z => mesh(x, top, z)));
-  grid(g.z0, g.z1, z => along(xa, xb, x => mesh(x, top, z)));
+  grid(xa, xb, x => along(g.z0, g.z1, z => mesh(farNet, x, top, z)));
+  grid(g.z0, g.z1, z => along(xa, xb, x => mesh(farNet, x, top, z)));
   // Crossbar, near-post top to far-post top.
   along(g.z0, g.z1, z => {
     for (const y of [g.barY, top]) {
-      put(back, g.lineX, y, z, M.white);
-      put(back, g.lineX + 1, y, z, M.white);
+      put(farNet, g.lineX, y, z, M.white);
+      put(farNet, g.lineX + 1, y, z, M.white);
     }
   });
 
@@ -242,5 +248,5 @@ export function goalSprites(side: 'left' | 'right'): GoalArt {
     });
     return img;
   };
-  return { back, nearPost: post(g.z0), farPost: post(g.z1), origin: { x: col0 - g.lineX, y: row0 - NEAR_SY } };
+  return { farNet, nearNet, nearPost: post(g.z0), farPost: post(g.z1), origin: { x: col0 - g.lineX, y: row0 - NEAR_SY } };
 }

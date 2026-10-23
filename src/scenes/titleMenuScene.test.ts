@@ -47,6 +47,19 @@ describe('title menu', () => {
     expect(createTitleMenuScene(context()).update(frame(['back']), STEP)?.kind).toBe('pressStart');
   });
 
+  it('Start on the title menu starts the selected item, like A', () => {
+    expect(createTitleMenuScene(context()).update(frame(['pause']), STEP)?.kind).toBe('match');
+    expect(createTitleMenuScene(context(), 2).update(frame(['pause']), STEP)?.kind).toBe('help');
+  });
+
+  it('Esc on the title menu goes back to Press Start', () => {
+    expect(createTitleMenuScene(context()).update(frame(['pause', 'back']), STEP)?.kind).toBe('pressStart');
+  });
+
+  it('Enter on the title menu still confirms', () => {
+    expect(createTitleMenuScene(context()).update(frame(['pause', 'confirm']), STEP)?.kind).toBe('match');
+  });
+
   it('HELP opens Help, and B there comes back to the title menu on HELP', () => {
     const s = createTitleMenuScene(context());
     s.update(frame(['up']), STEP);

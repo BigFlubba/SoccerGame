@@ -3,6 +3,7 @@ import { MASTER } from '../art/colors';
 import { BASE_H, BASE_W } from '../engine/viewport';
 import { drawBackdrop } from './backdrop';
 import type { GameContext } from './context';
+import { backsOut } from './menu';
 import type { Scene } from './scene';
 
 export interface HelpScene extends Scene {
@@ -67,7 +68,7 @@ const BUTTON_RAISE = 2;
 const FOOTER_Y = BASE_H - 18;
 const BUTTON_LINE = /^(A|B|X|RT|START): (.*)$/;
 
-/** CONTROLS, THE MATCH, MOVES: left/right flip the pages (wrapping); B, Backspace or C goes back. */
+/** CONTROLS, THE MATCH, MOVES: left/right flip the pages (wrapping); B, Backspace, C, Esc or Start goes back. */
 export function createHelpScene(ctx: GameContext, back: () => Scene): HelpScene {
   let page = 0;
   const { art } = ctx;
@@ -77,7 +78,7 @@ export function createHelpScene(ctx: GameContext, back: () => Scene): HelpScene 
       return page;
     },
     update(input) {
-      if (input.pressed.has('back')) return back();
+      if (backsOut(input)) return back();
       const n = HELP_PAGES.length;
       if (input.pressed.has('right')) page = (page + 1) % n;
       if (input.pressed.has('left')) page = (page - 1 + n) % n;

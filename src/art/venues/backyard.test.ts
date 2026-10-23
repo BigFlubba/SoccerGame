@@ -116,16 +116,25 @@ describe('goalSprites', () => {
 
       it('the crossbar runs between the post tops at height 28–30', () => {
         for (const z of [24, 32, 40]) {
-          expect(pixelAt(art, art.back, goal.lineX, goal.lineX, 28, z)).toBe(M.white);
-          expect(pixelAt(art, art.back, goal.lineX, goal.lineX, 29, z)).toBe(M.white);
+          expect(pixelAt(art, art.farNet, goal.lineX, goal.lineX, 28, z)).toBe(M.white);
+          expect(pixelAt(art, art.farNet, goal.lineX, goal.lineX, 29, z)).toBe(M.white);
         }
-        expect(pixelAt(art, art.back, goal.lineX, goal.lineX, 20, 32)).not.toBe(M.white);
+        expect(pixelAt(art, art.farNet, goal.lineX, goal.lineX, 20, 32)).not.toBe(M.white);
       });
 
       it('has a net mesh between the frame', () => {
-        const ids = new Set(art.back.data);
-        expect(ids.has(M.silver)).toBe(true);
-        expect(ids.has(0)).toBe(true);
+        for (const net of [art.farNet, art.nearNet]) {
+          const ids = new Set(net.data);
+          expect(ids.has(M.silver)).toBe(true);
+          expect(ids.has(0)).toBe(true);
+        }
+      });
+
+      it('splits the nets by depth without losing or adding a pixel', () => {
+        // The single back sprite these replace had this many opaque pixels.
+        const before = { left: 457, right: 493 }[goal.side];
+        const union = art.farNet.data.filter((v, i) => v !== 0 || art.nearNet.data[i] !== 0).length;
+        expect(union).toBe(before);
       });
     });
   }

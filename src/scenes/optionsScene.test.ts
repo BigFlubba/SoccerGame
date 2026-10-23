@@ -46,6 +46,12 @@ describe('options', () => {
     expect(ctx.settings.difficulty).toBe('easy');
   });
 
+  it('Start or Esc goes back too, but Enter does not', () => {
+    expect(createOptionsScene(context(), () => BEHIND).update(frame(['pause']), STEP)).toBe(BEHIND);
+    expect(createOptionsScene(context(), () => BEHIND).update(frame(['pause', 'back']), STEP)).toBe(BEHIND);
+    expect(createOptionsScene(context(), () => BEHIND).update(frame(['pause', 'confirm']), STEP)).toBeNull();
+  });
+
   it('shows the difficulty row with arrows the font can draw', () => {
     expect(difficultyRow('normal')).toBe('DIFFICULTY  < NORMAL >');
     for (const ch of '<>') expect(glyph(ch)).not.toBe(glyph('?'));

@@ -3,6 +3,7 @@ import { BASE_W } from '../engine/viewport';
 import type { Difficulty } from '../game/ai';
 import { drawBackdrop } from './backdrop';
 import type { GameContext } from './context';
+import { backsOut } from './menu';
 import type { Scene } from './scene';
 
 const DIFFICULTIES: readonly Difficulty[] = ['easy', 'normal', 'hard'];
@@ -23,7 +24,7 @@ export function createOptionsScene(ctx: GameContext, back: () => Scene): Scene {
   return {
     kind: 'options',
     update(input) {
-      if (input.pressed.has('back')) return back();
+      if (backsOut(input)) return back();
       const step = (input.pressed.has('right') ? 1 : 0) - (input.pressed.has('left') ? 1 : 0);
       if (step !== 0) {
         const n = DIFFICULTIES.length;

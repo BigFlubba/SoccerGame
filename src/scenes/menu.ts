@@ -17,6 +17,10 @@ export function stepMenu(m: MenuState, input: InputFrame): { m: MenuState; chose
   return { m: { items: m.items, index }, chosen, back: input.pressed.has('back') };
 }
 
+/** B, Backspace, Esc or Start backs out of a screen; Enter (pause plus confirm) does not. */
+export const backsOut = (input: InputFrame): boolean =>
+  input.pressed.has('back') || (input.pressed.has('pause') && !input.pressed.has('confirm'));
+
 const LINE_H = 10;
 const PANEL_PAD = 6;
 const CURSOR_GAP = 8;

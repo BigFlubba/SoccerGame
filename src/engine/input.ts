@@ -49,7 +49,7 @@ const KEYS: Readonly<Record<string, readonly Action[]>> = {
   ShiftLeft: ['sprint'],
   ShiftRight: ['sprint'],
   Enter: ['pause', 'confirm'],
-  Escape: ['pause'],
+  Escape: ['pause', 'back'],
   Backspace: ['back'],
 };
 

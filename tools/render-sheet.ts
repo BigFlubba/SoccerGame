@@ -107,7 +107,13 @@ function backyardView(cam: number, actors: readonly Actor[]): SheetItem {
     const art = goalSprites(goal.side);
     const at = project(goal.lineX, 0, 0, cam);
     const anchor = { x: -art.origin.x, y: -art.origin.y };
-    paint(view, art.back, pal, Math.round(at.sx - anchor.x), Math.round(at.sy - anchor.y));
+    // Nets before posts, as in the match, so a post is drawn over its net.
+    for (const [z, img] of [
+      [goal.z1, art.farNet],
+      [goal.z0, art.nearNet],
+    ] as const) {
+      posts.push({ x: goal.lineX, y: 0, z, img, palette: pal, anchor: { x: anchor.x + z * DEPTH_SHEAR, y: anchor.y - z } });
+    }
     posts.push({ x: goal.lineX, y: 0, z: goal.z0, img: art.nearPost, palette: pal, anchor: { x: anchor.x + goal.z0 * DEPTH_SHEAR, y: anchor.y - goal.z0 } });
     posts.push({ x: goal.lineX, y: 0, z: goal.z1, img: art.farPost, palette: pal, anchor: { x: anchor.x + goal.z1 * DEPTH_SHEAR, y: anchor.y - goal.z1 } });
   }
