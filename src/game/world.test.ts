@@ -64,6 +64,20 @@ describe('world', () => {
     expect(w.ball.vx).toBeGreaterThan(100);
   });
 
+  it('a ball contested from both sides squirts out to either side, not always to whoever resolves last', () => {
+    const sides = new Set<number>();
+    for (let seed = 1; seed <= 8; seed++) {
+      const w = createWorld(BASE_STATS, BASE_STATS, seed, ERR);
+      w.match.phase = 'playing';
+      Object.assign(w.home, { x: 300, vx: 95 });
+      Object.assign(w.away, { x: 316, vx: -95, facing: -1 });
+      Object.assign(w.ball, { x: 308, y: 0 });
+      for (let i = 0; i < 30; i++) stepWorld(w, move(1), move(-1), STEP);
+      sides.add(Math.sign(w.ball.x - (w.home.x + w.away.x) / 2));
+    }
+    expect(sides).toEqual(new Set([-1, 1]));
+  });
+
   it('knows when the ball is at a player’s feet so B chips', () => {
     const w = createWorld(BASE_STATS, BASE_STATS, 1, ERR);
     w.match.phase = 'playing';

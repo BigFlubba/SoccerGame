@@ -23,6 +23,8 @@ export interface World {
   rng: Rng;
   aimErrorDeg: { home: number; away: number };
   events: WorldEvents;
+  /** Fixed ticks so far; its parity decides who acts on the ball first. */
+  tick: number;
 }
 
 /** Where the kicking-off player stands, behind the ball. */
@@ -45,6 +47,7 @@ export function createWorld(homeStats: Stats, awayStats: Stats, seed: number, ai
     rng: seeded(seed),
     aimErrorDeg,
     events: quietEvents(),
+    tick: 0,
   };
   placeForKickoff(w);
   return w;
@@ -77,10 +80,13 @@ export function stepWorld(w: World, homeIntent: PlayerIntent, awayIntent: Player
   separatePlayers(w.home, w.away);
 
   const ball = stepBall(w.ball, dt, w.field);
-  const kicks = [
-    resolveContacts(w.home, w.away, w.ball, w.aimErrorDeg.home, w.rng, w.field),
-    resolveContacts(w.away, w.home, w.ball, w.aimErrorDeg.away, w.rng, w.field),
-  ];
+  // The second player to act on the ball has the last word, so take turns going first.
+  const contact = (p: Player, other: Player) => resolveContacts(p, other, w.ball, w.aimErrorDeg[p.team], w.rng, w.field);
+  const homeFirst = w.tick % 2 === 0;
+  const first = homeFirst ? contact(w.home, w.away) : contact(w.away, w.home);
+  const second = homeFirst ? contact(w.away, w.home) : contact(w.home, w.away);
+  const kicks = homeFirst ? [first, second] : [second, first];
+  w.tick++;
 
   const before = { ...w.match.score };
   const { resetForKickoff } = stepMatch(w.match, dt, goalScored(w.field, w.ball));

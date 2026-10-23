@@ -25,6 +25,9 @@ const SLIDE_BALL_VY = 80;
 /** A ball hitting his body keeps this fraction of its speed, reversed. */
 const BODY_RESTITUTION = 0.4;
 const PINNED_POP_VY = 160;
+/** Clears both players' heads (PLAYER_H) with room to spare. */
+const SQUEEZE_POP_VY = 300;
+const SQUEEZE_SQUIRT_VX = 60;
 /** How close counts as touching a wall. */
 const TOUCH_EPS = 0.5;
 
@@ -113,6 +116,21 @@ function unpin(p: Player, ball: Ball, field: Field): void {
   if (atFence || atNet) ball.vy = PINNED_POP_VY;
 }
 
+const squeezed = (p: Player, opponent: Player, ball: Ball): boolean =>
+  ballIn(bodyBox(p), ball, BALL_R) && ballIn(bodyBox(opponent), ball, BALL_R);
+
+/**
+ * A 50/50: a ball squeezed between both players on the ground pops up over
+ * their heads midway between them and squirts out to a random side, so
+ * neither body shoves it through the other and neither side always wins.
+ */
+function squirt(p: Player, opponent: Player, ball: Ball, rng: Rng): void {
+  ball.x = (p.x + opponent.x) / 2;
+  if (ball.vy > 0 || ball.y > BALL_R) return;
+  ball.vy = SQUEEZE_POP_VY;
+  ball.vx = (p.vx + opponent.vx) / 2 + (rng() < 0.5 ? -1 : 1) * SQUEEZE_SQUIRT_VX;
+}
+
 /** Everything player `p` does to the ball (and to the opponent's feet) this tick. */
 export function resolveContacts(p: Player, opponent: Player, ball: Ball, aimErrorDeg: number, rng: Rng, field: Field): ContactEvents {
   const ev: ContactEvents = { touched: false, kicked: null, perfect: false, tackledBall: false, trippedOpponent: false };
@@ -120,8 +138,12 @@ export function resolveContacts(p: Player, opponent: Player, ball: Ball, aimErro
   strike(p, ball, aimErrorDeg, rng, ev);
   if (!ev.kicked) headBall(p, ball, ev);
   if (ev.kicked || ev.tackledBall) return ev;
-  dribble(p, ball, ev);
-  block(p, ball);
-  unpin(p, ball, field);
+  if (!squeezed(p, opponent, ball)) {
+    dribble(p, ball, ev);
+    block(p, ball);
+    unpin(p, ball, field);
+  }
+  // Also catches a block that pushed the ball out into the other player.
+  if (squeezed(p, opponent, ball)) squirt(p, opponent, ball, rng);
   return ev;
 }

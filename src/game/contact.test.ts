@@ -183,6 +183,15 @@ describe('resolveContacts: pinned ball', () => {
     expect(b.vy).toBe(160);
   });
 
+  it('a ball squeezed between two players pops up over their heads and squirts out sideways', () => {
+    const { p, opp } = setup(300);
+    opp.x = 313;
+    const b = ball({ x: 306.5, vx: 50 });
+    contact(p, opp, b);
+    expect((b.vy * b.vy) / (2 * 900)).toBeGreaterThan(40);
+    expect(b.vx).not.toBe(0);
+  });
+
   it('a ball pinned against the back of the net pops free', () => {
     const { p, opp } = setup(619);
     const b = ball({ x: 625, y: 0 });
