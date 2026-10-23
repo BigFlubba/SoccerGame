@@ -1,0 +1,7 @@
+# Reference photos of Harrison: never commit (public repo)
+*.jpg
+*.jpeg
+reference/
+
+node_modules/
+dist/
