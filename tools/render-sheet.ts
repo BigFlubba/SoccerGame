@@ -3,6 +3,9 @@
  * Run with `npm run sheet`.
  */
 import { mkdirSync, writeFileSync } from 'node:fs';
+import { drawFigure } from '../src/art/body/drawFigure';
+import { standingPose } from '../src/art/body/pose';
+import { HARRISON_BODY } from '../src/art/body/proportions';
 import { C, MASTER, resolvePalette, toRGBA } from '../src/art/colors';
 import { HARRISON_HEADS, HARRISON_POWER_HEADS } from '../src/art/harrison/head';
 import { harrisonLook, type PowerForm } from '../src/art/harrison/look';
@@ -38,7 +41,13 @@ function item(img: IndexedImage, kit: KitId = 'home', form: PowerForm = 'base', 
   return { width: src.width, height: src.height, rgba: toRGBA(src, resolvePalette(harrisonLook(kit, form))) };
 }
 
+const standing = standingPose(HARRISON_BODY);
 const rows: SheetItem[][] = [
+  [
+    item(drawFigure(standing, HARRISON_BODY, HARRISON_HEADS), 'home'),
+    item(drawFigure(standing, HARRISON_BODY, HARRISON_HEADS), 'away'),
+    item(drawFigure(standing, HARRISON_BODY, HARRISON_POWER_HEADS), 'home', 'golden'),
+  ],
   [
     ...FACINGS.map(f => item(HARRISON_HEADS[f].image, 'home', 'base', true)),
     ...FACINGS.map(f => item(HARRISON_POWER_HEADS[f].image, 'home', 'golden', true)),
