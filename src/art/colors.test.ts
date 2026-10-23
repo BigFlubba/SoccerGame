@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { ART_LEGEND, C, MASTER, resolvePalette, toRGBA, type LookColors, type Slot } from './colors';
+import { ART_LEGEND, C, M, MASTER, masterPalette, resolvePalette, toRGBA, type LookColors, type Slot } from './colors';
 import { IndexedImage } from './indexedImage';
 import { KITS, KIT_SLOT_NAMES, VOLT_BOOTS } from './kits';
 
@@ -62,5 +62,19 @@ describe('KITS', () => {
 describe('ART_LEGEND', () => {
   it('does not use the reserved transparent char', () => {
     expect('.' in ART_LEGEND).toBe(false);
+  });
+});
+
+describe('M and masterPalette', () => {
+  it('numbers master colours from 1 in key order', () => {
+    const keys = Object.keys(MASTER) as (keyof typeof MASTER)[];
+    expect(M[keys[0]!]).toBe(1);
+    expect(M[keys[keys.length - 1]!]).toBe(keys.length);
+  });
+
+  it('resolves M ids to their master colour, 0 transparent', () => {
+    const pal = masterPalette();
+    expect(pal[0]).toEqual([0, 0, 0, 0]);
+    expect(pal[M.red]).toEqual([0xc0, 0x24, 0x2c, 255]);
   });
 });

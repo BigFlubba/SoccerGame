@@ -86,6 +86,12 @@ export const MASTER = {
 } as const;
 
 export type MasterColor = keyof typeof MASTER;
+
+/**
+ * Master colour ids for art drawn straight in master colours (scenery, ball,
+ * goals) rather than in logical roles: 1-based, in MASTER key order.
+ */
+export const M = Object.fromEntries(Object.keys(MASTER).map((name, i) => [name, i + 1])) as Readonly<Record<MasterColor, number>>;
 export type LookColors = Record<Slot, MasterColor>;
 export type RGBA = readonly [number, number, number, number];
 /** Indexed by logical colour id; entry 0 is transparent. */
@@ -105,6 +111,11 @@ export function resolvePalette(look: LookColors): ResolvedPalette {
     palette[id] = hexToRGBA(MASTER[look[slot as Slot]]);
   }
   return palette;
+}
+
+/** Resolves M ids: id → its MASTER colour, 0 transparent. */
+export function masterPalette(): ResolvedPalette {
+  return [TRANSPARENT, ...Object.values(MASTER).map(hexToRGBA)];
 }
 
 export function toRGBA(img: IndexedImage, palette: ResolvedPalette): Uint8ClampedArray<ArrayBuffer> {

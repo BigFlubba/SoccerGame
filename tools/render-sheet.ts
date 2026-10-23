@@ -7,12 +7,15 @@ import { bakeAll } from '../src/art/body/bake';
 import { drawFigure } from '../src/art/body/drawFigure';
 import { standingPose } from '../src/art/body/pose';
 import { HARRISON_BODY } from '../src/art/body/proportions';
-import { C, MASTER, resolvePalette, toRGBA, type LookColors } from '../src/art/colors';
+import { C, MASTER, masterPalette, resolvePalette, toRGBA, type LookColors, type ResolvedPalette } from '../src/art/colors';
 import { HARRISON_HEADS, HARRISON_POWER_HEADS } from '../src/art/harrison/head';
 import { harrisonLook, type PowerForm } from '../src/art/harrison/look';
+import { ballFrames } from '../src/art/ball';
+import { ANCHOR } from '../src/art/body/pose';
 import { renderText, textPalette } from '../src/art/font';
+import { PARALLAX, backyardLayers, goalSprites } from '../src/art/venues/backyard';
 import { harrisonPortrait } from '../src/art/harrison/portrait';
-import { IndexedImage, blit } from '../src/art/indexedImage';
+import { IndexedImage, blit, flipX } from '../src/art/indexedImage';
 import { MAX_HEADS, maxLook } from '../src/art/opponents/max';
 import type { KitId } from '../src/art/kits';
 import { addOutline } from '../src/art/raster';
@@ -56,10 +59,50 @@ function text(s: string, scale: number): SheetItem {
   return { width: img.width, height: img.height, rgba: toRGBA(img, textPalette('white', 'outline')) };
 }
 
+/** Paints a resolved image into a 320×180 RGBA view, skipping transparent pixels. */
+function paint(view: Uint8ClampedArray, img: IndexedImage, palette: ResolvedPalette, dx: number, dy: number): void {
+  for (let y = 0; y < img.height; y++) {
+    for (let x = 0; x < img.width; x++) {
+      const id = img.get(x, y);
+      const vx = x + dx;
+      const vy = y + dy;
+      if (id === 0 || vx < 0 || vy < 0 || vx >= VIEW_W || vy >= VIEW_H) continue;
+      view.set(palette[id]!, (vy * VIEW_W + vx) * 4);
+    }
+  }
+}
+
+const VIEW_W = 320;
+const VIEW_H = 180;
+const GROUND_Y = 164;
+
+/** The Backyard as the camera at `cam` sees it, with both goals, Harrison, Max and the ball. */
+function backyardView(cam: number): SheetItem {
+  const view = new Uint8ClampedArray(VIEW_W * VIEW_H * 4);
+  const pal = masterPalette();
+  const L = backyardLayers();
+  const farX = -Math.round(cam * PARALLAX.far);
+  paint(view, L.far, pal, farX, 0);
+  paint(view, L.far, pal, farX + L.far.width, 0);
+  for (const name of ['mid', 'near', 'ground'] as const) paint(view, L[name], pal, -Math.round(cam * PARALLAX[name]), 0);
+  const goal = goalSprites();
+  const goalY = GROUND_Y - (goal.back.height - 1);
+  paint(view, goal.back, pal, 12 - cam, goalY);
+  paint(view, flipX(goal.back), pal, 612 - cam, goalY);
+  paint(view, flipX(max.idle.frames[0]!), resolvePalette(maxLook()), 360 - cam - ANCHOR.x, GROUND_Y - ANCHOR.y);
+  paint(view, baked.run.frames[2]!, resolvePalette(harrisonLook()), 280 - cam - ANCHOR.x, GROUND_Y - ANCHOR.y);
+  paint(view, ballFrames()[0]!, pal, 300 - cam - 3, GROUND_Y - 3 - 3);
+  paint(view, ballFrames()[1]!, pal, 600 - cam - 3, GROUND_Y - 20 - 3);
+  paint(view, goal.front, pal, 12 - cam, goalY);
+  paint(view, flipX(goal.front), pal, 612 - cam, goalY);
+  return { width: VIEW_W, height: VIEW_H, rgba: view };
+}
+
 const standing = standingPose(HARRISON_BODY);
 const baked = bakeAll(HARRISON_BODY, HARRISON_HEADS);
 const powered = bakeAll(HARRISON_BODY, HARRISON_POWER_HEADS);
 const max = bakeAll(HARRISON_BODY, MAX_HEADS);
+const ballRow = ballFrames().map(f => resolved(f, harrisonLook())).map((it, i) => ({ ...it, rgba: toRGBA(ballFrames()[i]!, masterPalette()) }));
 const clipRows = (kit: KitId) => Object.values(baked).map(clip => clip.frames.map(f => item(f, kit)));
 
 const EXPRESSIONS = ['neutral', 'celebrate', 'determined', 'disappointed'] as const;
@@ -83,6 +126,8 @@ const rows: SheetItem[][] = [
   Object.values(MASTER).map(swatch),
   [...max.idle.frames, ...max.run.frames].map(f => resolved(f, maxLook())),
   [...FACINGS.map(f => resolved(MAX_HEADS[f].image, maxLook(), true)), item(baked.idle.frames[0]!), resolved(max.idle.frames[0]!, maxLook())],
+  [backyardView(0), backyardView(320)],
+  ballRow,
   [text("HARRISON 0-0 MAX 45'", 1), text('ABCDEFGHIJKLMNOPQRSTUVWXYZ', 1), text("0123456789 -':!?.,/+", 1)],
   [text("HARRISON 0-0 MAX 45'", 2), text('GOAL! PERFECT', 2)],
 ];
