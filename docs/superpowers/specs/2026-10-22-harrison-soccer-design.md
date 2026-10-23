@@ -24,7 +24,8 @@ wanting to show it to friends.
 - He goes by **"Harrison"** (not Harry). **Jersey number 12.** He is **12 years
   old**.
 - The game is about **playing soccer**.
-- It has **upgrades and things to earn**.
+- It has **upgrades and things to earn**. **Some upgrades are big, powerful
+  effects in the style of Dragon Ball Z.**
 - **Short sessions, long-term progression.**
 - **One player only.** No local multiplayer.
 - **No deadline.** Built in order, finished when it's finished.
@@ -130,7 +131,7 @@ Default gamepad mapping (Xbox layout):
 | A | Jump. Ball touching his head mid-jump is a header, aimed by the stick. |
 | X | Shoot. Tap for a quick shot; hold to charge, release to fire. In the air: volley. |
 | B | With the ball: chip/lob (hold for distance). Without: slide tackle. |
-| Y | Super shot (when the super meter is full). |
+| Y | With a full super meter: hold to power up, release to unleash the equipped power move. |
 | RT | Sprint (uses stamina, which recovers when not sprinting). |
 | RB | Skill move: step-over by default; with stick up, rainbow flick (once unlocked). |
 | LB | 2v2: pass to teammate / call for the ball. |
@@ -222,7 +223,9 @@ Pick any unlocked venue and opponent. Full coin and XP rewards, no stars.
 The builder tunes the exact numbers to these targets. Starting points:
 
 - Win 60 coins, draw 30, loss 15. +10 per goal scored. +15 for a "style goal"
-  (header, volley, chip, bicycle kick, super shot). +20 for a clean sheet.
+  (header, volley, chip, bicycle kick, power move). +20 for a clean sheet.
+- Power moves and their tiers are the big-ticket items: each one should feel
+  like a goal to save up for.
 - First win of each day: +50 coins. Missing a day costs nothing.
 - XP roughly proportional to coins; level curve gets gradually steeper.
 - Pacing targets: early on, something new is affordable every 2–3 matches;
@@ -248,16 +251,65 @@ tackle, sprint. Unlocked by level (the builder picks exact levels, spread
 through the career): step-over feint, rainbow flick (flick the ball over an
 opponent's head), bicycle kick, scorpion kick.
 
-### Super shots (bought with coins, one equipped at a time, uses the full super meter)
+### Power moves (Dragon Ball Z-style)
 
-The super meter fills from touches, tackles, shots on target and style goals.
+The parent asked for some upgrades to be big, powerful effects: "think Dragon
+Ball Z". These are the game's showpiece upgrades. The feel is an open homage,
+but every name is original (no DBZ names, characters or attacks).
 
-- **Fireball:** very fast, straight, flaming trail, knocks a keeper back if
-  saved.
-- **Dipper:** rises then dips sharply under the crossbar (the side-view
-  equivalent of a banana shot).
-- **Lightning Dash:** a burst of extreme speed with afterimages, ball glued to
-  his feet.
+**Powering up.** The super meter fills from touches, tackles, shots on target
+and style goals. With a full meter, **hold Y to power up**:
+
+- Harrison drops into a charging stance.
+- An energy aura flares around him, and his hair glows and lifts.
+- The ground shakes, grass and pebbles float up, and the crowd gasps.
+- The controller rumbles harder the longer he holds.
+
+A full power-up takes about a second. **Release Y to unleash** the equipped
+power move. If he's tackled while charging, the power-up is cancelled but he
+keeps the meter, so picking the moment matters.
+
+**Power moves.** One is equipped at a time. Each is unlocked by level, bought
+with coins, then upgraded through **three tiers** that make it faster, bigger
+and flashier.
+
+- **Blaze Shot:** the ball is wreathed in fire with a roaring flame trail and
+  leaves scorch marks where it bounces. At tier 3 a save knocks the keeper
+  into the net with it.
+- **Energy Wave:** the headline move. He strikes the ball inside a huge
+  horizontal energy beam that crosses the screen and sends defenders flying.
+- **Dragon Strike:** the ball becomes a pixel energy dragon that snakes up and
+  then dives under the crossbar. This replaces the earlier Dipper.
+- **Blink Dash:** he vanishes and reappears further upfield with the ball,
+  leaving afterimages. This replaces the earlier Lightning Dash.
+- **Meteor Volley:** he leaps high, a giant glowing ball charges above him,
+  and he volleys it down into the goal.
+- **Thunder Header:** lightning strikes the ball as he heads it.
+
+**Power forms.** These change how he looks while powered up and during
+celebrations. They unlock by level, are equipped in the Locker Room, and each
+adds a small bonus to how fast the meter fills.
+
+- **Base:** white aura.
+- **Golden Form:** gold aura, glowing golden spiky hair, sparks.
+- **Storm Form:** gold aura crackling with blue lightning.
+- **Ultra Form:** blue-white aura, silver-blue hair.
+
+**Anime effects.** Power moves, and big goals in general, draw on a shared
+set of effects:
+
+- speed lines across the screen
+- impact frames: one or two frames of high-contrast silhouette at the moment
+  of contact
+- screen flash, heavy shake and slow motion
+- dust and debris, shockwave rings
+- glowing particle trails and crackling pixel energy
+
+**Power Clash.** The bosses in venues 4 and 5 have their own power moves. When
+his power move meets theirs (beam against beam, or both striking the ball at
+once), the two energies lock together mid-field and he mashes X to overpower
+it. If he wins, the ball rockets toward their goal; if he loses, it flies
+toward his.
 
 ### Cosmetics (look only, no stats)
 
@@ -269,6 +321,8 @@ The super meter fills from touches, tackles, shots on target and style goals.
 - **Balls:** classic, retro, gold, fire, and so on.
 - **Accessories:** headband, wristbands, captain's armband, clear-framed
   glasses.
+- **Aura colours** for his power-up, beyond those that come with his power
+  forms.
 - **Celebrations:** knee slide, backflip, robot, airplane, the spin-jump
   "Siuuu", and **"Point to the Back"**: a close-up back-view of Harrison
   pointing at **HARRISON 12** on his shirt. One is equipped and plays after
@@ -299,7 +353,8 @@ unlocks at venue 2, Beat the Keeper at venue 3.
 
 Title ("Press Start") → **Hub** (Harrison's portrait, level, coins) →
 Career / Quick Match / Training / Shop / Locker Room (kit, boots, ball,
-accessories, celebration, equipped super shot) / Trophy Room / Settings.
+accessories, celebration, equipped power move and power form) / Trophy Room /
+Settings.
 
 After every match or drill: a **Results** screen that tallies coins and XP
 with sound, shows level-ups and anything newly unlocked, and offers
@@ -316,8 +371,10 @@ save code, reset save (with a confirmation step).
 
 - Internal resolution 320×180, scaled up by the largest whole number that fits
   the window, letterboxed, with smoothing off (crisp pixels).
-- A fixed master palette of around 32 colours; each sprite uses about 12 or
-  fewer. The builder picks the palette.
+- A fixed master palette of around 40 colours, including bright energy
+  colours (glowing gold, white, electric blue, flame orange, violet) for
+  auras and power moves. Each in-game sprite uses about 12 or fewer. The
+  builder picks the palette.
 - Venues have 2–3 parallax layers (sky; distant scenery; crowd or fence) over a
   pitch with mowing stripes. Crowds are animated with simple pixel bobbing.
 - Goals drawn with a pixel net pattern that ripples when the ball hits it.
@@ -467,15 +524,17 @@ Each step ends with something playable or reviewable.
    Plus the GitHub Pages deploy pipeline. **Harrison playtests it at the real
    address.** If this isn't fun, fix it before going on.
 3. **Big moments and sound.** Goal slow motion, screen shake, "GOAL!!!",
-   celebrations, crowd, rumble, SFX and music.
+   celebrations, crowd, rumble, SFX and music, plus the shared anime effects
+   (particles, speed lines, impact frames, shockwaves, aura rendering).
 4. **Progression core.** Save system (including save code export/import),
    coins, XP and levels, Results screen, Hub, Shop with the four stats.
 5. **Career mode.** All five venues and backgrounds, 20 regular opponents plus
    5 bosses, stars and bonus objectives, goalkeepers, 2v2 with teammate AI,
    Quick Match.
 6. **Training Ground.** The four drills.
-7. **Moves, super shots and cosmetics.** Level-unlocked moves, super meter and
-   super shots, Locker Room, all cosmetics and celebrations, Trophy Room and
+7. **Moves, power moves and cosmetics.** Level-unlocked moves, super meter,
+   powering up, the six power moves with their tiers, power forms, Power
+   Clash, Locker Room, all cosmetics and celebrations, Trophy Room and
    achievements.
 8. **Polish.** Settings, difficulty and the quiet ease-off, balancing pass.
 
@@ -492,7 +551,9 @@ used to produce the character sheet PNG.
 ## Designer's calls (not confirmed by the parent)
 
 Side-view; 1v1 growing into keepers and then 2v2; no fouls or set pieces;
-golden goal; four stats; the moves and super shots listed; drills chosen to
+golden goal; four stats; the moves listed; the power move, power form and
+Power Clash details (the parent asked for the DBZ feel, not these specifics);
+drills chosen to
 suit side-view (Crossbar Challenge and Beat the Keeper instead of a face-on
 penalty shootout or cone weaving); venue list and bosses including Biscuit the
 Dog; the reward numbers; the Vite + TypeScript + Canvas stack; 320×180
