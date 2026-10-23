@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import type { GameArt } from './art';
 import type { GameContext } from './context';
 import { DIFFICULTY } from '../game/ai';
-import type { Settings } from '../meta/settings';
+import { DEFAULT_SETTINGS, type Settings } from '../meta/settings';
 import { PAUSE_ITEMS, createMatchScene, type MatchScene } from './matchScene';
 import type { Scene } from './scene';
 import { frame } from './testInput';
@@ -10,7 +10,7 @@ import { frame } from './testInput';
 const STEP = 1 / 60;
 /** update() never touches the art, so tests can run without a DOM. */
 const NO_ART = {} as GameArt;
-const CTX: GameContext = { art: NO_ART, settings: { version: 1, difficulty: 'normal' }, save: () => {} };
+const CTX: GameContext = { art: NO_ART, settings: { ...DEFAULT_SETTINGS }, save: () => {} };
 
 function live(): MatchScene {
   const s = createMatchScene(CTX, 1);
@@ -155,7 +155,7 @@ describe('match scene: pause menu screens', () => {
   });
 
   it('a difficulty change from pause applies to the current match', () => {
-    const settings: Settings = { version: 1, difficulty: 'normal' };
+    const settings: Settings = { ...DEFAULT_SETTINGS };
     const ctx: GameContext = { art: NO_ART, settings, save: next => void (ctx.settings = next) };
     const s = liveWith(ctx);
     const options = pick(s, 'OPTIONS')!;

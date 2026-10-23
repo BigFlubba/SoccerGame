@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { DIFFICULTY } from '../game/ai';
-import type { Settings } from '../meta/settings';
+import { DEFAULT_SETTINGS, type Settings } from '../meta/settings';
 import type { GameArt } from './art';
 import type { GameContext } from './context';
 import type { MatchScene } from './matchScene';
@@ -13,7 +13,7 @@ const STEP = 1 / 60;
 const NO_ART = {} as GameArt;
 
 function context(difficulty: Settings['difficulty'] = 'normal'): GameContext {
-  return { art: NO_ART, settings: { version: 1, difficulty }, save: () => {} };
+  return { art: NO_ART, settings: { ...DEFAULT_SETTINGS, difficulty }, save: () => {} };
 }
 
 describe('press start screen', () => {

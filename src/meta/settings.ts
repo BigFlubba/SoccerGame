@@ -2,14 +2,20 @@ import { DIFFICULTY, type Difficulty } from '../game/ai';
 
 /** Player settings, versioned so a later build can always read them. */
 export interface Settings {
-  version: 1;
+  version: 2;
   difficulty: Difficulty;
+  /** 0–VOLUME_MAX. */
+  musicVolume: number;
+  /** 0–VOLUME_MAX. */
+  sfxVolume: number;
+  rumble: boolean;
 }
 
 /** Game-specific, so it never clashes with other pages on the same site. */
 export const SETTINGS_KEY = 'harrisons-road-to-the-cup/settings';
-const VERSION = 1;
-export const DEFAULT_SETTINGS: Readonly<Settings> = Object.freeze({ version: VERSION, difficulty: 'normal' });
+const VERSION = 2;
+export const VOLUME_MAX = 10;
+export const DEFAULT_SETTINGS: Readonly<Settings> = Object.freeze({ version: VERSION, difficulty: 'normal', musicVolume: 6, sfxVolume: 8, rumble: true });
 
 /** The parts of localStorage settings need; injectable for tests and for browsers without it. */
 export interface KeyValueStore {
@@ -31,13 +37,27 @@ const isRecord = (v: unknown): v is Record<string, unknown> => typeof v === 'obj
 /** Saved by a newer build than this one: left alone, so a rollback never loses it. */
 const isNewer = (v: unknown): boolean => isRecord(v) && typeof v.version === 'number' && v.version > VERSION;
 
-/** Loads settings, falling back to the defaults for anything missing, broken or from a newer build. */
+const difficultyOr = (v: unknown, d: Difficulty): Difficulty => (typeof v === 'string' && Object.hasOwn(DIFFICULTY, v) ? (v as Difficulty) : d);
+/** A whole volume 0–VOLUME_MAX; anything else is the default. */
+const volumeOr = (v: unknown, d: number): number => (typeof v === 'number' && v >= 0 && v <= VOLUME_MAX ? Math.round(v) : d);
+
+/**
+ * Loads settings field by field, so one bad value falls back to its own
+ * default. A version 1 save keeps its difficulty. Missing, broken or newer
+ * saves load the defaults.
+ */
 export function loadSettings(store: KeyValueStore | null): Settings {
   const v = readStored(store);
-  if (!isRecord(v) || v.version !== VERSION || typeof v.difficulty !== 'string' || !Object.hasOwn(DIFFICULTY, v.difficulty)) {
-    return { ...DEFAULT_SETTINGS };
-  }
-  return { version: VERSION, difficulty: v.difficulty as Difficulty };
+  const d = DEFAULT_SETTINGS;
+  if (!isRecord(v) || (v.version !== 1 && v.version !== VERSION)) return { ...d };
+  if (v.version === 1) return { ...d, difficulty: difficultyOr(v.difficulty, d.difficulty) };
+  return {
+    version: VERSION,
+    difficulty: difficultyOr(v.difficulty, d.difficulty),
+    musicVolume: volumeOr(v.musicVolume, d.musicVolume),
+    sfxVolume: volumeOr(v.sfxVolume, d.sfxVolume),
+    rumble: typeof v.rumble === 'boolean' ? v.rumble : d.rumble,
+  };
 }
 
 /** Saves settings. Never throws (private browsing can refuse storage), and never overwrites a newer build's settings. */

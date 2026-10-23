@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { DEFAULT_SETTINGS } from '../meta/settings';
 import { glyph, measureText } from '../art/font';
 import type { GameArt } from './art';
 import type { GameContext } from './context';
@@ -7,7 +8,7 @@ import type { Scene } from './scene';
 import { frame } from './testInput';
 
 const STEP = 1 / 60;
-const CTX: GameContext = { art: {} as GameArt, settings: { version: 1, difficulty: 'normal' }, save: () => {} };
+const CTX: GameContext = { art: {} as GameArt, settings: { ...DEFAULT_SETTINGS }, save: () => {} };
 const BEHIND: Scene = { kind: 'titleMenu', update: () => null, draw: () => {} };
 const allText = () => HELP_PAGES.flatMap(p => [p.title, ...p.lines]).join('\n');
 
