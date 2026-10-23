@@ -135,13 +135,42 @@ describe('match scene', () => {
     expect(s.world.home.kick?.aim).toBe('far');
   });
 
-  it('offers play again after full time', () => {
+  it('full time awards once, then Results follows the banner', () => {
+    const ctx = testContext();
+    const s = createMatchScene(ctx, 1);
+    Object.assign(s.world.match, { phase: 'playing', clockS: 89.99, score: { home: 2, away: 1 } });
+    run(s, 0.1);
+    expect(s.world.match.phase).toBe('fullTime');
+    expect(ctx.savedProfiles).toHaveLength(1);
+    expect(s.reward).not.toBeNull();
+    expect(s.reward!.summary).toEqual({ result: 'win', goalsFor: 2, goalsAgainst: 1, styleGoals: [] });
+    expect(ctx.profile.ladderWins).toBe(1);
+    const kinds: (string | undefined)[] = [];
+    for (let i = 0; i < Math.round(2 / STEP); i++) kinds.push(s.update(frame(), STEP)?.kind);
+    expect(kinds.indexOf('results')).toBeGreaterThan(Math.round(1.3 / STEP));
+    expect(ctx.savedProfiles).toHaveLength(1);
+  });
+
+  it('stepping the match again after the hand-off hands over the same Results', () => {
     const s = live();
-    s.world.match.phase = 'fullTime';
-    s.world.match.result = 'win';
+    Object.assign(s.world.match, { clockS: 89.99, score: { home: 0, away: 1 } });
     run(s, 2);
-    const next = s.update(frame(['confirm']), STEP) as MatchScene | null;
-    expect(next?.world.match.phase).toBe('kickoff');
+    const a = s.update(frame(), STEP);
+    const b = s.update(frame(), STEP);
+    expect(a?.kind).toBe('results');
+    expect(b).toBe(a);
+  });
+
+  it('RESTART forfeits the match', () => {
+    const ctx = testContext();
+    const s = createMatchScene(ctx, 1);
+    Object.assign(s.world.match, { phase: 'playing', clockS: 80, score: { home: 3, away: 0 } });
+    s.update(frame(['pause']), STEP);
+    s.update(frame(['down']), STEP);
+    const next = s.update(frame(['confirm']), STEP) as MatchScene;
+    run(next, 0.1);
+    expect(ctx.savedProfiles).toHaveLength(0);
+    expect(ctx.profile).toEqual(newProfile());
   });
 
   it('pause menu lists RESUME, RESTART, HELP, OPTIONS, QUIT TO HUB', () => {
@@ -328,6 +357,26 @@ describe('match scene: pause menu screens', () => {
       expect(s.world.match.phase).toBe('fullTime');
     });
 
+    it('a golden-goal win is awarded once, after the moment', () => {
+      const ctx = testContext();
+      const s = createMatchScene(ctx, 1);
+      Object.assign(s.world.match, { phase: 'playing', goldenGoal: true, clockS: 90, score: { home: 1, away: 1 } });
+      Object.assign(s.world.ball, { x: 616, y: 3, z: 32, vx: 100 });
+      s.update(frame(), STEP);
+      expect(s.world.match.phase).toBe('goal');
+      expect(s.world.match.result).toBe('win');
+      for (let i = 0; i < Math.round(3.7 / STEP); i++) {
+        s.update(frame(), STEP);
+        if (s.world.match.phase === 'goal') expect(ctx.savedProfiles).toHaveLength(0);
+      }
+      run(s, 0.5);
+      expect(s.world.match.phase).toBe('fullTime');
+      expect(ctx.savedProfiles).toHaveLength(1);
+      expect(s.reward!.summary).toMatchObject({ result: 'win', goalsFor: 2, goalsAgainst: 1 });
+      run(s, 3);
+      expect(ctx.savedProfiles).toHaveLength(1);
+    });
+
     it('pausing mid-moment and resuming continues it, and the goal cues and rumble fire once', () => {
       const { s, audio, rumble } = scored();
       run(s, 0.5);
@@ -391,6 +440,30 @@ describe('match scene: pause menu screens', () => {
       expect(s.callout).toBe('HEADER!');
       run(s, 4);
       expect(s.callout).toBeNull();
+    });
+
+    it('a header goal counts as a style goal', () => {
+      const s = createMatchScene(testContext(), 1);
+      s.world.match.phase = 'playing';
+      Object.assign(s.world.away, { x: 300 });
+      Object.assign(s.world.home, { x: 540, z: 32, y: 10, state: 'air', vy: 0, facing: 1, kick: null });
+      Object.assign(s.world.ball, { x: 543, y: 40, z: 32, vx: -50, vy: -100, vz: 0 });
+      let n = 0;
+      while (!s.moment && n++ < 60) s.update(frame(), STEP);
+      expect(s.callout).toBe('HEADER!');
+      run(s, 4);
+      s.world.match.clockS = 89.99;
+      run(s, 3);
+      expect(s.world.match.phase).toBe('fullTime');
+      expect(s.reward!.summary.styleGoals).toEqual(['header']);
+    });
+
+    it('a plain shot is not a style goal', () => {
+      const { s } = scored();
+      run(s, 4);
+      s.world.match.clockS = 89.99;
+      run(s, 3);
+      expect(s.reward!.summary).toMatchObject({ goalsFor: 1, styleGoals: [] });
     });
 
     it('a third goal is a HAT-TRICK! with an extra roar', () => {

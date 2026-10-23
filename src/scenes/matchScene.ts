@@ -1,5 +1,4 @@
 import { matchFeedback } from '../audio/matchFeedback';
-import { MASTER } from '../art/colors';
 import type { InputFrame } from '../engine/input';
 import { BASE_W } from '../engine/viewport';
 import { DIFFICULTY, createBrain, think, type Difficulty } from '../game/ai';
@@ -8,7 +7,9 @@ import { HUMAN_AIM_ERROR_DEG, type Aim } from '../game/kick';
 import { cancelCharge, type PlayerIntent } from '../game/player';
 import { endGoalPause } from '../game/match';
 import { createWorld, stepWorld, type World } from '../game/world';
+import type { StyleKind } from '../meta/economy';
 import { maxStats, nextMatch } from '../meta/ladder';
+import { applyMatch, type MatchReward } from '../meta/progress';
 import type { GameContext } from './context';
 import { drawMenu, menuCue, stepMenu, type MenuState } from './menu';
 import { HAT_TRICK_GOALS, goalCallout, noteKick, type LastKick } from './goalCallout';
@@ -18,8 +19,8 @@ import { drawMatch, type MatchHud } from './matchView';
 import type { Scene } from './scene';
 import { createHelpScene } from './helpScene';
 import { createOptionsScene } from './optionsScene';
+import { createResultsScene } from './resultsScene';
 import { createHubScene } from './hubScene';
-import { createPressStartScene } from './titleScene';
 
 export interface MatchScene extends Scene {
   readonly world: World;
@@ -34,23 +35,25 @@ export interface MatchScene extends Scene {
   readonly trail: readonly TrailPoint[];
   /** The Backyard Ladder match being played, fixed when the match is made. */
   readonly ladderMatch: number;
+  /** What the match paid, from the tick it reached full time. */
+  readonly reward: MatchReward | null;
   /** The goal flash is owed to the next drawn frame. */
   readonly flash: boolean;
 }
 
 export const PAUSE_ITEMS = ['RESUME', 'RESTART', 'HELP', 'OPTIONS', 'QUIT TO HUB'] as const;
-const FULL_TIME_ITEMS = ['PLAY AGAIN', 'TITLE'] as const;
-/** The FULL TIME banner shows this long before the result and menu. */
+/** The FULL TIME banner shows this long before Results. */
 const RESULT_DELAY_S = 1.5;
 const PERFECT_SHOW_S = 0.6;
 /** How far the stick must lean up or down to aim a shot. */
 const AIM_THRESHOLD = 0.5;
-const RESULT_TEXT = { win: 'YOU WIN!', lose: 'YOU LOSE', draw: 'DRAW' } as const;
 /** A hat-trick's second roar comes in this long (real seconds) into the moment. */
 const HAT_TRICK_ROAR_S = 1.2;
 
 /** A fresh seed per match so every game plays differently. */
 export const newSeed = (): number => Math.floor(Math.random() * 2 ** 32);
+
+const isStyle = (kind: LastKick['kind']): kind is StyleKind => kind === 'header' || kind === 'volley' || kind === 'chip';
 
 /** Harrison's intent from the controller: the stick moves and aims, buttons act. */
 function harrisonIntent(input: InputFrame): PlayerIntent {
@@ -67,7 +70,11 @@ function harrisonIntent(input: InputFrame): PlayerIntent {
   };
 }
 
-/** A 90-second ladder match against Max: Harrison with his bought stats, Max with the match's. Pause and full-time menus. */
+/**
+ * A 90-second ladder match against Max: Harrison with his bought stats, Max
+ * with the match's. It pays out on the tick it reaches full time, then hands
+ * over to Results after the FULL TIME banner.
+ */
 export function createMatchScene(ctx: GameContext, seed: number): MatchScene {
   const { art } = ctx;
   let difficulty = ctx.settings.difficulty;
@@ -78,8 +85,11 @@ export function createMatchScene(ctx: GameContext, seed: number): MatchScene {
   const cam: Camera = { x: world.ball.x - BASE_W / 2 };
   const hud: MatchHud = { perfect: null, moment: null, callout: null, trail: [], flash: false };
   let lastKick: LastKick | null = null;
+  /** Harrison's header, volley and chip goals, for the style bonus. */
+  const styleGoals: StyleKind[] = [];
   let pause: MenuState | null = null;
-  let fullTime: MenuState | null = null;
+  let reward: MatchReward | null = null;
+  let results: Scene | null = null;
   let t = 0;
   ctx.audio.setCrowd('match');
   // No music in a match: the crowd carries it.
@@ -99,6 +109,13 @@ export function createMatchScene(ctx: GameContext, seed: number): MatchScene {
     ctx.audio.setCrowd('low');
   };
   const restart = () => createMatchScene(ctx, seed + 1);
+  /** Saved at once, so closing the tab during the FULL TIME banner loses nothing. Called once, on the full-time tick. */
+  const award = (result: NonNullable<World['match']['result']>) => {
+    const { home, away } = world.match.score;
+    const done = applyMatch(ctx.profile, { result, goalsFor: home, goalsAgainst: away, styleGoals: [...styleGoals] }, ladderMatch, ctx.today());
+    ctx.saveProfile(done.profile);
+    reward = done.reward;
+  };
   /** Help and Options come back to this match, still paused, with any new difficulty applied to Max. */
   const backHere = (): Scene => {
     difficulty = ctx.settings.difficulty;
@@ -126,6 +143,9 @@ export function createMatchScene(ctx: GameContext, seed: number): MatchScene {
       return hud.trail;
     },
     ladderMatch,
+    get reward() {
+      return reward;
+    },
     get flash() {
       return hud.flash;
     },
@@ -148,12 +168,8 @@ export function createMatchScene(ctx: GameContext, seed: number): MatchScene {
         }
         return null;
       }
-      if (fullTime) {
-        const r = step(fullTime, input);
-        fullTime = r.m;
-        if (r.chosen === 'PLAY AGAIN') return restart();
-        if (r.chosen === 'TITLE') return createPressStartScene(ctx);
-      } else if (input.pressed.has('pause') && world.match.phase !== 'fullTime' && !(hud.moment && input.pressed.has('confirm'))) {
+      if (results) return results;
+      if (input.pressed.has('pause') && world.match.phase !== 'fullTime' && !(hud.moment && input.pressed.has('confirm'))) {
         // During Harrison's moment Enter (pause plus confirm) skips it instead; Esc and Start still pause.
         openPause();
         return null;
@@ -179,6 +195,7 @@ export function createMatchScene(ctx: GameContext, seed: number): MatchScene {
           hud.moment = createGoalMoment();
           hud.flash = true;
           hud.callout = goalCallout(lastKick, world.match.score.home);
+          if (lastKick && isStyle(lastKick.kind)) styleGoals.push(lastKick.kind);
           // The roar cue swells; the crowd holds it through the celebration.
           ctx.audio.setCrowd('roar');
         }
@@ -198,26 +215,15 @@ export function createMatchScene(ctx: GameContext, seed: number): MatchScene {
           ctx.audio.setCrowd('match');
         }
       }
-      if (world.match.phase === 'fullTime' && !fullTime && world.match.phaseT >= RESULT_DELAY_S) {
-        fullTime = { items: FULL_TIME_ITEMS, index: 0 };
-        // The jingle comes in with the result, after the full-time whistle.
-        if (world.match.result) ctx.audio.playMusic(world.match.result);
-      }
-      return null;
+      if (world.match.phase !== 'fullTime' || !world.match.result) return null;
+      if (!reward) award(world.match.result);
+      // Results brings in the jingle, after the full-time whistle.
+      if (world.match.phaseT >= RESULT_DELAY_S) results = createResultsScene(ctx, reward!);
+      return results;
     },
     draw(g) {
       drawMatch(g, world, cam, art, t, hud);
       if (pause) drawMenu(g, art, pause, BASE_W / 2, 70);
-      if (fullTime && world.match.result) {
-        const { home, away } = world.match.score;
-        g.fillStyle = MASTER.outline;
-        g.fillRect(0, 50, BASE_W, 70);
-        const result = art.text(RESULT_TEXT[world.match.result], 2, 'energyGold', 'outline');
-        g.drawImage(result, Math.round(BASE_W / 2 - result.width / 2), 56);
-        const score = art.text(`${home} - ${away}`, 1, 'white', 'outline');
-        g.drawImage(score, Math.round(BASE_W / 2 - score.width / 2), 74);
-        drawMenu(g, art, fullTime, BASE_W / 2, 88);
-      }
     },
   };
   return scene;
