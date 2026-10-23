@@ -1,6 +1,5 @@
 import { describe, expect, it } from 'vitest';
 import {
-  FLASH_S,
   HIT_STOP_S,
   MOMENT_S,
   SHAKE_PX,
@@ -9,7 +8,6 @@ import {
   bannerShown,
   celebrating,
   createGoalMoment,
-  flashing,
   shakeOffset,
   simScale,
   stepGoalMoment,
@@ -43,14 +41,6 @@ describe('goal moment', () => {
       return dx !== 0 || dy !== 0;
     });
     expect(moved).toBe(true);
-  });
-
-  it('flashes on the first tick only', () => {
-    const gm = createGoalMoment();
-    expect(flashing(gm)).toBe(true);
-    stepGoalMoment(gm, STEP, false);
-    expect(flashing(gm)).toBe(false);
-    expect(FLASH_S).toBeCloseTo(STEP);
   });
 
   it('shows the banner, then celebrates', () => {

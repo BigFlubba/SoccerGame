@@ -11,7 +11,7 @@ import type { World } from '../game/world';
 import type { GameArt } from './art';
 import { depthSorted, type Drawable } from './depthSort';
 import type { TrailPoint } from './shotTrail';
-import { BANNER_FROM_S, CELEBRATE_FROM_S, bannerShown, celebrating, flashing, shakeOffset, type GoalMoment } from './goalMoment';
+import { BANNER_FROM_S, CELEBRATE_FROM_S, bannerShown, celebrating, shakeOffset, type GoalMoment } from './goalMoment';
 
 /** Overlay state the match scene keeps between frames. */
 export interface MatchHud {
@@ -23,6 +23,15 @@ export interface MatchHud {
   callout: string | null;
   /** Where a hard-hit ball has just been, newest first. */
   trail: TrailPoint[];
+  /** A white flash is owed to the next drawn frame (set when his goal moment starts). */
+  flash: boolean;
+}
+
+/** Whether to draw the goal flash this frame. It shows on exactly one drawn frame, however many ticks that frame covers. */
+export function takeFlash(hud: MatchHud): boolean {
+  const owed = hud.flash;
+  hud.flash = false;
+  return owed;
 }
 
 export const HOME_NAME = 'HARRISON';
@@ -89,11 +98,10 @@ function drawPlayer(g: CanvasRenderingContext2D, cam: Camera, p: Player, art: Ga
 
 /**
  * Harrison's clip this frame: arms up while he celebrates (the match is
- * frozen then, so it runs on the moment's clock), unless the back-view card
- * is showing instead.
+ * frozen then, so it runs on the moment's clock).
  */
-export function homeClip(w: World, moment: GoalMoment | null, withCard = false): Clip {
-  if (!moment || !celebrating(moment) || withCard) return w.home.anim;
+export function homeClip(w: World, moment: GoalMoment | null): Clip {
+  if (!moment || !celebrating(moment)) return w.home.anim;
   const { fps, frameCount } = CLIPS.celebrate;
   return { name: 'celebrate', frame: Math.floor((moment.t - CELEBRATE_FROM_S) * fps) % frameCount };
 }
@@ -240,7 +248,7 @@ export function drawMatch(g: CanvasRenderingContext2D, w: World, cam: Camera, ar
   drawChargeBar(g, cam, w.away, nowS);
   drawChargeBar(g, cam, w.home, nowS);
   g.restore();
-  if (moment && flashing(moment)) {
+  if (takeFlash(hud)) {
     g.save();
     g.globalAlpha = FLASH_ALPHA;
     ink(g, 'white');

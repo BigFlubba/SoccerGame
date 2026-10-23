@@ -31,6 +31,8 @@ export interface MatchScene extends Scene {
   readonly callout: string | null;
   /** Where a hard-hit ball has just been, newest first. */
   readonly trail: readonly TrailPoint[];
+  /** The goal flash is owed to the next drawn frame. */
+  readonly flash: boolean;
 }
 
 export const PAUSE_ITEMS = ['RESUME', 'RESTART', 'HELP', 'OPTIONS', 'QUIT TO TITLE'] as const;
@@ -67,7 +69,7 @@ export function createMatchScene(ctx: GameContext, seed: number): MatchScene {
   const world = createWorld(BASE_STATS, BASE_STATS, seed, { home: HUMAN_AIM_ERROR_DEG, away: profile.aimErrorDeg });
   const brain = createBrain(profile);
   const cam: Camera = { x: world.ball.x - BASE_W / 2 };
-  const hud: MatchHud = { perfect: null, moment: null, callout: null, trail: [] };
+  const hud: MatchHud = { perfect: null, moment: null, callout: null, trail: [], flash: false };
   let lastKick: LastKick | null = null;
   let pause: MenuState | null = null;
   let fullTime: MenuState | null = null;
@@ -115,6 +117,9 @@ export function createMatchScene(ctx: GameContext, seed: number): MatchScene {
     },
     get trail() {
       return hud.trail;
+    },
+    get flash() {
+      return hud.flash;
     },
     onHidden() {
       if (!pause && world.match.phase !== 'fullTime') openPause();
@@ -164,6 +169,7 @@ export function createMatchScene(ctx: GameContext, seed: number): MatchScene {
         lastKick = noteKick(lastKick, world);
         if (world.events.goal === 'home') {
           hud.moment = createGoalMoment();
+          hud.flash = true;
           hud.callout = goalCallout(lastKick, world.match.score.home);
           // The roar cue swells; the crowd holds it through the celebration.
           ctx.audio.setCrowd('roar');

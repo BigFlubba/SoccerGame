@@ -180,6 +180,18 @@ describe('stepPlayer: jumping', () => {
     }
   });
 
+  it('a diagonal take-off steered sideways is no faster than a run', () => {
+    // Near the near touchline, so the jump never reaches the far one (a wall drops vz and hides the speed).
+    const p = createPlayer('home', BASE_STATS, 320, 1, PLAYER_R + 1);
+    tick(p, { moveX: 1, moveZ: 1 }, ticks(0.2));
+    tick(p, { moveX: 1, moveZ: 1, jump: true });
+    expect(p.state).toBe('air');
+    for (let n = 0; p.state === 'air' && n < ticks(3); n++) {
+      tick(p, { moveX: 1, moveZ: 0 });
+      if (p.state === 'air') expect(Math.hypot(p.vx, p.vz)).toBeLessThanOrEqual(runSpeed(p.stats) + 1e-6);
+    }
+  });
+
   it('jumps to the stat apex and lands', () => {
     const p = harrison();
     tick(p, { jump: true });

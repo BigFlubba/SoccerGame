@@ -264,6 +264,13 @@ describe('match scene: pause menu screens', () => {
       expect(s.moment).toBeNull();
     });
 
+    it('the goal flash waits for a drawn frame, however many ticks pass', () => {
+      const { s } = scored();
+      s.update(frame(), STEP);
+      s.update(frame(), STEP);
+      expect(s.flash).toBe(true);
+    });
+
     it('a confirm press after 0.5 s skips to the kickoff', () => {
       const { s } = scored();
       run(s, 0.6);

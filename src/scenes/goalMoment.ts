@@ -8,7 +8,6 @@ export const HIT_STOP_S = 0.1,
   SLOW_MO_SCALE = 0.25,
   SHAKE_S = 0.8,
   SHAKE_PX = 4,
-  FLASH_S = 1 / 60,
   BANNER_FROM_S = 0.3,
   CELEBRATE_FROM_S = 1.6,
   MOMENT_S = 3.8,
@@ -55,11 +54,6 @@ export function shakeOffset(gm: GoalMoment): { dx: number; dy: number } {
   const amp = Math.round(SHAKE_PX * (1 - s / SHAKE_S));
   const [x, y] = SHAKE_PATTERN[Math.floor(s / FRAME_S) % SHAKE_PATTERN.length]!;
   return { dx: x * amp + 0, dy: y * amp + 0 };
-}
-
-/** One frame of white flash, never a strobe. */
-export function flashing(gm: GoalMoment): boolean {
-  return gm.t < FLASH_S - 1e-9;
 }
 
 export function bannerShown(gm: GoalMoment): boolean {

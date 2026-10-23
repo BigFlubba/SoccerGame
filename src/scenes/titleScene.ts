@@ -24,7 +24,9 @@ export function createPressStartScene(ctx: GameContext): PressStartScene {
       return ctx.audio.available && !ctx.audio.unlocked;
     },
     update(input) {
-      if (!input.pressed.has('confirm') && !input.pressed.has('pause')) return null;
+      // Esc is pause plus back, so it doesn't go on; Start and Enter (pause plus confirm) do.
+      const goOn = input.pressed.has('confirm') || (input.pressed.has('pause') && !input.pressed.has('back'));
+      if (!goOn) return null;
       ctx.audio.play('menuConfirm');
       return createTitleMenuScene(ctx);
     },

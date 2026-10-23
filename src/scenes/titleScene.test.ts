@@ -4,6 +4,7 @@ import { recordingRumble } from '../engine/testRumble';
 import { DEFAULT_SETTINGS } from '../meta/settings';
 import type { GameArt } from './art';
 import type { GameContext } from './context';
+import { frame } from './testInput';
 import { createPressStartScene } from './titleScene';
 
 const context = (audio = recordingAudio()): GameContext => ({ art: {} as GameArt, settings: { ...DEFAULT_SETTINGS }, save: () => {}, audio, rumble: recordingRumble() });
@@ -24,5 +25,11 @@ describe('press start sound hint', () => {
     audio.crowd = 'match';
     createPressStartScene(context(audio));
     expect(audio.crowd).toBe('off');
+  });
+
+  it('Esc on Press Start does nothing; Enter and Start still go on', () => {
+    expect(createPressStartScene(context()).update(frame(['pause', 'back']), 1 / 60)).toBeNull();
+    expect(createPressStartScene(context()).update(frame(['pause', 'confirm']), 1 / 60)).not.toBeNull();
+    expect(createPressStartScene(context()).update(frame(['pause']), 1 / 60)).not.toBeNull();
   });
 });

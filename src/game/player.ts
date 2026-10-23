@@ -69,6 +69,8 @@ export interface Player {
   touchCooldown: number;
   /** Seconds on the current looping animation. */
   animT: number;
+  /** Horizontal speed (px/s) at the last take-off: steering in the air never goes faster than this or a run. */
+  takeoffSpeed: number;
 }
 
 export const PLAYER_H = 40;
@@ -124,6 +126,7 @@ export function createPlayer(team: 'home' | 'away', stats: Stats, x: number, fac
     slideCooldown: 0,
     touchCooldown: 0,
     animT: 0,
+    takeoffSpeed: 0,
   };
 }
 
@@ -278,6 +281,7 @@ export function stepPlayer(p: Player, intent: PlayerIntent, dt: number, field: F
     if (intent.jump) {
       enter(p, 'air');
       p.vy = jumpVelocity(p.stats);
+      p.takeoffSpeed = Math.hypot(p.vx, p.vz);
     } else if (shootPressed) {
       enter(p, 'charging');
     } else if (chipPressed && ballAtFeet) {
@@ -301,14 +305,17 @@ export function stepPlayer(p: Player, intent: PlayerIntent, dt: number, field: F
     case 'ground':
       approach2(p, intent.moveX * runTarget, intent.moveZ * runTarget, dt, ACCEL, DECEL);
       break;
-    case 'air':
+    case 'air': {
       if (shootPressed && !p.kick) {
         p.kick = { kind: 'volley', charge: 0, overchargeS: 0, aim: intent.aim, active: true };
         p.stateT = 0;
       }
       if (p.kick?.kind === 'volley') p.kick.active = p.stateT <= VOLLEY_ACTIVE_S;
-      // Normalised like the ground target, so a diagonal jump is no faster than a run.
-      p.vx = approach(p.vx, target / moveLen, dt, AIR_ACCEL, AIR_ACCEL);
+      // Normalised like the ground target, and capped against the depth speed he took off with,
+      // so steering never makes him faster than a run, or than he left the ground.
+      const limit = Math.max(runSpeed(p.stats), p.takeoffSpeed);
+      const cap = Math.sqrt(Math.max(limit ** 2 - p.vz ** 2, 0));
+      p.vx = approach(p.vx, Math.min(Math.max(target / moveLen, -cap), cap), dt, AIR_ACCEL, AIR_ACCEL);
       fall(p, dt);
       if (p.y <= 0 && p.vy <= 0) {
         p.y = 0;
@@ -317,6 +324,7 @@ export function stepPlayer(p: Player, intent: PlayerIntent, dt: number, field: F
         enter(p, 'ground');
       }
       break;
+    }
     case 'charging':
       if (!intent.shootHeld) {
         release(p, 'shot', intent.aim);
