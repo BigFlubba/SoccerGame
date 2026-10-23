@@ -1,0 +1,32 @@
+{
+  "name": "soccer-game",
+  "version": "1.0.0",
+  "description": "Harrison's Road to the Cup: an 8-bit browser soccer game",
+  "directories": {
+    "doc": "docs"
+  },
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc --noEmit && vite build",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "sheet": "tsx tools/render-sheet.ts"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://dialmaster@github.com/DialmasterOrg/SoccerGame.git"
+  },
+  "type": "module",
+  "bugs": {
+    "url": "https://github.com/DialmasterOrg/SoccerGame/issues"
+  },
+  "homepage": "https://github.com/DialmasterOrg/SoccerGame#readme",
+  "devDependencies": {
+    "@types/node": "^26.6.5",
+    "tsx": "^4.23.15",
+    "typescript": "^7.0.2",
+    "vite": "^8.3.5",
+    "vitest": "^4.1.12"
+  },
+  "private": true
+}
