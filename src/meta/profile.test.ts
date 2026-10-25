@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { LADDER_MATCHES, PROFILE_KEY, followProfile, loadProfile, newProfile, saveProfile, type Profile } from './profile';
+import { addXp } from './economy';
+import { LADDER_MATCHES, MAX_LOADED, PROFILE_KEY, followProfile, loadProfile, newProfile, saveProfile, type Profile } from './profile';
 import type { KeyValueStore } from './storage';
 
 /** An in-memory store, standing in for localStorage. */
@@ -23,7 +24,7 @@ const ZERO_TOTALS = { matches: 0, wins: 0, draws: 0, losses: 0, goalsFor: 0, goa
 
 /** A save with something in every field. */
 const SOME: Profile = {
-  version: 1,
+  version: 2,
   coins: 420,
   level: 3,
   xp: 35,
@@ -31,13 +32,17 @@ const SOME: Profile = {
   ladderWins: 4,
   dailyWinDate: '2026-10-22',
   totals: { matches: 9, wins: 5, draws: 1, losses: 3, goalsFor: 17, goalsAgainst: 9, styleGoals: 4, xpEarned: 610 },
+  powerMoves: { owned: ['energyWave'], equipped: 'energyWave' },
+  powerForms: { owned: [], equipped: null },
 };
+
+const NO_POWER = { owned: [], equipped: null };
 
 describe('profile', () => {
   it('a missing save is a new profile under a game-specific key', () => {
     expect(loadProfile(memoryStore())).toEqual(newProfile());
     expect(newProfile()).toEqual({
-      version: 1,
+      version: 2,
       coins: 0,
       level: 1,
       xp: 0,
@@ -45,6 +50,8 @@ describe('profile', () => {
       ladderWins: 0,
       dailyWinDate: null,
       totals: ZERO_TOTALS,
+      powerMoves: NO_POWER,
+      powerForms: NO_POWER,
     });
     expect(PROFILE_KEY.startsWith('harrisons-road-to-the-cup/')).toBe(true);
     expect(LADDER_MATCHES).toBe(10);
@@ -59,16 +66,18 @@ describe('profile', () => {
   it('each bad field falls back alone', () => {
     const store = stored({
       ...SOME,
-      coins: -5,
+      coins: 'lots',
       level: 0,
       xp: 'x',
       stats: { speed: '3', power: 4, control: 12 },
       ladderWins: 99,
       dailyWinDate: 7,
       totals: null,
+      powerMoves: 'all',
+      powerForms: { owned: 'golden', equipped: 3 },
     });
     expect(loadProfile(store)).toEqual({
-      version: 1,
+      version: 2,
       coins: 0,
       level: 1,
       xp: 0,
@@ -76,7 +85,55 @@ describe('profile', () => {
       ladderWins: 10,
       dailyWinDate: null,
       totals: ZERO_TOTALS,
+      powerMoves: NO_POWER,
+      powerForms: NO_POWER,
     });
+  });
+
+  it('negative coins fall back to 0', () => {
+    expect(loadProfile(stored({ ...SOME, coins: -5 })).coins).toBe(0);
+  });
+
+  it('a full v1 save loads into v2 with every field kept', () => {
+    const v1 = {
+      version: 1,
+      coins: 640,
+      level: 4,
+      xp: 30,
+      stats: { speed: 3, power: 2, jump: 2, control: 1 },
+      ladderWins: 4,
+      dailyWinDate: '2026-10-24',
+      totals: { matches: 12, wins: 7, draws: 2, losses: 3, goalsFor: 21, goalsAgainst: 11, styleGoals: 5, xpEarned: 480 },
+    };
+    expect(loadProfile(stored(v1))).toEqual({ ...v1, version: 2, powerMoves: NO_POWER, powerForms: NO_POWER });
+  });
+
+  it('a v1 save at level 5 or more loads with Golden Form owned and equipped', () => {
+    const { powerMoves: _m, powerForms: _f, ...v1 } = { ...SOME, version: 1, level: 6 };
+    const p = loadProfile(stored(v1));
+    expect(p.powerForms).toEqual({ owned: ['golden'], equipped: 'golden' });
+    expect(p.powerMoves).toEqual(NO_POWER);
+  });
+
+  it('unknown, duplicate and unowned power entries are dropped', () => {
+    const p = loadProfile(
+      stored({
+        ...SOME,
+        powerMoves: { owned: ['energyWave', 'energyWave', 'blazeShot'], equipped: 'blazeShot' },
+        powerForms: { owned: ['storm'], equipped: 'golden' },
+      }),
+    );
+    expect(p.powerMoves).toEqual({ owned: ['energyWave'], equipped: null });
+    expect(p.powerForms).toEqual(NO_POWER);
+  });
+
+  it('absurd counts are capped so loading and levelling finish', () => {
+    const p = loadProfile(stored({ ...SOME, xp: 1e300, coins: 1e300, level: 1e9, totals: { ...SOME.totals, goalsFor: 1e300 } }));
+    expect(p.xp).toBe(MAX_LOADED.xp);
+    expect(p.coins).toBe(MAX_LOADED.count);
+    expect(p.level).toBe(MAX_LOADED.level);
+    expect(p.totals.goalsFor).toBe(MAX_LOADED.count);
+    expect(addXp(p.level, p.xp, 100).level).toBeGreaterThanOrEqual(p.level);
   });
 
   it('a bad total falls back alone too', () => {
@@ -92,7 +149,7 @@ describe('profile', () => {
   });
 
   it('a newer save is read best-effort and never written over', () => {
-    const store = stored({ ...SOME, version: 2, coins: 300, gems: 5 });
+    const store = stored({ ...SOME, version: 3, coins: 300, gems: 5 });
     const before = store.data[PROFILE_KEY];
     expect(loadProfile(store).coins).toBe(300);
     saveProfile(store, { ...newProfile(), coins: 0 });
