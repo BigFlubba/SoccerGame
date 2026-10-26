@@ -2,6 +2,7 @@ import { seeded, type Rng } from '../engine/random';
 import { BALL_REST_Y, stepBall, type Ball, type BallEvents } from './ball';
 import { resolveBodies } from './bodies';
 import { resolveContacts, type ContactEvents } from './contact';
+import { createDog, dropBall, parkBall, quietDog, resetDog, stepDog, vulnerable, type DogEvents, type DogProfile, type DogState } from './dog';
 import { BACKYARD, goalScored, type Field } from './field';
 import { createMatch, stepMatch, type MatchState, type Team } from './match';
 import { NO_INTENT, createPlayer, stepPlayer, type Player, type PlayerIntent } from './player';
@@ -40,6 +41,8 @@ export interface WorldEvents {
   ball: BallEvents;
   goal: Team | null;
   power: PowerEvents;
+  /** What Biscuit did this tick. All false without him. */
+  dog: DogEvents;
 }
 
 export interface World {
@@ -55,6 +58,8 @@ export interface World {
   power: PowerState | null;
   /** The Energy Wave on screen, live or fading. */
   wave: Wave | null;
+  /** Biscuit, when the away body is the dog; null in every match against Max, which then plays exactly as before. */
+  dog: DogState | null;
   /** Fixed ticks so far; its parity decides who acts on the ball first. */
   tick: number;
 }
@@ -68,23 +73,29 @@ const attackDir = (team: Team): 1 | -1 => (team === 'home' ? 1 : -1);
 
 const quietPower = (): PowerEvents => ({ started: false, ready: false, cancelled: false, fired: false, braced: false, blown: false });
 const quietContact = (): ContactEvents => ({ touched: false, kicked: null, perfect: false, tackledBall: false, trippedOpponent: false });
+const quietBall = (): BallEvents => ({ bounced: false, hitBar: false, hitPost: false, hitWall: false, hitNet: false });
 const quietEvents = (): WorldEvents => ({
   kicks: [],
-  ball: { bounced: false, hitBar: false, hitPost: false, hitWall: false, hitNet: false },
+  ball: quietBall(),
   goal: null,
   power: quietPower(),
+  dog: quietDog(),
 });
 
 /** The kicks that make a goal a style goal. */
 const STYLE_KINDS: ReadonlySet<PowerState['lastKind']> = new Set(['header', 'volley', 'chip', 'wave']);
 
-/** `kit` gives Harrison his super meter; without one the match plays exactly as it always has. */
+/**
+ * `kit` gives Harrison his super meter; without one the match plays exactly
+ * as it always has. `dog` makes the away body Biscuit, with that profile.
+ */
 export function createWorld(
   homeStats: Stats,
   awayStats: Stats,
   seed: number,
   aimErrorDeg: { home: number; away: number },
   kit: PowerKit | null = null,
+  dog: DogProfile | null = null,
 ): World {
   const centre = BACKYARD.width / 2;
   const w: World = {
@@ -98,6 +109,7 @@ export function createWorld(
     events: quietEvents(),
     power: kit ? createPower(kit) : null,
     wave: null,
+    dog: dog ? createDog(dog) : null,
     tick: 0,
   };
   placeForKickoff(w);
@@ -118,6 +130,7 @@ export function placeForKickoff(w: World): void {
     const dir = attackDir(p.team);
     reset(p, p.team === w.match.kickoffTeam ? centre - KICKOFF_GAP * dir : centre - KICKOFF_DEFENDER_DEPTH * dir, w.field.depth / 2);
   }
+  if (w.dog) resetDog(w.dog);
 }
 
 /**
@@ -156,6 +169,27 @@ function powerEnds(w: World, live: boolean, [, away]: ContactEvents[]): boolean 
 }
 
 /**
+ * Contacts with Biscuit on the pitch. Only Harrison plays the ball with his
+ * feet, and never trips the dog. A carried ball is out of play, except while
+ * the dog is slow (jinking) when it is contested where it would land, at the
+ * muzzle on the ground: any slide, touch or kick that reaches it knocks it
+ * out of his mouth. The dog's own grab reports as a touch.
+ */
+function dogContacts(w: World, dog: DogState, ev: DogEvents): ContactEvents[] {
+  let home = quietContact();
+  const carried = dog.carrying;
+  if (!w.wave?.live && (!carried || vulnerable(dog))) {
+    if (carried) w.ball.y = BALL_REST_Y;
+    home = resolveContacts(w.home, w.away, w.ball, w.aimErrorDeg.home, w.rng, w.field, { trips: false });
+    if (carried && (home.tackledBall || home.touched || home.kicked)) {
+      dropBall(w, true);
+      ev.dropped = true;
+    }
+  }
+  return [home, { ...quietContact(), touched: ev.grabbed }];
+}
+
+/**
  * One fixed tick: players, then their bodies kept apart and out of the
  * goals, then the wave, the ball, contacts and the match rules. Intents
  * only count while the ball is in play.
@@ -179,7 +213,10 @@ export function stepWorld(w: World, homeIntent: PlayerIntent, awayIntent: Player
   // Powered up, X only ever fires the wave: until it can (ready, with the ball, a clean line), the press does nothing.
   const waveDir = live && canFireWave(w) ? maxGoalDir(w) : live && (w.power?.activeS ?? 0) > 0 ? 'wait' : null;
   stepOne(home, homeIntent, live, w, dt, waveDir);
-  stepOne(w.away, awayIntent, live, w, dt);
+  // The dog runs on his own legs; braced or blown away, his body is a player's like Max's.
+  const dogBody = w.dog !== null && w.away.state !== 'bracing' && w.away.state !== 'blown';
+  const dog = dogBody ? stepDog(w, awayIntent, live, dt) : quietDog();
+  if (!dogBody) stepOne(w.away, w.dog ? NO_INTENT : awayIntent, live, w, dt);
   if (w.power && home.powerArmed && canStartPower(w)) {
     home.powerArmed = false;
     w.power.activeS = POWERED_S;
@@ -195,14 +232,19 @@ export function stepWorld(w: World, homeIntent: PlayerIntent, awayIntent: Player
 
   const { braced, blown } = stepWave(w, dt);
   [power.braced, power.blown] = [braced, blown];
-  const ball = stepBall(w.ball, dt, w.field);
+  // A carried ball isn't simulated: it rides in the dog's mouth.
+  const ball = w.dog?.carrying ? quietBall() : stepBall(w.ball, dt, w.field);
   // The second player to act on the ball has the last word, so take turns going first.
   const contact = (p: Player, other: Player) =>
     w.wave?.live ? quietContact() : resolveContacts(p, other, w.ball, w.aimErrorDeg[p.team], w.rng, w.field);
   const homeFirst = w.tick % 2 === 0;
-  const first = homeFirst ? contact(home, w.away) : contact(w.away, home);
-  const second = homeFirst ? contact(w.away, home) : contact(home, w.away);
-  const kicks = homeFirst ? [first, second] : [second, first];
+  let kicks: ContactEvents[];
+  if (w.dog) kicks = dogContacts(w, w.dog, dog);
+  else {
+    const first = homeFirst ? contact(home, w.away) : contact(w.away, home);
+    const second = homeFirst ? contact(w.away, home) : contact(home, w.away);
+    kicks = homeFirst ? [first, second] : [second, first];
+  }
   w.tick++;
   if (w.power && !power.fired && (wasActive || power.started)) {
     if (w.power.activeS > 0 && powerEnds(w, live, kicks)) w.power.activeS = 0;
@@ -213,6 +255,8 @@ export function stepWorld(w: World, homeIntent: PlayerIntent, awayIntent: Player
     noteLastKind(w.power, kicks);
   }
 
+  // Written after everything has moved, so the goal sees the carried ball where he is.
+  if (w.dog?.carrying) parkBall(w);
   const before = { ...w.match.score };
   const { resetForKickoff } = stepMatch(w.match, dt, goalScored(w.field, w.ball));
   const goal: Team | null = w.match.score.home > before.home ? 'home' : w.match.score.away > before.away ? 'away' : null;
@@ -220,7 +264,7 @@ export function stepWorld(w: World, homeIntent: PlayerIntent, awayIntent: Player
     if (goal === 'home' && STYLE_KINDS.has(w.power.lastKind)) addMeter(w.power, 'styleGoal');
     w.power.lastKind = null;
   }
-  w.events = { kicks, ball, goal, power };
+  w.events = { kicks, ball, goal, power, dog };
   if (resetForKickoff) {
     placeForKickoff(w);
     w.wave = null;

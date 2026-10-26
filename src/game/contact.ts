@@ -43,8 +43,8 @@ function hit(ball: Ball, k: { vx: number; vy: number; vz: number; spin: number }
   ball.spin = k.spin;
 }
 
-/** A slide wins the ball if it reaches it, otherwise it can take the opponent's feet. */
-function slide(p: Player, opponent: Player, ball: Ball, ev: ContactEvents): void {
+/** A slide wins the ball if it reaches it, otherwise it can take the opponent's feet (unless `trips` is off). */
+function slide(p: Player, opponent: Player, ball: Ball, ev: ContactEvents, trips: boolean): void {
   if (p.state !== 'sliding' || !p.kick?.active) return;
   const reach = slideZone(p);
   if (ballIn(reach, ball, BALL_R)) {
@@ -56,7 +56,7 @@ function slide(p: Player, opponent: Player, ball: Ball, ev: ContactEvents): void
   const onGround = opponent.y === 0 && opponent.state !== 'air';
   const feetX = opponent.x + PLAYER_R >= reach.x0 && opponent.x - PLAYER_R <= reach.x1;
   const feetZ = opponent.z + PLAYER_R >= reach.z0 && opponent.z - PLAYER_R <= reach.z1;
-  if (onGround && opponent.state !== 'fallen' && opponent.state !== 'blown' && feetX && feetZ) {
+  if (trips && onGround && opponent.state !== 'fallen' && opponent.state !== 'blown' && feetX && feetZ) {
     knockDown(opponent);
     p.kick.active = false;
     ev.trippedOpponent = true;
@@ -232,12 +232,20 @@ function squirt(p: Player, opponent: Player, ball: Ball, rng: Rng, field: Field)
   ball.vz = (p.vz + opponent.vz) / 2 + side * sz * SQUEEZE_SQUIRT_VX;
 }
 
-/** Everything player `p` does to the ball (and to the opponent's feet) this tick. */
-export function resolveContacts(p: Player, opponent: Player, ball: Ball, aimErrorDeg: number, rng: Rng, field: Field): ContactEvents {
+/** Everything player `p` does to the ball (and to the opponent's feet, unless `trips` is off: nobody trips the dog) this tick. */
+export function resolveContacts(
+  p: Player,
+  opponent: Player,
+  ball: Ball,
+  aimErrorDeg: number,
+  rng: Rng,
+  field: Field,
+  { trips }: { trips: boolean } = { trips: true },
+): ContactEvents {
   const ev: ContactEvents = { touched: false, kicked: null, perfect: false, tackledBall: false, trippedOpponent: false };
   // Flying through the air after a wave, he can't block, dribble or head it.
   if (p.state === 'blown') return ev;
-  slide(p, opponent, ball, ev);
+  slide(p, opponent, ball, ev, trips);
   strike(p, ball, aimErrorDeg, rng, field, ev);
   if (!ev.kicked) headBall(p, ball, field, ev);
   if (ev.kicked || ev.tackledBall || onRoof(ball, field)) return ev;
