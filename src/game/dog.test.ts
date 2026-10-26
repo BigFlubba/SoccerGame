@@ -2,10 +2,12 @@ import { describe, expect, it } from 'vitest';
 import { BALL_R } from '../art/ball';
 import { MUZZLE } from '../art/opponents/biscuit';
 import { BALL_REST_Y } from './ball';
-import { DOG_CATCH_SPEED, DOG_DIFFICULTY, DOG_SPEED, DWELL_PER_CONTROL, JINK_S, PANT_S, TUNING_STATS, dropBall, dwellFor } from './dog';
+import { DOG_CATCH_SPEED, DOG_DIFFICULTY, DOG_SPEED, DWELL_PER_CONTROL, JINK_S, PANT_S, REGRAB_S, TUNING_STATS, canGrab, dropBall, dwellFor, parkBall } from './dog';
+import { createDogBrain, dogThink } from './dogAi';
 import { BACKYARD, goalScored, inGoalBox } from './field';
-import { NO_INTENT, type PlayerIntent } from './player';
+import { BLOWN_DOWN_S, BRACE_S, NO_INTENT, PLAYER_R, type PlayerIntent } from './player';
 import { SPRINT_MULTIPLIER, runSpeed } from './stats';
+import { WAVE_SPEED } from './wave';
 import { createWorld, stepWorld, type World } from './world';
 
 const STEP = 1 / 60;
@@ -16,8 +18,10 @@ const slide: PlayerIntent = { ...NO_INTENT, chipHeld: true };
 const LEFT_GOAL = BACKYARD.goals[0];
 
 /** A boss world in play, with the dog and Harrison where the test wants them and the ball at (bx, bz). */
-function boss(opts: { dog: [number, number]; home: [number, number]; ball: [number, number]; control?: number; d?: 'easy' | 'normal' | 'hard' }): World {
-  const w = createWorld({ ...TUNING_STATS, control: opts.control ?? TUNING_STATS.control }, { speed: 1, power: 1, jump: 1, control: 1 }, 7, ERR, null, DOG_DIFFICULTY[opts.d ?? 'normal']);
+function boss(opts: { dog: [number, number]; home: [number, number]; ball: [number, number]; control?: number; d?: 'easy' | 'normal' | 'hard'; kit?: boolean }): World {
+  const kit = opts.kit ? { golden: false } : null;
+  const w = createWorld({ ...TUNING_STATS, control: opts.control ?? TUNING_STATS.control }, { speed: 1, power: 1, jump: 1, control: 1 }, 7, ERR, kit, DOG_DIFFICULTY[opts.d ?? 'normal']);
+  if (w.power) w.power.meter = 1;
   w.match.phase = 'playing';
   [w.away.x, w.away.z] = opts.dog;
   [w.home.x, w.home.z] = opts.home;
@@ -187,5 +191,71 @@ describe('the dog', () => {
     expect(w.dog).toBeNull();
     stepWorld(w, still, still, STEP);
     expect(w.events.dog).toEqual({ grabbed: false, dropped: false, jinked: false, panted: false });
+  });
+});
+
+describe('the wave and the dog', () => {
+  /** Harrison on the ball at x 200 with a full meter and the dog at dogX facing him; Harrison powers up and waits for the wave. */
+  function readyToFire(dogX: number, homeX = 200): World {
+    const w = boss({ dog: [dogX, 32], home: [homeX, 32], ball: [homeX + 8, 32], kit: true });
+    ticks(w, 1, { ...NO_INTENT, powerHeld: true });
+    expect(w.events.power.started).toBe(true);
+    for (let i = 0; i < 120 && !w.events.power.ready; i++) ticks(w, 1);
+    return w;
+  }
+  const fire = (w: World) => ticks(w, 1, { ...NO_INTENT, shootHeld: true });
+
+  it('braced from range: he digs in, the ball dies in front of him, and he takes it once the brace ends', () => {
+    const w = readyToFire(358);
+    fire(w);
+    let braced = false;
+    for (let i = 0; i < 20 && !braced; i++) {
+      ticks(w, 1);
+      braced = w.events.power.braced;
+    }
+    expect(braced).toBe(true);
+    expect(w.away.state).toBe('bracing');
+    expect([w.ball.vx, w.ball.vz]).toEqual([0, 0]);
+    expect(canGrab(w)).toBe(false);
+    // He skids back on the brace, as Max does, then runs the dead ball down: a turnover.
+    const brain = createDogBrain(w.dog!.profile);
+    for (let i = 0; i < Math.ceil((BRACE_S + REGRAB_S) / STEP) + 2; i++) stepWorld(w, still, dogThink(brain, w, STEP), STEP);
+    expect(w.dog!.carrying).toBe(true);
+  });
+
+  it('fired from close: he is blown away, lands inside the field on his feet, and the ball runs on', () => {
+    for (const [dogX, homeX] of [[248, 200], [572, 524]] as const) {
+      const w = readyToFire(dogX, homeX);
+      fire(w);
+      let blown = false;
+      for (let i = 0; i < 10 && !blown; i++) {
+        ticks(w, 1);
+        blown = w.events.power.blown;
+      }
+      expect(blown, `from ${dogX}`).toBe(true);
+      // The ball runs on at wave speed (less the tick of friction its own step takes off).
+      expect(w.ball.vx).toBeGreaterThan(WAVE_SPEED * w.wave!.dirX * 0.99);
+      let downS = 0;
+      while (w.away.state === 'blown') {
+        expect(canGrab(w)).toBe(false);
+        ticks(w, 1);
+        downS += STEP;
+      }
+      expect(downS).toBeCloseTo(BLOWN_DOWN_S, 1);
+      expect(w.dog!.carrying).toBe(false);
+      expect([w.away.state, w.away.y]).toEqual(['ground', 0]);
+      expect(w.away.x).toBeGreaterThanOrEqual(w.field.fenceL + PLAYER_R);
+      expect(w.away.x).toBeLessThanOrEqual(w.field.fenceR - PLAYER_R);
+      for (const g of w.field.goals) expect(inGoalBox(g, w.away.x, w.away.z)).toBe(false);
+    }
+  });
+
+  it('a wave never fires while he carries, because Harrison has no ball', () => {
+    const w = boss({ dog: [300, 32], home: [270, 32], ball: [290, 32], kit: true });
+    w.dog!.carrying = true;
+    parkBall(w);
+    ticks(w, 1, { ...NO_INTENT, powerHeld: true });
+    expect(w.events.power.started).toBe(false);
+    expect(w.power!.meter).toBe(1);
   });
 });
