@@ -16,7 +16,7 @@ import type { MatchHud } from './matchView';
  */
 
 /** Top right, mirroring the stamina bar: the label, the bar under it, the Y button beside it. */
-const METER = { right: 316, labelY: 1, barX: 272, barY: 8, barW: 44, barH: 5, glyphX: 259, glyphY: 4 };
+const METER = { right: 316, labelY: 1, barX: 272, barY: 10, barW: 44, barH: 5, glyphX: 259, glyphY: 6 };
 /** The meter's left edge: anything else in the top right keeps left of it. */
 export const POWER_METER_X0 = METER.glyphX - 1;
 const DIM_ALPHA = 0.35;

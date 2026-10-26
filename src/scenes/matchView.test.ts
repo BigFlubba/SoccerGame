@@ -108,6 +108,14 @@ describe('calloutLine', () => {
 });
 
 describe('takeFlash', () => {
+  it('a flash owed while impact frames run waits for them to finish', () => {
+    const hud: MatchHud = { perfect: null, moment: null, callout: null, trail: [], flash: true, shake: null, impactFrames: 1, goldenCelebration: false };
+    expect(takeFlash(hud)).toBe(false);
+    expect(hud.flash).toBe(true);
+    hud.impactFrames = 0;
+    expect(takeFlash(hud)).toBe(true);
+  });
+
   it('takeFlash is true once, then false', () => {
     const hud: MatchHud = { perfect: null, moment: null, callout: null, trail: [], flash: true, shake: null, impactFrames: 0, goldenCelebration: false };
     expect(takeFlash(hud)).toBe(true);

@@ -47,8 +47,13 @@ export interface MatchHud {
   goldenCelebration: boolean;
 }
 
-/** Whether to draw the goal flash this frame. It shows on exactly one drawn frame, however many ticks that frame covers. */
+/**
+ * Whether to draw the white flash this frame. It shows on exactly one drawn
+ * frame, however many ticks that frame covers, and waits out a fired wave's
+ * impact frames so it never greys their silhouettes.
+ */
 export function takeFlash(hud: MatchHud): boolean {
+  if (hud.impactFrames > 0) return false;
   const owed = hud.flash;
   hud.flash = false;
   return owed;
@@ -323,6 +328,8 @@ function drawImpact(g: CanvasRenderingContext2D, w: World, cam: Camera, art: Gam
 export function drawMatch(g: CanvasRenderingContext2D, w: World, cam: Camera, art: GameArt, nowS: number, hud: MatchHud): void {
   const { moment } = hud;
   const shake = pitchShake(w, hud, nowS);
+  // Decided before this frame uses up an impact frame, so the flash comes on the frame after the last one.
+  const flash = takeFlash(hud);
   const home = homeClip(w, moment);
   const look: HomeLook = { set: homeSprites(w, hud), aura: auraStrength(w, hud), nowS };
   g.save();
@@ -346,7 +353,7 @@ export function drawMatch(g: CanvasRenderingContext2D, w: World, cam: Camera, ar
   drawChargeBar(g, cam, w.home, nowS);
   drawPowerBar(g, cam, w.home, nowS);
   g.restore();
-  if (takeFlash(hud)) {
+  if (flash) {
     g.save();
     g.globalAlpha = FLASH_ALPHA;
     ink(g, 'white');

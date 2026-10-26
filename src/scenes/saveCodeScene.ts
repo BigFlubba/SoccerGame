@@ -41,10 +41,11 @@ const CODE_SIZES = [
   { scale: 1, groupsPerLine: 8, lineH: 9 },
 ] as const;
 const CODE_MAX_LINES = 3;
-const STATUS_Y = PANEL.y + 82;
-const MENU_TOP = PANEL.y + 98;
+const STATUS_Y = PANEL.y + 96;
+const MENU_TOP = PANEL.y + 110;
 const FOOTER_Y = PANEL.y + PANEL.h - 14;
 const CURSOR_BLINK_HZ = 2;
+const ENTRY_DROP = 12;
 
 /** A code's groups of 5 laid out in lines: big if it fits in three lines, otherwise small. */
 export function codeLines(code: string): { lines: string[]; scale: number; lineH: number } {
@@ -179,13 +180,15 @@ export function createSaveCodeScene(ctx: GameContext, back: () => Scene): SaveCo
         centre(art.text('REPLACE THIS SAVE?', 2, 'energyGold', 'outline'), CODE.y + 30);
       } else {
         const shown = codeLines(stage === 'enter' ? groupCode(entry) : code);
+        // Entering, the code sits a line lower, under how to enter it.
+        const top = stage === 'enter' ? CODE.y + ENTRY_DROP : CODE.y + 4;
         if (stage === 'enter') {
-          centre(art.text('TYPE OR PASTE A CODE - KEYBOARD ONLY', 1, 'silver', 'outline'), CODE.y - 8);
+          centre(art.text('TYPE OR PASTE A CODE - KEYBOARD ONLY', 1, 'silver', 'outline'), CODE.y);
           if (shown.lines.length === 0) shown.lines.push('');
         }
         shown.lines.forEach((line, i) => {
           const t = art.text(line, shown.scale, 'white', 'outline');
-          const y = CODE.y + 4 + i * shown.lineH;
+          const y = top + i * shown.lineH;
           if (line) centre(t, y);
           const last = i === shown.lines.length - 1;
           if (stage === 'enter' && last && Math.floor(nowS * CURSOR_BLINK_HZ * 2) % 2 === 0) {
@@ -197,8 +200,8 @@ export function createSaveCodeScene(ctx: GameContext, back: () => Scene): SaveCo
       if (status) centre(art.text(status, 1, status === BAD_CODE ? 'redLight' : 'volt', 'outline'), STATUS_Y);
       if (menu) drawMenu(g, art, menu, BASE_W / 2, MENU_TOP);
       if (stage === 'enter') {
-        drawButtonHint(g, art, art.buttons.START, 'ENTER: CHECK IT', BASE_W / 2 - 60, FOOTER_Y);
-        drawButtonHint(g, art, art.buttons.B, 'ESC: BACK', BASE_W / 2 + 70, FOOTER_Y);
+        // Keyboard only, so no pad buttons here.
+        centre(art.text('ENTER: CHECK IT    ESC: BACK', 1, 'silver', 'outline'), FOOTER_Y);
       } else {
         drawButtonHint(g, art, art.buttons.B, 'BACK', BASE_W / 2, FOOTER_Y);
       }

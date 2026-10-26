@@ -49,6 +49,9 @@ export function moveRow(p: Profile): string {
 /** What the Shop teaches once he owns the Energy Wave. */
 const WAVE_HOW_TO = 'HOLD Y WITH A FULL POWER METER';
 
+/** Why a buy didn't happen is red; how to use the move he's just bought isn't an error. */
+export const messageInk = (message: string): 'redLight' | 'volt' => (message === WAVE_HOW_TO ? 'volt' : 'redLight');
+
 /**
  * The four stats, then the Energy Wave under POWER MOVES. Up/down choose
  * one, A buys it at once and saves, B goes back.
@@ -149,7 +152,7 @@ export function createShopScene(ctx: GameContext, back: () => Scene): ShopScene 
       g.drawImage(art.text(moveRow(ctx.profile), 1, locked ? 'gray' : onWave ? 'energyGold' : 'white', 'outline'), x + PAD + CURSOR_GAP, MOVE_ROW_Y);
       const blurb = onWave ? POWER_MOVES.energyWave.blurb : STAT_INFO[STAT_NAMES[row]!].blurb;
       centre(art.text(blurb, 1, 'silver', 'outline'), BLURB_Y);
-      if (message) centre(art.text(message, 1, 'redLight', 'outline'), MESSAGE_Y);
+      if (message) centre(art.text(message, 1, messageInk(message), 'outline'), MESSAGE_Y);
       drawButtonHint(g, art, art.buttons.B, 'BACK', BASE_W / 2, FOOTER_Y);
     },
   };

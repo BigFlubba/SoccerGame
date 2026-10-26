@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { STAT_NAMES } from '../game/stats';
 import { newProfile } from '../meta/profile';
 import type { Scene } from './scene';
-import { createShopScene, moveRow, shopRow } from './shopScene';
+import { createShopScene, messageInk, moveRow, shopRow } from './shopScene';
 import { testContext } from './testContext';
 import { frame } from './testInput';
 
@@ -168,6 +168,14 @@ describe('shop: power moves', () => {
     ctx.audio.setCrowd('roar');
     createShopScene(ctx, () => BEHIND);
     expect(ctx.audio.crowd).toBe('off');
+  });
+});
+
+describe('shop messages', () => {
+  it('what went wrong is red; how to use the move is not', () => {
+    expect(messageInk('NEED 150 MORE')).toBe('redLight');
+    expect(messageInk('REACH LEVEL 3')).toBe('redLight');
+    expect(messageInk('HOLD Y WITH A FULL POWER METER')).toBe('volt');
   });
 });
 
