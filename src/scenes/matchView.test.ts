@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { DOG_DIFFICULTY } from '../game/dog';
 import { BASE_STATS } from '../game/stats';
 import { createWorld } from '../game/world';
 import type { GameArt } from './art';
@@ -20,6 +21,13 @@ describe('pitchDrawables', () => {
     expect(zs.filter(z => z === 18)).toHaveLength(4);
     expect(zs.filter(z => z === 46)).toHaveLength(4);
     expect(zs).toHaveLength(11);
+  });
+
+  it('with Biscuit carrying, the ball is in his frame, not drawn on its own', () => {
+    const w = createWorld(BASE_STATS, BASE_STATS, 1, { home: 4, away: 6 }, null, DOG_DIFFICULTY.normal);
+    expect(pitchDrawables(w, { x: 0 }, NO_ART)).toHaveLength(11);
+    w.dog!.carrying = true;
+    expect(pitchDrawables(w, { x: 0 }, NO_ART)).toHaveLength(10);
   });
 
   it('a player behind a goal is drawn before its net and crossbar', () => {

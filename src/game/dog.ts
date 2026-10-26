@@ -72,6 +72,8 @@ const DOG_GOAL = 'left';
 export interface DogState {
   profile: DogProfile;
   carrying: boolean;
+  /** Seconds he has carried the ball so far (0 when he hasn't it): the view shows the grab at first. */
+  carryS: number;
   /** Muzzle time on a controlled ball so far. */
   dwellS: number;
   /** Time left in the jink. */
@@ -95,12 +97,12 @@ export interface DogEvents {
 export const quietDog = (): DogEvents => ({ grabbed: false, dropped: false, jinked: false, panted: false });
 
 export function createDog(profile: DogProfile): DogState {
-  return { profile, carrying: false, dwellS: 0, jinkS: 0, jinkSide: 1, jinkCooldownS: 0, runS: 0, pantS: 0, regrabS: 0 };
+  return { profile, carrying: false, carryS: 0, dwellS: 0, jinkS: 0, jinkSide: 1, jinkCooldownS: 0, runS: 0, pantS: 0, regrabS: 0 };
 }
 
 /** Clears everything a kickoff starts afresh. */
 export function resetDog(d: DogState): void {
-  Object.assign(d, { carrying: false, dwellS: 0, jinkS: 0, pantS: 0, regrabS: 0 });
+  Object.assign(d, { carrying: false, carryS: 0, dwellS: 0, jinkS: 0, pantS: 0, regrabS: 0 });
 }
 
 export const dwellFor = (profile: DogProfile, control: number): number => profile.dwellS + DWELL_PER_CONTROL * (control - 1);
@@ -157,6 +159,7 @@ export function parkBall(w: World): void {
 export function dropBall(w: World, pop: boolean): void {
   const d = w.dog!;
   d.carrying = false;
+  d.carryS = 0;
   d.dwellS = 0;
   d.regrabS = Math.max(d.regrabS, REGRAB_S);
   parkBall(w);
@@ -212,6 +215,7 @@ function grab(w: World, d: DogState, dt: number, ev: DogEvents): void {
     if (d.dwellS < dwellFor(d.profile, w.home.stats.control)) return;
   }
   d.carrying = true;
+  d.carryS = 0;
   d.dwellS = 0;
   parkBall(w);
   ev.grabbed = true;
@@ -237,6 +241,7 @@ export function stepDog(w: World, intent: PlayerIntent, live: boolean, dt: numbe
   d.jinkCooldownS = Math.max(0, d.jinkCooldownS - dt);
   d.pantS = Math.max(0, d.pantS - dt);
   d.regrabS = Math.max(0, d.regrabS - dt);
+  if (d.carrying) d.carryS += dt;
   move(w, d, intent, dt);
   tire(w, d, dt, ev);
   grab(w, d, dt, ev);

@@ -11,16 +11,20 @@ import { HARRISON_HEADS, HARRISON_POWER_HEADS } from '../art/harrison/head';
 import { harrisonLook } from '../art/harrison/look';
 import { harrisonPortrait, type Expression } from '../art/harrison/portrait';
 import { IndexedImage, blit } from '../art/indexedImage';
+import { BISCUIT_FACE, BISCUIT_FRAMES, type DogAnim } from '../art/opponents/biscuit';
 import { MAX_HEADS, maxLook } from '../art/opponents/max';
 import { addOutline } from '../art/raster';
 import { backyardLayers, goalSprites, type GoalArt, type VenueLayers } from '../art/venues/backyard';
 import { toCanvas } from '../engine/bitmaps';
-import { SpriteCache } from '../engine/sprites';
+import { SpriteCache, type FacingFrames } from '../engine/sprites';
 
 export interface SpriteSet {
   right: Record<AnimName, HTMLCanvasElement[]>;
   left: Record<AnimName, HTMLCanvasElement[]>;
 }
+
+/** Biscuit's clips, facing right and left. */
+export type DogSprites = Record<DogAnim, FacingFrames>;
 
 /** A goal's sprites, placed at project(lineX, 0, 0, cam) + origin. */
 export interface GoalCanvases {
@@ -47,6 +51,10 @@ export interface GameArt {
   portraits: Record<Expression, HTMLCanvasElement>;
   /** Max's face, front on and outlined, for the venue screen's match panel. */
   maxFace: HTMLCanvasElement;
+  /** Biscuit the Dog, the Backyard's boss. */
+  biscuit: DogSprites;
+  /** His face, front on and outlined, for the boss node and the VS card. */
+  biscuitFace: HTMLCanvasElement;
   /** Outlined text, cached per string, scale and colours. */
   text(s: string, scale: number, ink: MasterColor, outline: MasterColor): HTMLCanvasElement;
 }
@@ -95,6 +103,10 @@ export function loadGameArt(): GameArt {
     away: spriteSet(cache, 'max', MAX_HEADS, maxLook()),
     portraits: Object.fromEntries(EXPRESSIONS.map(e => [e, toCanvas(harrisonPortrait(e), resolvePalette(harrisonLook('home')))])) as Record<Expression, HTMLCanvasElement>,
     maxFace: faceCanvas(MAX_HEADS.front, maxLook()),
+    biscuit: Object.fromEntries(
+      Object.entries(BISCUIT_FRAMES).map(([name, frames]) => [name, cache.frames(`biscuit/${name}`, () => ({ frames: [...frames], palette: master }))]),
+    ) as DogSprites,
+    biscuitFace: toCanvas(BISCUIT_FACE, master),
     text(s, scale, ink, outline) {
       const key = `${s}|${scale}|${ink}|${outline}`;
       let c = texts.get(key);

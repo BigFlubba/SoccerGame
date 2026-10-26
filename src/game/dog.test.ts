@@ -45,7 +45,9 @@ describe('the dog', () => {
     expect(w.dog!.carrying).toBe(true);
     expect(w.events.dog.grabbed).toBe(true);
     expect(w.events.kicks[1]?.touched).toBe(true);
+    expect(w.dog!.carryS).toBe(0);
     ticks(w, 10, still, run(-1));
+    expect(w.dog!.carryS).toBeCloseTo(10 * STEP);
     expect(w.ball.x).toBeCloseTo(w.away.x - MUZZLE.x, 0);
     expect(w.ball.y).toBe(-MUZZLE.y);
     expect([w.ball.vx, w.ball.vy, w.ball.vz]).toEqual([0, 0, 0]);

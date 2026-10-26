@@ -11,6 +11,7 @@ import { powerHint } from '../game/power';
 import type { World } from '../game/world';
 import type { GameArt, SpriteSet } from './art';
 import { depthSorted, type Drawable } from './depthSort';
+import { drawDog } from './dogView';
 import {
   POWER_METER_X0,
   auraStrength,
@@ -88,6 +89,8 @@ const PROMPT_BLINK_HZ = 8;
 /** The arrow is drawn 3 px either side of its x; this keeps a pixel's gap beside the meter. */
 const ARROW_CLEARANCE = 5;
 const SHADOW_W = 5;
+/** Biscuit is long: his shadow is a wider patch. */
+const DOG_SHADOW_W = 9;
 
 const ink = (g: CanvasRenderingContext2D, c: MasterColor) => (g.fillStyle = MASTER[c]);
 
@@ -112,11 +115,11 @@ function goalAt(cam: Camera, lineX: number, origin: { x: number; y: number }): {
   return { x: Math.round(at.sx + origin.x), y: Math.round(at.sy + origin.y) };
 }
 
-/** A 5×1 patch of dark grass on the ground under (x, z): shows how far back something is. */
-function drawShadow(g: CanvasRenderingContext2D, cam: Camera, x: number, z: number): void {
+/** A 5×1 patch (or `width`) of dark grass on the ground under (x, z): shows how far back something is. */
+function drawShadow(g: CanvasRenderingContext2D, cam: Camera, x: number, z: number, width = SHADOW_W): void {
   const s = screen(cam, x, 0, z);
   ink(g, 'grassDark');
-  g.fillRect(s.x - Math.floor(SHADOW_W / 2), s.y + 1, SHADOW_W, 1);
+  g.fillRect(s.x - Math.floor(width / 2), s.y + 1, width, 1);
 }
 
 type Clip = { name: AnimName; frame: number };
@@ -132,6 +135,12 @@ function drawPlayer(g: CanvasRenderingContext2D, cam: Camera, p: Player, art: Ga
   const s = screen(cam, p.x, p.y, p.z);
   const hop = clip.name === 'celebrate' && clip.frame === 1 ? CELEBRATE_HOP_PX : 0;
   g.drawImage(flat ? silhouette(frame) : frame, s.x - ANCHOR.x, s.y - ANCHOR.y - hop);
+}
+
+/** The away side: Max, or Biscuit when he's the opponent. */
+function drawAway(g: CanvasRenderingContext2D, cam: Camera, w: World, art: GameArt, nowS: number, flat = false): void {
+  if (w.dog) drawDog(g, cam, w, art, nowS, flat);
+  else drawPlayer(g, cam, w.away, art, w.away.anim, undefined, flat);
 }
 
 /**
@@ -185,7 +194,7 @@ const BEHIND = 1e-3;
  * Everything standing on the pitch, ready for the depth sort: both players,
  * the ball, and each goal's nets and posts. The nets come first, so at the
  * same depth a post is drawn over its net. While he's powered up, his aura
- * goes just behind him.
+ * goes just behind him. A ball Biscuit carries is part of his frame.
  */
 export function pitchDrawables(
   w: World,
@@ -221,9 +230,9 @@ export function pitchDrawables(
     ...goals,
     ...aura,
     { z: w.home.z, draw: g => drawPlayer(g, cam, w.home, art, home, art[look.set]) },
-    { z: w.away.z, draw: g => drawPlayer(g, cam, w.away, art) },
+    { z: w.away.z, draw: g => drawAway(g, cam, w, art, look.nowS) },
     // Last among equals: at his feet, the ball is drawn over his boots.
-    { z: w.ball.z, draw: g => drawBall(g, w, cam, art) },
+    ...(w.dog?.carrying ? [] : [{ z: w.ball.z, draw: (g: CanvasRenderingContext2D) => drawBall(g, w, cam, art) }]),
   ];
 }
 
@@ -318,9 +327,9 @@ function pitchShake(w: World, hud: MatchHud, nowS: number): { dx: number; dy: nu
 function drawImpact(g: CanvasRenderingContext2D, w: World, cam: Camera, art: GameArt, home: Clip, look: HomeLook): void {
   ink(g, 'white');
   g.fillRect(-8, -8, VIEW_W + 16, BASE_H + 16);
-  drawPlayer(g, cam, w.away, art, w.away.anim, undefined, true);
+  drawAway(g, cam, w, art, look.nowS, true);
   drawPlayer(g, cam, w.home, art, home, art[look.set], true);
-  drawBall(g, w, cam, art, true);
+  if (!w.dog?.carrying) drawBall(g, w, cam, art, true);
 }
 
 /**
@@ -340,15 +349,16 @@ export function drawMatch(g: CanvasRenderingContext2D, w: World, cam: Camera, ar
   g.save();
   g.translate(shake.dx, shake.dy);
   drawLayers(g, cam, art);
-  drawShadow(g, cam, w.ball.x, w.ball.z);
-  for (const p of [w.away, w.home]) drawShadow(g, cam, p.x, p.z);
+  if (!w.dog?.carrying) drawShadow(g, cam, w.ball.x, w.ball.z);
+  drawShadow(g, cam, w.away.x, w.away.z, w.dog ? DOG_SHADOW_W : SHADOW_W);
+  drawShadow(g, cam, w.home.x, w.home.z);
   drawSkid(g, cam, w.away);
   drawTrail(g, cam, hud.trail);
   for (const d of depthSorted(pitchDrawables(w, cam, art, home, look))) d.draw(g);
   if (w.wave) {
     drawBeam(g, cam, w.wave, nowS);
     // Braced, he stands in front of the beam's broken end.
-    if (w.wave.outcome === 'braced' && w.away.state === 'bracing') drawPlayer(g, cam, w.away, art);
+    if (w.wave.outcome === 'braced' && w.away.state === 'bracing') drawAway(g, cam, w, art, nowS);
   }
   if (hud.impactFrames > 0) {
     drawImpact(g, w, cam, art, home, look);
