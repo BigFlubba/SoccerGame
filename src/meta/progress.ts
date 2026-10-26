@@ -1,3 +1,4 @@
+import { POWER_MOVES, grantForms, moveStatus } from './catalog';
 import { LEVEL_UP_COINS, addXp, matchLines, matchXp, type MatchSummary, type RewardLine } from './economy';
 import { isChampion, nextMatch } from './ladder';
 import type { Profile } from './profile';
@@ -8,6 +9,9 @@ export interface Standing {
   level: number;
   xp: number;
 }
+
+/** Something a level-up just made available, announced on Results. */
+export type Unlock = 'energyWave' | 'goldenForm';
 
 /** Everything the Results screen shows about one match. */
 export interface MatchReward {
@@ -22,6 +26,8 @@ export interface MatchReward {
   after: Standing;
   /** The ladder match played, whether this result beat it, and whether he's champion now. */
   ladder: { match: number; beaten: boolean; champion: boolean };
+  /** What this match's level-ups unlocked, in the order to announce them. */
+  unlocked: Unlock[];
 }
 
 const standing = (p: Profile): Standing => ({ coins: p.coins, level: p.level, xp: p.xp });
@@ -38,7 +44,7 @@ export function applyMatch(p: Profile, s: MatchSummary, match: number, today: st
   const beaten = win && match === nextMatch(p.ladderWins) && !isChampion(p.ladderWins);
   const ladderWins = beaten ? p.ladderWins + 1 : p.ladderWins;
   const t = p.totals;
-  const profile: Profile = {
+  const profile: Profile = grantForms({
     ...p,
     coins: p.coins + coins,
     level: levels.level,
@@ -56,7 +62,11 @@ export function applyMatch(p: Profile, s: MatchSummary, match: number, today: st
       styleGoals: t.styleGoals + s.styleGoals.length,
       xpEarned: t.xpEarned + xp,
     },
-  };
+  });
+  const unlocked: Unlock[] = [];
+  const waveLevel = POWER_MOVES.energyWave.unlockLevel;
+  if (p.level < waveLevel && profile.level >= waveLevel && moveStatus(p, 'energyWave') !== 'owned') unlocked.push('energyWave');
+  if (!p.powerForms.owned.includes('golden') && profile.powerForms.owned.includes('golden')) unlocked.push('goldenForm');
   return {
     profile,
     reward: {
@@ -68,6 +78,7 @@ export function applyMatch(p: Profile, s: MatchSummary, match: number, today: st
       before: standing(p),
       after: standing(profile),
       ladder: { match, beaten, champion: isChampion(ladderWins) },
+      unlocked,
     },
   };
 }

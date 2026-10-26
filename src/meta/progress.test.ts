@@ -72,6 +72,25 @@ describe('applyMatch', () => {
     expect(reward.levelBonus).toBe(100);
   });
 
+  it('reaching level 3 announces the Energy Wave once', () => {
+    const first = applyMatch({ ...newProfile(), level: 2, xp: 140 }, win30, 1, TODAY);
+    expect(first.profile.level).toBe(3);
+    expect(first.reward.unlocked).toEqual(['energyWave']);
+    expect(applyMatch(first.profile, win30, 2, TODAY).reward.unlocked).toEqual([]);
+  });
+
+  it('jumping from level 2 to 6 announces both unlocks and grants Golden Form', () => {
+    const { profile, reward } = applyMatch({ ...newProfile(), level: 2, xp: 790 }, win30, 1, TODAY);
+    expect(profile.level).toBe(6);
+    expect(reward.unlocked).toEqual(['energyWave', 'goldenForm']);
+    expect(profile.powerForms).toEqual({ owned: ['golden'], equipped: 'golden' });
+  });
+
+  it('owning the move already means no Energy Wave unlock line', () => {
+    const owner: Profile = { ...newProfile(), level: 2, xp: 140, powerMoves: { owned: ['energyWave'], equipped: 'energyWave' } };
+    expect(applyMatch(owner, win30, 1, TODAY).reward.unlocked).toEqual([]);
+  });
+
   it('applyMatch does not change its input', () => {
     const p = { ...newProfile(), coins: 40 };
     const copy = structuredClone(p);

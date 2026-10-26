@@ -39,6 +39,15 @@ describe('match rewards', () => {
     ]);
   });
 
+  it('an Energy Wave goal is a style line worth 15', () => {
+    expect(pairs({ result: 'win', goalsFor: 2, goalsAgainst: 1, styleGoals: ['wave', 'chip'] })).toEqual([
+      ['WIN', 60],
+      ['2 GOALS', 20],
+      ['CHIP', 15],
+      ['ENERGY WAVE', 15],
+    ]);
+  });
+
   it('a loss with no goals still pays', () => {
     expect(pairs({ result: 'lose', goalsFor: 0, goalsAgainst: 3, styleGoals: [] })).toEqual([['LOSS', 15]]);
   });
@@ -100,6 +109,14 @@ describe('the shop', () => {
     expect(canUpgrade({ ...newProfile(), coins: 150 })).toBe(true);
     expect(canUpgrade({ ...newProfile(), coins: 149 })).toBe(false);
     expect(canUpgrade({ ...newProfile(), coins: 99999, stats: { speed: 10, power: 10, jump: 10, control: 10 } })).toBe(false);
+  });
+
+  it('the Energy Wave counts as an upgrade only when unlocked and affordable', () => {
+    const maxed = { ...newProfile(), stats: { speed: 10, power: 10, jump: 10, control: 10 } };
+    expect(canUpgrade({ ...maxed, level: 2, coins: 600 })).toBe(false);
+    expect(canUpgrade({ ...maxed, level: 3, coins: 599 })).toBe(false);
+    expect(canUpgrade({ ...maxed, level: 3, coins: 600 })).toBe(true);
+    expect(canUpgrade({ ...maxed, level: 3, coins: 600, powerMoves: { owned: ['energyWave'], equipped: 'energyWave' } })).toBe(false);
   });
 
   it('cheapestUpgrade ignores maxed stats', () => {

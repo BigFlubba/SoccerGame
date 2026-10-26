@@ -1,8 +1,9 @@
 import { MAX_STAT_LEVEL, STAT_NAMES, type StatName } from '../game/stats';
+import { POWER_MOVES, moveStatus } from './catalog';
 import type { Profile } from './profile';
 
-/** The goals that pay a style bonus. The bicycle kick and power moves join when they're built. */
-export type StyleKind = 'header' | 'volley' | 'chip';
+/** The goals that pay a style bonus. The bicycle kick and other power moves join when they're built. */
+export type StyleKind = 'header' | 'volley' | 'chip' | 'wave';
 
 /** A finished match, from Harrison's side. */
 export interface MatchSummary {
@@ -28,11 +29,12 @@ export const LEVEL_UP_COINS = 50;
 
 const RESULT_LABEL = { win: 'WIN', draw: 'DRAW', lose: 'LOSS' } as const;
 const DAILY_WIN_LABEL = 'FIRST WIN TODAY';
-const STYLE_ORDER: readonly StyleKind[] = ['header', 'volley', 'chip'];
+const STYLE_ORDER: readonly StyleKind[] = ['header', 'volley', 'chip', 'wave'];
 const STYLE_LABEL: Record<StyleKind, [one: string, many: string]> = {
   header: ['HEADER', 'HEADERS'],
   volley: ['VOLLEY', 'VOLLEYS'],
   chip: ['CHIP', 'CHIPS'],
+  wave: ['ENERGY WAVE', 'ENERGY WAVES'],
 };
 
 /** XP needed to go from `level` to the next: 100, then 50 more each level. */
@@ -91,10 +93,11 @@ export function cheapestUpgrade(p: Profile): number | null {
   return prices.length ? Math.min(...prices) : null;
 }
 
-/** He can afford at least one upgrade now. */
+/** He can afford at least one upgrade now: a stat, or the Energy Wave once it's unlocked. */
 export function canUpgrade(p: Profile): boolean {
   const cheapest = cheapestUpgrade(p);
-  return cheapest !== null && p.coins >= cheapest;
+  if (cheapest !== null && p.coins >= cheapest) return true;
+  return moveStatus(p, 'energyWave') === 'buy' && p.coins >= POWER_MOVES.energyWave.price;
 }
 
 /** The profile after buying one level of `stat`, or null when it's maxed or he can't afford it. Never changes `p`. */

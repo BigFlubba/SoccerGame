@@ -53,7 +53,7 @@ const HAT_TRICK_ROAR_S = 1.2;
 /** A fresh seed per match so every game plays differently. */
 export const newSeed = (): number => Math.floor(Math.random() * 2 ** 32);
 
-const isStyle = (kind: LastKick['kind']): kind is StyleKind => kind === 'header' || kind === 'volley' || kind === 'chip';
+const isStyle = (kind: LastKick['kind']): kind is Extract<StyleKind, LastKick['kind']> => kind === 'header' || kind === 'volley' || kind === 'chip';
 
 /** Harrison's intent from the controller: the stick moves and aims, buttons act. */
 function harrisonIntent(input: InputFrame): PlayerIntent {
