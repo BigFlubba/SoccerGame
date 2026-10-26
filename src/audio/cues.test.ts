@@ -54,5 +54,18 @@ describe('cue recipes', () => {
     expect(CUES.buy.voices.length).toBeGreaterThanOrEqual(2);
     expect(Math.max(...CUES.nope.voices.map(v => v.freq))).toBeLessThan(CUES.menuBack.voices[0]!.freq);
   });
+
+  it('the power cues are short and no louder than a hard kick', () => {
+    for (const cue of ['powerUp', 'waveBlast', 'beam', 'brace', 'whoosh'] as const) {
+      expect(loudest(cue), cue).toBeLessThanOrEqual(loudest('kickHard'));
+      for (const v of CUES[cue].voices) expect((v.at ?? 0) + v.dur, cue).toBeLessThanOrEqual(1.1);
+    }
+  });
+
+  it('the power-up hum rises over about a second', () => {
+    const hum = CUES.powerUp.voices[0]!;
+    expect(hum.dur).toBeGreaterThanOrEqual(0.9);
+    expect(hum.toFreq! / hum.freq).toBeGreaterThanOrEqual(3);
+  });
 });
 

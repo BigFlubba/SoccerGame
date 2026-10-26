@@ -11,15 +11,39 @@ export interface MatchFeedback {
   rumble: RumbleKind[];
 }
 
+/** The power-up's rumble steps up as the charge passes these. */
+const CHARGE_STEPS: readonly [at: number, kind: RumbleKind][] = [
+  [1 / 3, 'charge2'],
+  [2 / 3, 'charge3'],
+];
+
 /**
  * The sounds and rumbles one tick's events make. The kicks are [home, away].
  * The rumble only ever reflects what Harrison feels. A ball resting against
  * the net reports a hit every tick, so the net only sounds on a goal.
+ * `prevCharge` is his charge before the tick, so the power-up's rumble can
+ * step up as it builds.
  */
-export function matchFeedback(w: World, prevPhase: Phase): MatchFeedback {
+export function matchFeedback(w: World, prevPhase: Phase, prevCharge = 0): MatchFeedback {
   const cues = new Set<Cue>();
   const rumble = new Set<RumbleKind>();
-  const { ball, kicks, goal } = w.events;
+  const { ball, kicks, goal, power } = w.events;
+  if (power.started) {
+    cues.add('powerUp').add('ooh');
+    rumble.add('charge1');
+  }
+  if (w.home.state === 'poweringUp') {
+    for (const [at, kind] of CHARGE_STEPS) if (prevCharge < at && w.home.charge >= at) rumble.add(kind);
+  }
+  if (power.fired) {
+    cues.add('waveBlast').add('beam');
+    rumble.add('wave');
+  }
+  if (power.braced) {
+    cues.add('brace');
+    rumble.add('brace');
+  }
+  if (power.blown) cues.add('whoosh');
   const hard = Math.hypot(w.ball.vx, w.ball.vy, w.ball.vz) >= HARD_KICK_SPEED;
   kicks.forEach((k, i) => {
     if (k.kicked) {

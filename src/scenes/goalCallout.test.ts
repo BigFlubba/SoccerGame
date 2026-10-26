@@ -62,3 +62,24 @@ describe('goalCallout', () => {
     expect(goalCallout(kick({ perfect: true, distance: 400 }), 1)).toBe('PERFECT STRIKE!');
   });
 });
+
+describe('the Energy Wave callout', () => {
+  const fired = (w: World) => {
+    w.events.power = { ...w.events.power, fired: true };
+    return w;
+  };
+
+  it('firing the wave makes it his last kick', () => {
+    expect(noteKick(null, fired(world({}, {}, 300)))).toEqual({ kind: 'wave', perfect: false, distance: 612 - 300 });
+  });
+
+  it('a wave goal is ENERGY WAVE!, even as the third goal', () => {
+    expect(goalCallout(kick({ kind: 'wave' }), 1)).toBe('ENERGY WAVE!');
+    expect(goalCallout(kick({ kind: 'wave', distance: 400 }), HAT_TRICK_GOALS)).toBe('ENERGY WAVE!');
+  });
+
+  it('Max touching the ball after a wave clears it', () => {
+    expect(noteKick(kick({ kind: 'wave' }), world({}, { touched: true }))).toBeNull();
+  });
+});
+

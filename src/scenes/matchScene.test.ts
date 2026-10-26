@@ -534,3 +534,96 @@ describe('match scene: pause menu screens', () => {
     });
   });
 });
+
+describe('match scene: the Energy Wave', () => {
+  /** A profile that owns the move, optionally in Golden Form. */
+  const owner = (golden = false) => ({
+    ...newProfile(),
+    level: golden ? 5 : 3,
+    powerMoves: { owned: ['energyWave' as const], equipped: 'energyWave' as const },
+    powerForms: golden ? { owned: ['golden' as const], equipped: 'golden' as const } : { owned: [], equipped: null },
+  });
+
+  /** In play with a full meter, Harrison on the ball facing Max's goal, Max far behind him. */
+  function ready(golden = false) {
+    const ctx = testContext({ profile: owner(golden) });
+    const s = createMatchScene(ctx, 1);
+    s.world.match.phase = 'playing';
+    s.world.power!.meter = 1;
+    Object.assign(s.world.home, { x: 300, z: 32, facing: 1 });
+    Object.assign(s.world.away, { x: 100, z: 6 });
+    Object.assign(s.world.ball, { x: 308, y: 3, z: 32, vx: 0, vy: 0, vz: 0 });
+    return { s, ctx };
+  }
+
+  /** Holds power through a full charge, then lets go. */
+  function fire(s: MatchScene): void {
+    s.update(frame(['power']), STEP);
+    run(s, 1.1, ['power']);
+    s.update(frame(), STEP);
+  }
+
+  it('without the move, the world has no power', () => {
+    expect(createMatchScene(testContext(), 1).world.power).toBeNull();
+  });
+
+  it('with the move owned, holding power with a full meter powers up', () => {
+    const { s } = ready();
+    s.update(frame(['power']), STEP);
+    run(s, 0.3, ['power']);
+    expect(s.world.home.state).toBe('poweringUp');
+  });
+
+  it('pausing mid power-up cancels it and keeps the meter; on resume, a held Y needs a fresh press', () => {
+    const { s } = ready();
+    s.update(frame(['power']), STEP);
+    run(s, 1.2, ['power']);
+    s.update(frame(['pause'], ['power']), STEP);
+    expect(s.world.home.state).toBe('ground');
+    expect(s.world.power?.meter).toBe(1);
+    s.update(frame(['confirm'], ['power']), STEP);
+    run(s, 0.3, ['power']);
+    expect(s.world.home.state).toBe('ground');
+    expect(s.world.wave).toBeNull();
+  });
+
+  it('firing plays the blast, rumbles and owes a flash and impact frames', () => {
+    const { s, ctx } = ready();
+    fire(s);
+    expect(s.world.wave).not.toBeNull();
+    expect(ctx.audio.played).toEqual(expect.arrayContaining(['powerUp', 'waveBlast', 'beam']));
+    expect(ctx.rumble.pulses).toEqual(expect.arrayContaining(['charge1', 'charge2', 'charge3', 'wave']));
+    expect(s.flash).toBe(true);
+  });
+
+  it('a wave goal pays the style bonus and shows ENERGY WAVE!', () => {
+    const { s } = ready();
+    fire(s);
+    let n = 0;
+    while (!s.moment && n++ < 60) s.update(frame(), STEP);
+    expect(s.callout).toBe('ENERGY WAVE!');
+    run(s, 4);
+    s.world.match.clockS = 89.99;
+    run(s, 3);
+    expect(s.reward!.summary.styleGoals).toEqual(['wave']);
+  });
+
+  it('a Golden Form wave goal celebrates golden, and the gold clears with the moment', () => {
+    const { s } = ready(true);
+    fire(s);
+    let n = 0;
+    while (!s.moment && n++ < 60) s.update(frame(), STEP);
+    expect(s.goldenCelebration).toBe(true);
+    run(s, 4);
+    expect(s.goldenCelebration).toBe(false);
+  });
+
+  it('a wave goal without Golden Form celebrates in his normal look', () => {
+    const { s } = ready();
+    fire(s);
+    let n = 0;
+    while (!s.moment && n++ < 60) s.update(frame(), STEP);
+    expect(s.goldenCelebration).toBe(false);
+  });
+});
+

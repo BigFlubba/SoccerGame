@@ -2,7 +2,7 @@ import type { World } from '../game/world';
 
 /** Harrison's last kick, while the ball is still his: what it was and how far from Max's goal line. */
 export interface LastKick {
-  kind: 'shot' | 'chip' | 'volley' | 'header';
+  kind: 'shot' | 'chip' | 'volley' | 'header' | 'wave';
   perfect: boolean;
   distance: number;
 }
@@ -20,15 +20,15 @@ export function noteKick(last: LastKick | null, w: World): LastKick | null {
   const [home, away] = w.events.kicks;
   if (away && (away.touched || away.kicked || away.tackledBall)) return null;
   if (!home) return last;
-  if (home.kicked) {
-    const goal = w.field.goals.find(g => g.side === 'right')!;
-    return { kind: home.kicked, perfect: home.perfect, distance: Math.abs(goal.lineX - w.ball.x) };
-  }
+  const goal = w.field.goals.find(g => g.side === 'right')!;
+  if (w.events.power.fired) return { kind: 'wave', perfect: false, distance: Math.abs(goal.lineX - w.ball.x) };
+  if (home.kicked) return { kind: home.kicked, perfect: home.perfect, distance: Math.abs(goal.lineX - w.ball.x) };
   return home.touched ? null : last;
 }
 
 /** The line under GOAL!!! that names Harrison's goal, if it was special. */
 export function goalCallout(kick: LastKick | null, homeGoals: number): string | null {
+  if (kick?.kind === 'wave') return 'ENERGY WAVE!';
   if (homeGoals === HAT_TRICK_GOALS) return 'HAT-TRICK!';
   if (!kick) return null;
   if (kick.perfect) return 'PERFECT STRIKE!';

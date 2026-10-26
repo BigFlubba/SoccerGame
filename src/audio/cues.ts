@@ -20,7 +20,12 @@ export type Cue =
   | 'coin'
   | 'buy'
   | 'levelUp'
-  | 'nope';
+  | 'nope'
+  | 'powerUp'
+  | 'waveBlast'
+  | 'beam'
+  | 'brace'
+  | 'whoosh';
 
 export type Wave = 'square' | 'triangle' | 'noise';
 
@@ -151,4 +156,38 @@ export const CUES: Readonly<Record<Cue, CueRecipe>> = {
     minGapS: 1,
   },
   nope: { voices: [{ wave: 'square', dur: 0.16, gain: 0.1, freq: 140, toFreq: 110, filter: { type: 'lowpass' } }], minGapS: 0.15 },
+  /** The power-up's hum, rising with the charge over its second, with a shimmer on top. */
+  powerUp: {
+    voices: [
+      { wave: 'square', dur: 1, gain: 0.08, attack: 0.15, hold: 0.7, freq: 110, toFreq: 440, filter: { type: 'lowpass', q: 3 }, vibrato: { hz: 9, depth: 6 } },
+      { wave: 'noise', dur: 1, gain: 0.06, attack: 0.5, hold: 0.4, freq: 2000, toFreq: 5000, filter: { type: 'bandpass', q: 4 } },
+    ],
+    minGapS: 0.5,
+  },
+  /** The release: a deep boom with a crack of noise. */
+  waveBlast: {
+    voices: [
+      { wave: 'noise', dur: 0.3, gain: 0.6, freq: 2500, toFreq: 300, filter: { type: 'lowpass' } },
+      { wave: 'triangle', dur: 0.35, gain: 0.8, freq: 120, toFreq: 40 },
+    ],
+    minGapS: 0.3,
+  },
+  /** The beam's roar as it crosses the screen. */
+  beam: {
+    voices: [
+      { wave: 'noise', at: 0.05, dur: 0.4, gain: 0.35, attack: 0.05, hold: 0.15, freq: 1200, toFreq: 2400, filter: { type: 'bandpass', q: 1.2 } },
+      { wave: 'square', at: 0.05, dur: 0.4, gain: 0.06, attack: 0.05, freq: 220, toFreq: 330, filter: { type: 'lowpass' } },
+    ],
+    minGapS: 0.3,
+  },
+  /** Max braced: a heavy thud, and the scrape of his skid. */
+  brace: {
+    voices: [
+      { wave: 'triangle', dur: 0.2, gain: 0.75, freq: 90, toFreq: 40 },
+      { wave: 'noise', at: 0.04, dur: 0.45, gain: 0.25, freq: 900, toFreq: 300, filter: { type: 'bandpass', q: 0.8 } },
+    ],
+    minGapS: 0.3,
+  },
+  /** Max blown off his feet. */
+  whoosh: { voices: [{ wave: 'noise', dur: 0.35, gain: 0.3, attack: 0.08, freq: 600, toFreq: 2200, filter: { type: 'bandpass', q: 1.5 } }], minGapS: 0.3 },
 };

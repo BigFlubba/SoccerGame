@@ -25,12 +25,18 @@ describe('rumble', () => {
     expect(live.effects).toEqual([{ type: 'dual-rumble', params: { duration: 700, strongMagnitude: 1, weakMagnitude: 0.8 } }]);
   });
 
-  it('has a pulse for every kind, short except the goal', () => {
+  it('has a pulse for every kind, short except the goal and the Energy Wave', () => {
     for (const [kind, p] of Object.entries(RUMBLE)) {
-      expect(p.ms, kind).toBeLessThanOrEqual(kind === 'goal' ? 700 : 150);
+      expect(p.ms, kind).toBeLessThanOrEqual(kind === 'goal' || kind === 'wave' ? 700 : 150);
       expect(p.strong, kind).toBeLessThanOrEqual(1);
       expect(p.weak, kind).toBeLessThanOrEqual(1);
     }
+  });
+
+  it('the charge rumble rises in three steps', () => {
+    expect(RUMBLE.charge1.strong).toBeLessThan(RUMBLE.charge2.strong);
+    expect(RUMBLE.charge2.strong).toBeLessThan(RUMBLE.charge3.strong);
+    expect(RUMBLE.wave.strong).toBe(1);
   });
 
   it('does nothing when disabled', () => {

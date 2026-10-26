@@ -7,6 +7,7 @@ import { HUMAN_AIM_ERROR_DEG, type Aim } from '../game/kick';
 import { cancelCharge, type PlayerIntent } from '../game/player';
 import { endGoalPause } from '../game/match';
 import { createWorld, stepWorld, type World } from '../game/world';
+import { powerKit } from '../meta/catalog';
 import type { StyleKind } from '../meta/economy';
 import { maxStats, nextMatch } from '../meta/ladder';
 import { applyMatch, type MatchReward } from '../meta/progress';
@@ -16,6 +17,7 @@ import { HAT_TRICK_GOALS, goalCallout, noteKick, type LastKick } from './goalCal
 import { createGoalMoment, simScale, stepGoalMoment, type GoalMoment } from './goalMoment';
 import { stepTrail, type TrailPoint } from './shotTrail';
 import { drawMatch, type MatchHud } from './matchView';
+import { BRACE_SHAKE, WAVE_SHAKE } from './powerView';
 import type { Scene } from './scene';
 import { createHelpScene } from './helpScene';
 import { createOptionsScene } from './optionsScene';
@@ -39,6 +41,8 @@ export interface MatchScene extends Scene {
   readonly reward: MatchReward | null;
   /** The goal flash is owed to the next drawn frame. */
   readonly flash: boolean;
+  /** He celebrates this goal in Golden Form's gold: an Energy Wave goal in Golden Form. */
+  readonly goldenCelebration: boolean;
 }
 
 export const PAUSE_ITEMS = ['RESUME', 'RESTART', 'HELP', 'OPTIONS', 'QUIT TO HUB'] as const;
@@ -49,11 +53,14 @@ const PERFECT_SHOW_S = 0.6;
 const AIM_THRESHOLD = 0.5;
 /** A hat-trick's second roar comes in this long (real seconds) into the moment. */
 const HAT_TRICK_ROAR_S = 1.2;
+/** A fired wave shows this many high-contrast impact frames. */
+const IMPACT_FRAMES = 2;
 
 /** A fresh seed per match so every game plays differently. */
 export const newSeed = (): number => Math.floor(Math.random() * 2 ** 32);
 
-const isStyle = (kind: LastKick['kind']): kind is Extract<StyleKind, LastKick['kind']> => kind === 'header' || kind === 'volley' || kind === 'chip';
+const isStyle = (kind: LastKick['kind']): kind is Extract<StyleKind, LastKick['kind']> =>
+  kind === 'header' || kind === 'volley' || kind === 'chip' || kind === 'wave';
 
 /** Harrison's intent from the controller: the stick moves and aims, buttons act. */
 function harrisonIntent(input: InputFrame): PlayerIntent {
@@ -81,12 +88,18 @@ export function createMatchScene(ctx: GameContext, seed: number): MatchScene {
   let difficulty = ctx.settings.difficulty;
   const thinking = DIFFICULTY[difficulty];
   const ladderMatch = nextMatch(ctx.profile.ladderWins);
-  const world = createWorld({ ...ctx.profile.stats }, maxStats(ladderMatch), seed, { home: HUMAN_AIM_ERROR_DEG, away: thinking.aimErrorDeg });
+  const world = createWorld(
+    { ...ctx.profile.stats },
+    maxStats(ladderMatch),
+    seed,
+    { home: HUMAN_AIM_ERROR_DEG, away: thinking.aimErrorDeg },
+    powerKit(ctx.profile),
+  );
   const brain = createBrain(thinking);
   const cam: Camera = { x: world.ball.x - BASE_W / 2 };
   const hud: MatchHud = { perfect: null, moment: null, callout: null, trail: [], flash: false, shake: null, impactFrames: 0, goldenCelebration: false };
   let lastKick: LastKick | null = null;
-  /** Harrison's header, volley and chip goals, for the style bonus. */
+  /** Harrison's header, volley, chip and Energy Wave goals, for the style bonus. */
   const styleGoals: StyleKind[] = [];
   let pause: MenuState | null = null;
   let reward: MatchReward | null = null;
@@ -150,6 +163,9 @@ export function createMatchScene(ctx: GameContext, seed: number): MatchScene {
     get flash() {
       return hud.flash;
     },
+    get goldenCelebration() {
+      return hud.goldenCelebration;
+    },
     onHidden() {
       if (!pause && world.match.phase !== 'fullTime') openPause();
     },
@@ -182,13 +198,20 @@ export function createMatchScene(ctx: GameContext, seed: number): MatchScene {
       const simDt = dt * (moment ? simScale(moment) : 1);
       if (simDt > 0) {
         const prevPhase = world.match.phase;
+        const prevCharge = world.home.charge;
         stepWorld(world, harrisonIntent(input), think(brain, world, world.away, world.home, simDt), simDt);
-        const feedback = matchFeedback(world, prevPhase);
+        const feedback = matchFeedback(world, prevPhase, prevCharge);
         for (const cue of feedback.cues) ctx.audio.play(cue);
         for (const kind of feedback.rumble) ctx.rumble.pulse(kind);
         world.events.kicks.forEach((k, i) => {
           if (k.perfect) hud.perfect = { team: i === 0 ? 'home' : 'away', untilS: t + PERFECT_SHOW_S };
         });
+        if (world.events.power.fired) {
+          hud.flash = true;
+          hud.impactFrames = IMPACT_FRAMES;
+          hud.shake = { px: WAVE_SHAKE.px, untilS: t + WAVE_SHAKE.s };
+        }
+        if (world.events.power.braced) hud.shake = { px: BRACE_SHAKE.px, untilS: t + BRACE_SHAKE.s };
         updateCamera(cam, world.ball, simDt, world.field);
         stepTrail(hud.trail, world.ball);
         lastKick = noteKick(lastKick, world);
@@ -197,6 +220,8 @@ export function createMatchScene(ctx: GameContext, seed: number): MatchScene {
           hud.flash = true;
           hud.callout = goalCallout(lastKick, world.match.score.home);
           if (lastKick && isStyle(lastKick.kind)) styleGoals.push(lastKick.kind);
+          // Forms show while powered up and celebrating: an Energy Wave goal in Golden Form keeps the gold.
+          hud.goldenCelebration = lastKick?.kind === 'wave' && world.power?.golden === true;
           // The roar cue swells; the crowd holds it through the celebration.
           ctx.audio.setCrowd('roar');
         }
@@ -213,6 +238,7 @@ export function createMatchScene(ctx: GameContext, seed: number): MatchScene {
           endGoalPause(world.match);
           hud.moment = null;
           hud.callout = null;
+          hud.goldenCelebration = false;
           ctx.audio.setCrowd('match');
         }
       }

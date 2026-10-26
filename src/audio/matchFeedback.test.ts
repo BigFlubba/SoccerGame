@@ -105,3 +105,38 @@ describe('matchFeedback', () => {
     expect(matchFeedback(w, 'fullTime').cues).toEqual([]);
   });
 });
+
+describe('matchFeedback: the power-up', () => {
+  const powered = (flags: Partial<World['events']['power']>): World => {
+    const w = world();
+    w.events.power = { started: false, cancelled: false, fired: false, braced: false, blown: false, ...flags };
+    return w;
+  };
+
+  it('starting a power-up hums, gasps and rumbles', () => {
+    expect(matchFeedback(powered({ started: true }), 'playing')).toEqual({ cues: ['powerUp', 'ooh'], rumble: ['charge1'] });
+  });
+
+  it('the charge rumble steps up at a third and two thirds', () => {
+    const w = powered({});
+    Object.assign(w.home, { state: 'poweringUp', charge: 0.34 });
+    expect(matchFeedback(w, 'playing', 0.32).rumble).toEqual(['charge2']);
+    Object.assign(w.home, { charge: 0.67 });
+    expect(matchFeedback(w, 'playing', 0.66).rumble).toEqual(['charge3']);
+    Object.assign(w.home, { charge: 0.5 });
+    expect(matchFeedback(w, 'playing', 0.48).rumble).toEqual([]);
+  });
+
+  it('firing blasts, roars and rumbles hard', () => {
+    expect(matchFeedback(powered({ fired: true }), 'playing')).toEqual({ cues: ['waveBlast', 'beam'], rumble: ['wave'] });
+  });
+
+  it('a brace thuds and rumbles', () => {
+    expect(matchFeedback(powered({ braced: true }), 'playing')).toEqual({ cues: ['brace'], rumble: ['brace'] });
+  });
+
+  it('Max blown away whooshes', () => {
+    expect(matchFeedback(powered({ blown: true }), 'playing')).toEqual({ cues: ['whoosh'], rumble: [] });
+  });
+});
+
