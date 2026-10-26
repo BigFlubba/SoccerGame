@@ -1,9 +1,10 @@
 import type { CareerMatch } from '../meta/career';
 import type { GameContext } from './context';
-import { createMatchScene, newSeed } from './matchScene';
+import { createHubScene } from './hubScene';
 import type { Scene } from './scene';
+import { createVsScene } from './vsScene';
 
-/** The one way into a career match. For now, straight to the match; the VS card goes in front of it next. */
+/** The one way into a career match: the VS card, then the match. B on the card goes back out. */
 export function startMatch(ctx: GameContext, match: CareerMatch): Scene {
-  return createMatchScene(ctx, newSeed(), match);
+  return createVsScene(ctx, match, () => createHubScene(ctx));
 }

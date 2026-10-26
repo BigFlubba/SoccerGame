@@ -4,11 +4,11 @@ import type { GoalRecord, MatchSummary } from '../meta/economy';
 import { nextMatch } from '../meta/ladder';
 import { newProfile, type Profile } from '../meta/profile';
 import { applyMatch } from '../meta/progress';
-import type { MatchScene } from './matchScene';
 import { LINE_S, SKIP_GRACE_S, STAR_S, XP_FILL_S, bonusLine, careerLine, createResultsScene, footLines, milestoneLines, resultsItems, tallyAt, unlockLines, type ResultsScene } from './resultsScene';
 import type { ShopScene } from './shopScene';
 import { TEST_TODAY, testContext } from './testContext';
 import { frame } from './testInput';
+import type { VsScene } from './vsScene';
 
 const STEP = 1 / 60;
 const WIN_3_0: MatchSummary = { result: 'win', goalsFor: 3, goalsAgainst: 0, styleGoals: [], goals: [] };
@@ -151,8 +151,8 @@ describe('results screen', () => {
     const s = createResultsScene(ctx, reward);
     run(s, 5);
     expect(s.menu!.items).toEqual(['NEXT MATCH', 'SHOP', 'HUB']);
-    const next = s.update(frame(['confirm']), STEP) as MatchScene;
-    expect(next.kind).toBe('match');
+    const next = s.update(frame(['confirm']), STEP) as VsScene;
+    expect(next.kind).toBe('vs');
     expect(next.match.rung).toBe(nextMatch(ctx.profile.ladderWins));
     expect(next.match.id).toBe('backyard-2');
     expect(ctx.savedProfiles).toHaveLength(0);
@@ -162,7 +162,7 @@ describe('results screen', () => {
     const { ctx, reward } = after(LOSS_0_2, { ...newProfile(), ladderWins: 4 });
     expect(resultsItems(reward)).toEqual(['TRY AGAIN', 'SHOP', 'HUB']);
     const s = createResultsScene(ctx, reward, true);
-    expect((s.update(frame(['confirm']), STEP) as MatchScene).match.id).toBe('backyard-5');
+    expect((s.update(frame(['confirm']), STEP) as VsScene).match.id).toBe('backyard-5');
   });
 
   it('SHOP and back returns to Results, done, with no second save', () => {
@@ -223,7 +223,7 @@ describe('results screen', () => {
   it('Start confirms once the tally is done', () => {
     const { ctx, reward } = after(WIN_3_0);
     const s = createResultsScene(ctx, reward, true);
-    expect(s.update(frame(['pause']), STEP)?.kind).toBe('match');
+    expect(s.update(frame(['pause']), STEP)?.kind).toBe('vs');
   });
 });
 
@@ -260,10 +260,10 @@ describe('careerLine', () => {
     const next = after(WIN_3_0, { ...newProfile(), ladderWins: 3 }, matchById('backyard-1')!);
     expect(resultsItems(next.reward)[0]).toBe('NEXT MATCH');
     const s = createResultsScene(next.ctx, next.reward, true);
-    expect((s.update(frame(['confirm']), STEP) as MatchScene).match.id).toBe('backyard-4');
+    expect((s.update(frame(['confirm']), STEP) as VsScene).match.id).toBe('backyard-4');
     const lost = after(LOSS_0_2, { ...newProfile(), ladderWins: 10 }, boss);
     expect(resultsItems(lost.reward)[0]).toBe('TRY AGAIN');
-    expect((createResultsScene(lost.ctx, lost.reward, true).update(frame(['confirm']), STEP) as MatchScene).match.id).toBe('backyard-boss');
+    expect((createResultsScene(lost.ctx, lost.reward, true).update(frame(['confirm']), STEP) as VsScene).match.id).toBe('backyard-boss');
     const done = after(WIN_3_0, { ...newProfile(), ladderWins: 10 }, boss);
     expect(resultsItems(done.reward)).toEqual(['CAREER', 'SHOP', 'HUB']);
     expect(createResultsScene(done.ctx, done.reward, true).update(frame(['confirm']), STEP)?.kind).toBe('hub');
@@ -301,6 +301,6 @@ describe('results: unlocks and the skip grace', () => {
     const s = createResultsScene(ctx, reward);
     s.update(frame(['confirm']), STEP);
     run(s, SKIP_GRACE_S + 0.05);
-    expect(s.update(frame(['confirm']), STEP)?.kind).toBe('match');
+    expect(s.update(frame(['confirm']), STEP)?.kind).toBe('vs');
   });
 });
