@@ -7,9 +7,23 @@ import { VIEW_W, offscreenArrow, project, type Camera } from '../game/camera';
 import { SWEET_SPOT } from '../game/kick';
 import { clockMinute, type Team } from '../game/match';
 import type { Player } from '../game/player';
+import { powerHint } from '../game/power';
 import type { World } from '../game/world';
-import type { GameArt } from './art';
+import type { GameArt, SpriteSet } from './art';
 import { depthSorted, type Drawable } from './depthSort';
+import {
+  POWER_METER_X0,
+  auraStrength,
+  drawAura,
+  drawBeam,
+  drawDebris,
+  drawPowerBar,
+  drawPowerMeter,
+  drawSkid,
+  homeSprites,
+  shakeFor,
+  silhouette,
+} from './powerView';
 import type { TrailPoint } from './shotTrail';
 import { BANNER_FROM_S, CELEBRATE_FROM_S, bannerShown, celebrating, shakeOffset, type GoalMoment } from './goalMoment';
 
@@ -23,8 +37,14 @@ export interface MatchHud {
   callout: string | null;
   /** Where a hard-hit ball has just been, newest first. */
   trail: TrailPoint[];
-  /** A white flash is owed to the next drawn frame (set when his goal moment starts). */
+  /** A white flash is owed to the next drawn frame (set when his goal moment starts, or a wave fires). */
   flash: boolean;
+  /** A power shake running until untilS (a fired wave, a brace). */
+  shake: { px: number; untilS: number } | null;
+  /** Drawn frames left of the high-contrast impact silhouettes, as a wave fires. */
+  impactFrames: number;
+  /** He celebrates an Energy Wave goal in Golden Form's gold. */
+  goldenCelebration: boolean;
 }
 
 /** Whether to draw the goal flash this frame. It shows on exactly one drawn frame, however many ticks that frame covers. */
@@ -54,6 +74,8 @@ const CELEBRATE_HOP_PX = 2;
 /** Blinks per second for the overcharge flash. */
 const BLINK_HZ = 8;
 const ARROW_Y = 16;
+/** The arrow is drawn 3 px either side of its x; this keeps a pixel's gap beside the meter. */
+const ARROW_CLEARANCE = 5;
 const SHADOW_W = 5;
 
 const ink = (g: CanvasRenderingContext2D, c: MasterColor) => (g.fillStyle = MASTER[c]);
@@ -88,12 +110,17 @@ function drawShadow(g: CanvasRenderingContext2D, cam: Camera, x: number, z: numb
 
 type Clip = { name: AnimName; frame: number };
 
-function drawPlayer(g: CanvasRenderingContext2D, cam: Camera, p: Player, art: GameArt, clip: Clip = p.anim): void {
-  const set = p.team === 'home' ? art.home : art.away;
+/** The sprite canvas a player is drawn with this frame. */
+function spriteFrame(p: Player, set: SpriteSet, clip: Clip): HTMLCanvasElement {
   const frames = (p.facing === 1 ? set.right : set.left)[clip.name];
+  return frames[Math.min(clip.frame, frames.length - 1)]!;
+}
+
+function drawPlayer(g: CanvasRenderingContext2D, cam: Camera, p: Player, art: GameArt, clip: Clip = p.anim, set?: SpriteSet, flat = false): void {
+  const frame = spriteFrame(p, set ?? (p.team === 'home' ? art.home : art.away), clip);
   const s = screen(cam, p.x, p.y, p.z);
   const hop = clip.name === 'celebrate' && clip.frame === 1 ? CELEBRATE_HOP_PX : 0;
-  g.drawImage(frames[Math.min(clip.frame, frames.length - 1)]!, s.x - ANCHOR.x, s.y - ANCHOR.y - hop);
+  g.drawImage(flat ? silhouette(frame) : frame, s.x - ANCHOR.x, s.y - ANCHOR.y - hop);
 }
 
 /**
@@ -124,21 +151,38 @@ function drawTrail(g: CanvasRenderingContext2D, cam: Camera, trail: readonly Tra
   g.globalAlpha = 1;
 }
 
-function drawBall(g: CanvasRenderingContext2D, w: World, cam: Camera, art: GameArt): void {
+function drawBall(g: CanvasRenderingContext2D, w: World, cam: Camera, art: GameArt, flat = false): void {
   const b = w.ball;
   const s = screen(cam, b.x, b.y, b.z);
   const quarter = Math.PI / 2;
   const n = art.ball.length;
-  const frame = ((Math.floor(b.spinAngle / quarter) % n) + n) % n;
-  g.drawImage(art.ball[frame]!, s.x - BALL_SPRITE_R, s.y - BALL_SPRITE_R);
+  const frame = art.ball[((Math.floor(b.spinAngle / quarter) % n) + n) % n]!;
+  g.drawImage(flat ? silhouette(frame) : frame, s.x - BALL_SPRITE_R, s.y - BALL_SPRITE_R);
 }
+
+/** Harrison's look this frame: which sprite set, and how strongly his aura burns (0 for none). */
+export interface HomeLook {
+  set: 'home' | 'homePower' | 'homeGolden';
+  aura: number;
+  nowS: number;
+}
+
+/** Just behind him in the depth sort, so his aura and debris are drawn before him. */
+const BEHIND = 1e-3;
 
 /**
  * Everything standing on the pitch, ready for the depth sort: both players,
  * the ball, and each goal's nets and posts. The nets come first, so at the
- * same depth a post is drawn over its net.
+ * same depth a post is drawn over its net. While he powers up, his aura and
+ * the floating debris go just behind him.
  */
-export function pitchDrawables(w: World, cam: Camera, art: GameArt, home: Clip = w.home.anim): Drawable[] {
+export function pitchDrawables(
+  w: World,
+  cam: Camera,
+  art: GameArt,
+  home: Clip = w.home.anim,
+  look: HomeLook = { set: 'home', aura: 0, nowS: 0 },
+): Drawable[] {
   const goals = w.field.goals.flatMap(goal => {
     const part = (z: number, which: 'farNet' | 'nearNet' | 'nearPost' | 'farPost'): Drawable => ({
       z,
@@ -150,9 +194,23 @@ export function pitchDrawables(w: World, cam: Camera, art: GameArt, home: Clip =
     });
     return [part(goal.z1, 'farNet'), part(goal.z0, 'nearNet'), part(goal.z0, 'nearPost'), part(goal.z1, 'farPost')];
   });
+  const aura: Drawable[] =
+    look.aura > 0
+      ? [
+          {
+            z: w.home.z + BEHIND,
+            draw: g => {
+              const golden = look.set === 'homeGolden';
+              drawAura(g, cam, w.home, spriteFrame(w.home, art[look.set], home), golden, look.aura, look.nowS);
+              if (w.home.state === 'poweringUp') drawDebris(g, cam, w.home, look.aura, look.nowS);
+            },
+          },
+        ]
+      : [];
   return [
     ...goals,
-    { z: w.home.z, draw: g => drawPlayer(g, cam, w.home, art, home) },
+    ...aura,
+    { z: w.home.z, draw: g => drawPlayer(g, cam, w.home, art, home, art[look.set]) },
     { z: w.away.z, draw: g => drawPlayer(g, cam, w.away, art) },
     // Last among equals: at his feet, the ball is drawn over his boots.
     { z: w.ball.z, draw: g => drawBall(g, w, cam, art) },
@@ -180,7 +238,7 @@ function drawText(g: CanvasRenderingContext2D, art: GameArt, s: string, cx: numb
   g.drawImage(t, Math.round(cx - t.width / 2), y);
 }
 
-function drawHud(g: CanvasRenderingContext2D, w: World, art: GameArt): void {
+function drawHud(g: CanvasRenderingContext2D, w: World, art: GameArt, nowS: number): void {
   const { match, home } = w;
   drawText(g, art, `${HOME_NAME} ${match.score.home}-${match.score.away} ${AWAY_NAME}`, VIEW_W / 2, 0);
   const clock = match.goldenGoal ? `90+${Math.floor(match.goldenS)}` : `${clockMinute(match)}'`;
@@ -190,6 +248,7 @@ function drawHud(g: CanvasRenderingContext2D, w: World, art: GameArt): void {
   g.fillRect(STAMINA_BAR.x - 1, STAMINA_BAR.y - 1, STAMINA_BAR.w + 2, STAMINA_BAR.h + 2);
   ink(g, home.exhausted ? 'red' : 'volt');
   g.fillRect(STAMINA_BAR.x, STAMINA_BAR.y, Math.round(home.stamina * STAMINA_BAR.w), STAMINA_BAR.h);
+  if (w.power) drawPowerMeter(g, art, w.power.meter, powerHint(w), nowS);
 }
 
 /** The banner over the pitch, if any: GOAL!!! for Harrison's goal moment, a smaller MAX SCORES for Max's. */
@@ -218,10 +277,17 @@ function drawGoalBanner(g: CanvasRenderingContext2D, art: GameArt, moment: GoalM
   drawText(g, art, 'GOAL!!!', VIEW_W / 2, BANNER_Y + bounce, scale, 'energyGold');
 }
 
-function drawArrow(g: CanvasRenderingContext2D, w: World, cam: Camera): void {
+/** Where the off-screen ball arrow goes, if the ball is over the top: under the ball, kept clear of the POWER meter when it's shown. */
+export function arrowX(w: World, cam: Camera): number | null {
   const arrow = offscreenArrow(w.ball, cam);
-  if (!arrow) return;
-  const x = Math.round(Math.min(Math.max(arrow.x, 3), VIEW_W - 4));
+  if (!arrow) return null;
+  const right = w.power ? POWER_METER_X0 - ARROW_CLEARANCE : VIEW_W - 4;
+  return Math.round(Math.min(Math.max(arrow.x, 3), right));
+}
+
+function drawArrow(g: CanvasRenderingContext2D, w: World, cam: Camera): void {
+  const x = arrowX(w, cam);
+  if (x === null) return;
   ink(g, 'outline');
   g.fillRect(x - 3, ARROW_Y - 1, 7, 4);
   ink(g, 'white');
@@ -230,23 +296,55 @@ function drawArrow(g: CanvasRenderingContext2D, w: World, cam: Camera): void {
   g.fillRect(x, ARROW_Y + 2, 1, 1);
 }
 
+/** The bigger of the goal moment's shake and the power shake: they never add up past the goal moment's own. */
+function pitchShake(w: World, hud: MatchHud, nowS: number): { dx: number; dy: number } {
+  const goal = hud.moment ? shakeOffset(hud.moment) : { dx: 0, dy: 0 };
+  const power = shakeFor(w.power, w.home, hud, nowS);
+  const size = (s: { dx: number; dy: number }) => Math.max(Math.abs(s.dx), Math.abs(s.dy));
+  return size(power) > size(goal) ? power : goal;
+}
+
+/** An impact frame: the pitch in white, with the players and ball as dark silhouettes. */
+function drawImpact(g: CanvasRenderingContext2D, w: World, cam: Camera, art: GameArt, home: Clip, look: HomeLook): void {
+  ink(g, 'white');
+  g.fillRect(-8, -8, VIEW_W + 16, BASE_H + 16);
+  drawPlayer(g, cam, w.away, art, w.away.anim, undefined, true);
+  drawPlayer(g, cam, w.home, art, home, art[look.set], true);
+  drawBall(g, w, cam, art, true);
+}
+
 /**
  * Draws one frame of the match: scenery, shadows, then everything on the
- * pitch far to near, bars, HUD and banners. During Harrison's goal moment
- * the pitch shakes (the HUD doesn't), and the first frame flashes white.
+ * pitch far to near, the wave, bars, HUD and banners. During Harrison's
+ * goal moment the pitch shakes (the HUD doesn't), and the first frame
+ * flashes white; a power-up and a wave shake it too, and a fired wave
+ * shows a couple of impact frames.
  */
 export function drawMatch(g: CanvasRenderingContext2D, w: World, cam: Camera, art: GameArt, nowS: number, hud: MatchHud): void {
   const { moment } = hud;
-  const shake = moment ? shakeOffset(moment) : { dx: 0, dy: 0 };
+  const shake = pitchShake(w, hud, nowS);
+  const home = homeClip(w, moment);
+  const look: HomeLook = { set: homeSprites(w, hud), aura: auraStrength(w, hud), nowS };
   g.save();
   g.translate(shake.dx, shake.dy);
   drawLayers(g, cam, art);
   drawShadow(g, cam, w.ball.x, w.ball.z);
   for (const p of [w.away, w.home]) drawShadow(g, cam, p.x, p.z);
+  drawSkid(g, cam, w.away);
   drawTrail(g, cam, hud.trail);
-  for (const d of depthSorted(pitchDrawables(w, cam, art, homeClip(w, moment)))) d.draw(g);
+  for (const d of depthSorted(pitchDrawables(w, cam, art, home, look))) d.draw(g);
+  if (w.wave) {
+    drawBeam(g, cam, w.wave, nowS);
+    // Braced, he stands in front of the beam's broken end.
+    if (w.wave.outcome === 'braced' && w.away.state === 'bracing') drawPlayer(g, cam, w.away, art);
+  }
+  if (hud.impactFrames > 0) {
+    drawImpact(g, w, cam, art, home, look);
+    hud.impactFrames--;
+  }
   drawChargeBar(g, cam, w.away, nowS);
   drawChargeBar(g, cam, w.home, nowS);
+  drawPowerBar(g, cam, w.home, nowS);
   g.restore();
   if (takeFlash(hud)) {
     g.save();
@@ -255,7 +353,7 @@ export function drawMatch(g: CanvasRenderingContext2D, w: World, cam: Camera, ar
     g.fillRect(0, 0, VIEW_W, BASE_H);
     g.restore();
   }
-  drawHud(g, w, art);
+  drawHud(g, w, art, nowS);
   if (hud.perfect && nowS < hud.perfect.untilS) {
     const kicker = hud.perfect.team === 'home' ? w.home : w.away;
     const at = screen(cam, kicker.x, kicker.y, kicker.z);

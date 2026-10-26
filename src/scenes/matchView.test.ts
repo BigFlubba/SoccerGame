@@ -3,7 +3,8 @@ import { BASE_STATS } from '../game/stats';
 import { createWorld } from '../game/world';
 import type { GameArt } from './art';
 import { depthSorted } from './depthSort';
-import { banner, calloutLine, homeClip, pitchDrawables, takeFlash, type MatchHud } from './matchView';
+import { arrowX, banner, calloutLine, homeClip, pitchDrawables, takeFlash, type MatchHud } from './matchView';
+import { POWER_METER_X0 } from './powerView';
 
 /** Building the list never touches the art; only drawing does. */
 const NO_ART = {} as GameArt;
@@ -89,7 +90,16 @@ describe('homeClip', () => {
 
 describe('calloutLine', () => {
   it('shows the callout under GOAL!!! once the slam has settled, only during the moment', () => {
-    const hud = (t: number | null) => ({ perfect: null, moment: t === null ? null : { t, done: false }, callout: 'HEADER!', trail: [], flash: false });
+    const hud = (t: number | null) => ({
+      perfect: null,
+      moment: t === null ? null : { t, done: false },
+      callout: 'HEADER!',
+      trail: [],
+      flash: false,
+      shake: null,
+      impactFrames: 0,
+      goldenCelebration: false,
+    });
     expect(calloutLine(hud(0.3))).toBeNull();
     expect(calloutLine(hud(0.7))).toBe('HEADER!');
     expect(calloutLine(hud(null))).toBeNull();
@@ -99,8 +109,32 @@ describe('calloutLine', () => {
 
 describe('takeFlash', () => {
   it('takeFlash is true once, then false', () => {
-    const hud: MatchHud = { perfect: null, moment: null, callout: null, trail: [], flash: true };
+    const hud: MatchHud = { perfect: null, moment: null, callout: null, trail: [], flash: true, shake: null, impactFrames: 0, goldenCelebration: false };
     expect(takeFlash(hud)).toBe(true);
     expect(takeFlash(hud)).toBe(false);
+  });
+});
+
+describe('the off-screen ball arrow', () => {
+  it('the off-screen arrow never overlaps the POWER meter', () => {
+    const w = createWorld(BASE_STATS, BASE_STATS, 1, { home: 4, away: 6 }, { golden: false });
+    Object.assign(w.ball, { y: 400 });
+    for (let x = 0; x <= 640; x += 4) {
+      w.ball.x = x;
+      const at = arrowX(w, { x: 300 });
+      expect(at, `ball x ${x}`).not.toBeNull();
+      expect(at! + 3, `ball x ${x}`).toBeLessThan(POWER_METER_X0);
+    }
+  });
+
+  it('without the power move it reaches the right edge as before', () => {
+    const w = createWorld(BASE_STATS, BASE_STATS, 1, { home: 4, away: 6 });
+    Object.assign(w.ball, { x: 640, y: 400 });
+    expect(arrowX(w, { x: 300 })).toBe(316);
+  });
+
+  it('there is no arrow while the ball is on screen', () => {
+    const w = createWorld(BASE_STATS, BASE_STATS, 1, { home: 4, away: 6 });
+    expect(arrowX(w, { x: 160 })).toBeNull();
   });
 });

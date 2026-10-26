@@ -2,8 +2,8 @@ import { describe, expect, it } from 'vitest';
 import { M } from './colors';
 import { buttonGlyph, type ButtonName } from './glyphs';
 
-const BUTTONS: readonly ButtonName[] = ['A', 'B', 'X', 'RT', 'START'];
-const FACE: Record<ButtonName, number> = { A: M.grassLight, B: M.red, X: M.blue, RT: M.slate, START: M.slate };
+const BUTTONS: readonly Exclude<ButtonName, 'Y'>[] = ['A', 'B', 'X', 'RT', 'START'];
+const FACE: Record<Exclude<ButtonName, 'Y'>, number> = { A: M.grassLight, B: M.red, X: M.blue, RT: M.slate, START: M.slate };
 
 describe('buttonGlyph', () => {
   it('glyphs are distinct and round', () => {
@@ -39,5 +39,16 @@ describe('buttonGlyph', () => {
     expect(rt.width).toBeGreaterThan(a.width);
     expect(start.width).toBeGreaterThan(rt.width);
     for (const b of BUTTONS) expect(buttonGlyph(b).height).toBe(a.height);
+  });
+
+  it('the Y glyph is a gold disc with a dark Y', () => {
+    const y = buttonGlyph('Y');
+    const a = buttonGlyph('A');
+    expect([y.width, y.height]).toEqual([a.width, a.height]);
+    const ids = new Set(y.data);
+    expect(ids.has(M.gold)).toBe(true);
+    expect(ids.has(M.white)).toBe(false);
+    const dark = (img: typeof y) => img.data.filter(id => id === M.outline).length;
+    expect(dark(y)).toBeGreaterThan(dark(a));
   });
 });

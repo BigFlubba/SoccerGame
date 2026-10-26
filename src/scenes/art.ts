@@ -7,7 +7,7 @@ import { HARRISON_BODY } from '../art/body/proportions';
 import { masterPalette, resolvePalette, type LookColors, type MasterColor, type ResolvedPalette } from '../art/colors';
 import { renderText, textPalette } from '../art/font';
 import { buttonGlyph, type ButtonName } from '../art/glyphs';
-import { HARRISON_HEADS } from '../art/harrison/head';
+import { HARRISON_HEADS, HARRISON_POWER_HEADS } from '../art/harrison/head';
 import { harrisonLook } from '../art/harrison/look';
 import { harrisonPortrait, type Expression } from '../art/harrison/portrait';
 import { MAX_HEADS, maxLook } from '../art/opponents/max';
@@ -36,6 +36,10 @@ export interface GameArt {
   /** Controller button pictures, for Help. */
   buttons: Record<ButtonName, HTMLCanvasElement>;
   home: SpriteSet;
+  /** Harrison with his hair lifted by the power-up, in his own colours... */
+  homePower: SpriteSet;
+  /** ...and in Golden Form's gold. */
+  homeGolden: SpriteSet;
   away: SpriteSet;
   /** Harrison's portrait in each expression, in the home kit. */
   portraits: Record<Expression, HTMLCanvasElement>;
@@ -59,7 +63,7 @@ function goalCanvases(g: GoalArt, palette: ResolvedPalette): GoalCanvases {
   return { farNet: toCanvas(g.farNet, palette), nearNet: toCanvas(g.nearNet, palette), nearPost: toCanvas(g.nearPost, palette), farPost: toCanvas(g.farPost, palette), origin: g.origin };
 }
 
-const BUTTONS: readonly ButtonName[] = ['A', 'B', 'X', 'RT', 'START'];
+const BUTTONS: readonly ButtonName[] = ['A', 'B', 'X', 'Y', 'RT', 'START'];
 const EXPRESSIONS: readonly Expression[] = ['neutral', 'celebrate', 'determined', 'disappointed'];
 
 /** Bakes and resolves every image the match needs, once, at boot. */
@@ -74,6 +78,8 @@ export function loadGameArt(): GameArt {
     ball: ballFrames().map(f => toCanvas(f, master)),
     buttons: Object.fromEntries(BUTTONS.map(b => [b, toCanvas(buttonGlyph(b), master)])) as Record<ButtonName, HTMLCanvasElement>,
     home: spriteSet(cache, 'harrison', HARRISON_HEADS, harrisonLook('home')),
+    homePower: spriteSet(cache, 'harrison-power', HARRISON_POWER_HEADS, harrisonLook('home')),
+    homeGolden: spriteSet(cache, 'harrison-golden', HARRISON_POWER_HEADS, harrisonLook('home', 'golden')),
     away: spriteSet(cache, 'max', MAX_HEADS, maxLook()),
     portraits: Object.fromEntries(EXPRESSIONS.map(e => [e, toCanvas(harrisonPortrait(e), resolvePalette(harrisonLook('home')))])) as Record<Expression, HTMLCanvasElement>,
     text(s, scale, ink, outline) {

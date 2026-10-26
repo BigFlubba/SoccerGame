@@ -84,7 +84,7 @@ export function createMatchScene(ctx: GameContext, seed: number): MatchScene {
   const world = createWorld({ ...ctx.profile.stats }, maxStats(ladderMatch), seed, { home: HUMAN_AIM_ERROR_DEG, away: thinking.aimErrorDeg });
   const brain = createBrain(thinking);
   const cam: Camera = { x: world.ball.x - BASE_W / 2 };
-  const hud: MatchHud = { perfect: null, moment: null, callout: null, trail: [], flash: false };
+  const hud: MatchHud = { perfect: null, moment: null, callout: null, trail: [], flash: false, shake: null, impactFrames: 0, goldenCelebration: false };
   let lastKick: LastKick | null = null;
   /** Harrison's header, volley and chip goals, for the style bonus. */
   const styleGoals: StyleKind[] = [];

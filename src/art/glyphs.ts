@@ -2,10 +2,12 @@ import { M } from './colors';
 import { GLYPH_GAP, GLYPH_H, GLYPH_W, glyph, measureText } from './font';
 import { IndexedImage } from './indexedImage';
 
-export type ButtonName = 'A' | 'B' | 'X' | 'RT' | 'START';
+export type ButtonName = 'A' | 'B' | 'X' | 'Y' | 'RT' | 'START';
 
-/** Face colours as on an Xbox pad: A green, B red, X blue, the rest slate. */
-const FACE: Readonly<Record<ButtonName, number>> = { A: M.grassLight, B: M.red, X: M.blue, RT: M.slate, START: M.slate };
+/** Face colours as on an Xbox pad: A green, B red, X blue, Y yellow, the rest slate. */
+const FACE: Readonly<Record<ButtonName, number>> = { A: M.grassLight, B: M.red, X: M.blue, Y: M.gold, RT: M.slate, START: M.slate };
+/** Letters are white, except on the light yellow Y, where a dark letter reads better. */
+const LABEL: Readonly<Partial<Record<ButtonName, number>>> = { Y: M.outline };
 /** Round buttons are this tall (and A, B and X this wide); longer labels stretch into a pill. */
 const SIZE = 11;
 const R = (SIZE - 1) / 2;
@@ -36,7 +38,7 @@ export function buttonGlyph(b: ButtonName): IndexedImage {
   [...b].forEach((ch, i) => {
     const g = glyph(ch);
     for (let y = 0; y < g.height; y++) {
-      for (let x = 0; x < g.width; x++) if (g.get(x, y) !== 0) img.set(left + i * (GLYPH_W + GLYPH_GAP) + x, top + y, M.white);
+      for (let x = 0; x < g.width; x++) if (g.get(x, y) !== 0) img.set(left + i * (GLYPH_W + GLYPH_GAP) + x, top + y, LABEL[b] ?? M.white);
     }
   });
   return img;
