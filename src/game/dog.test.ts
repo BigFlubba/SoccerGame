@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { BALL_R } from '../art/ball';
 import { MUZZLE } from '../art/opponents/biscuit';
 import { BALL_REST_Y } from './ball';
-import { DOG_CATCH_SPEED, DOG_DIFFICULTY, DOG_SPEED, DWELL_PER_CONTROL, JINK_S, PANT_S, REGRAB_S, TUNING_STATS, canGrab, dropBall, dwellFor, parkBall } from './dog';
+import { DOG_CATCH_SPEED, DOG_DIFFICULTY, DOG_SPEED, DWELL_PER_CONTROL, JINK_S, PANT_S, TRAPPED_S, TUNING_STATS, canGrab, dropBall, dwellFor, parkBall } from './dog';
 import { createDogBrain, dogThink } from './dogAi';
 import { BACKYARD, goalScored, inGoalBox } from './field';
 import { BLOWN_DOWN_S, BRACE_S, NO_INTENT, PLAYER_R, type PlayerIntent } from './player';
@@ -71,6 +71,15 @@ describe('the dog', () => {
       ticks(w, 4, still, run(-1));
       expect(w.dog!.carrying, `control ${control} after the dwell`).toBe(true);
     }
+  });
+
+  it('pressing into Harrison with the ball between them is no 50/50: the dwell decides', () => {
+    // The ball at Harrison's feet and inside both bodies: against Max it would squirt up and out.
+    const w = boss({ dog: [111, 32], home: [100, 32], ball: [106, 32] });
+    ticks(w, 3, still, run(-1));
+    expect(w.ball.y).toBe(BALL_REST_Y);
+    expect(w.dog!.carrying).toBe(false);
+    expect(w.dog!.dwellS).toBeGreaterThan(0);
   });
 
   it('turning away resets the dwell', () => {
@@ -143,6 +152,18 @@ describe('the dog', () => {
     }
   });
 
+  it('pinned in a corner with the ball, he sets it down', () => {
+    // Beside the right goal's near post, the boards below him and Harrison in front.
+    const w = boss({ dog: [617, 5], home: [607, 5], ball: [607, 5] });
+    w.dog!.carrying = true;
+    parkBall(w);
+    ticks(w, Math.round(TRAPPED_S / STEP) - 5, still, run(-1, -1, true));
+    expect(w.dog!.carrying).toBe(true);
+    ticks(w, 10, still, run(-1, -1, true));
+    expect(w.dog!.carrying).toBe(false);
+    expect(w.ball.y).toBe(BALL_REST_Y);
+  });
+
   it('Harrison is never tripped by sliding at the dog', () => {
     const w = boss({ dog: [300, 32], home: [284, 32], ball: [500, 32] });
     let tripped = false;
@@ -206,6 +227,8 @@ describe('the wave and the dog', () => {
     return w;
   }
   const fire = (w: World) => ticks(w, 1, { ...NO_INTENT, shootHeld: true });
+  /** Once the brace ends he reacts and runs the skidded-off ball down within this long. */
+  const RUN_DOWN_S = 0.5;
 
   it('braced from range: he digs in, the ball dies in front of him, and he takes it once the brace ends', () => {
     const w = readyToFire(358);
@@ -221,7 +244,7 @@ describe('the wave and the dog', () => {
     expect(canGrab(w)).toBe(false);
     // He skids back on the brace, as Max does, then runs the dead ball down: a turnover.
     const brain = createDogBrain(w.dog!.profile);
-    for (let i = 0; i < Math.ceil((BRACE_S + REGRAB_S) / STEP) + 2; i++) stepWorld(w, still, dogThink(brain, w, STEP), STEP);
+    for (let i = 0; i < Math.ceil((BRACE_S + RUN_DOWN_S) / STEP) && !w.dog!.carrying; i++) stepWorld(w, still, dogThink(brain, w, STEP), STEP);
     expect(w.dog!.carrying).toBe(true);
   });
 

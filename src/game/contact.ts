@@ -232,7 +232,11 @@ function squirt(p: Player, opponent: Player, ball: Ball, rng: Rng, field: Field)
   ball.vz = (p.vz + opponent.vz) / 2 + side * sz * SQUEEZE_SQUIRT_VX;
 }
 
-/** Everything player `p` does to the ball (and to the opponent's feet, unless `trips` is off: nobody trips the dog) this tick. */
+/**
+ * Everything player `p` does to the ball (and to the opponent's feet) this
+ * tick. Against the dog, `trips` is off (nobody trips him) and so is
+ * `squeeze`: he contests a ball by his muzzle's dwell, never a 50/50.
+ */
 export function resolveContacts(
   p: Player,
   opponent: Player,
@@ -240,7 +244,7 @@ export function resolveContacts(
   aimErrorDeg: number,
   rng: Rng,
   field: Field,
-  { trips }: { trips: boolean } = { trips: true },
+  { trips, squeeze }: { trips: boolean; squeeze: boolean } = { trips: true, squeeze: true },
 ): ContactEvents {
   const ev: ContactEvents = { touched: false, kicked: null, perfect: false, tackledBall: false, trippedOpponent: false };
   // Flying through the air after a wave, he can't block, dribble or head it.
@@ -249,11 +253,11 @@ export function resolveContacts(
   strike(p, ball, aimErrorDeg, rng, field, ev);
   if (!ev.kicked) headBall(p, ball, field, ev);
   if (ev.kicked || ev.tackledBall || onRoof(ball, field)) return ev;
-  if (!squeezed(p, opponent, ball)) {
+  if (!squeeze || !squeezed(p, opponent, ball)) {
     dribble(p, ball, ev);
     block(p, ball, field);
   }
   // Also catches a block that pushed the ball out into the other player.
-  if (squeezed(p, opponent, ball)) squirt(p, opponent, ball, rng, field);
+  if (squeeze && squeezed(p, opponent, ball)) squirt(p, opponent, ball, rng, field);
   return ev;
 }

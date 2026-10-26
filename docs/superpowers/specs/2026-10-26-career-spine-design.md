@@ -398,6 +398,37 @@ Harrisons at those stats in headless matches:
 Those runs are tests, so a tuning change that breaks the lesson fails CI.
 The numbers are starting points, to revisit after Harrison plays.
 
+**Starting values, as built (2026-10-26).** `src/game/dog.ts` and
+`dogAi.ts`:
+
+| | Easy | Normal | Hard |
+|---|---|---|---|
+| Reaction | 0.32 s | 0.18 s | 0.1 s |
+| Snatch dwell at Control 1 (+0.08 s per level) | 0.55 s | 0.35 s | 0.2 s |
+| Jinks when a blocker is this close | 18 px | 22 px | 30 px |
+| Jink width | 14 px | 18 px | 22 px |
+| Full-speed running before a pant | 2.2 s | 3 s | 4 s |
+
+- His speed is 183 px/s, 1.12 × the tuning Harrison's sprint (163 px/s).
+  Backing off from a power-up he goes at 98 px/s, Max's rung-10 pace.
+- He catches a ball under 260 px/s whose centre is no higher than 16 px.
+  The jink lasts 0.5 s at 0.35 × his speed, with 0.6 s before the next.
+  A pant lasts 1.2 s.
+- **Dodge, not jink, for a charging Harrison.** One closing on him faster
+  than 60 px/s gets a full-speed dodge with no window. Only a Harrison who
+  waits for him gets the jink. Without this, a head-on chaser won most
+  matches.
+- **Knocked off the ball,** he stands shaking it off for 1 s, then goes
+  for it after his reaction time. A slide or touch that reaches the ball
+  during a jink knocks it free, popping ahead of the tackle.
+- **Pinned with the ball** (cornered beside a goal with Harrison in front)
+  for 1 s, he sets it down.
+- A ball pressed between the two of them is no 50/50: the dwell decides.
+
+Measured by the headless runs (blocker wins on 32 seeds; the blocker's
+reaction to a jink varies from 0.05 to 0.35 s per match): Easy 0.66,
+Normal 0.59, Hard 0.41. The chaser wins 0.03 on Normal.
+
 ## The save: profile version 3
 
 New fields, appended; everything else unchanged:

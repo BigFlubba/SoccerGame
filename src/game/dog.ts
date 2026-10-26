@@ -35,7 +35,7 @@ export interface DogProfile {
 
 export const DOG_DIFFICULTY: Readonly<Record<Difficulty, DogProfile>> = {
   easy: { reactionS: 0.32, dwellS: 0.55, jinkAhead: 18, jinkWidth: 14, staminaS: 2.2, braceSense: DIFFICULTY.easy.braceSense },
-  normal: { reactionS: 0.18, dwellS: 0.35, jinkAhead: 24, jinkWidth: 18, staminaS: 3, braceSense: DIFFICULTY.normal.braceSense },
+  normal: { reactionS: 0.18, dwellS: 0.35, jinkAhead: 22, jinkWidth: 18, staminaS: 3, braceSense: DIFFICULTY.normal.braceSense },
   hard: { reactionS: 0.1, dwellS: 0.2, jinkAhead: 30, jinkWidth: 22, staminaS: 4, braceSense: DIFFICULTY.hard.braceSense },
 };
 
@@ -60,10 +60,13 @@ export const JINK_S = 0.5;
 export const JINK_SLOW = 0.35;
 export const JINK_COOLDOWN_S = 0.6;
 export const PANT_S = 1.2;
-/** After a drop or a pant he can't grab for this long. */
-export const REGRAB_S = 0.4;
+/** After a drop or a pant he can't grab for this long: knocked off the ball, he stands shaking it off. */
+export const REGRAB_S = 1;
 /** A knocked-out ball pops this fast, ahead of the tackle. */
 export const DROP_POP = { vx: 90, vy: 60 };
+/** Carrying, trying to run but held to under TRAPPED_SPEED px/s for TRAPPED_S, he's pinned: he sets the ball down. */
+export const TRAPPED_S = 1;
+const TRAPPED_SPEED = 10;
 /** Running at least this fraction of DOG_SPEED spends his stamina; anything slower gives it back. */
 const FULL_SPEED_SHARE = 0.8;
 /** The goal he attacks, as the away side. */
@@ -85,6 +88,8 @@ export interface DogState {
   /** Time left panting. */
   pantS: number;
   regrabS: number;
+  /** How long he has been pinned with the ball, trying to run and getting nowhere. */
+  stuckS: number;
 }
 
 export interface DogEvents {
@@ -97,12 +102,12 @@ export interface DogEvents {
 export const quietDog = (): DogEvents => ({ grabbed: false, dropped: false, jinked: false, panted: false });
 
 export function createDog(profile: DogProfile): DogState {
-  return { profile, carrying: false, carryS: 0, dwellS: 0, jinkS: 0, jinkSide: 1, jinkCooldownS: 0, runS: 0, pantS: 0, regrabS: 0 };
+  return { profile, carrying: false, carryS: 0, dwellS: 0, jinkS: 0, jinkSide: 1, jinkCooldownS: 0, runS: 0, pantS: 0, regrabS: 0, stuckS: 0 };
 }
 
 /** Clears everything a kickoff starts afresh. */
 export function resetDog(d: DogState): void {
-  Object.assign(d, { carrying: false, carryS: 0, dwellS: 0, jinkS: 0, pantS: 0, regrabS: 0 });
+  Object.assign(d, { carrying: false, carryS: 0, dwellS: 0, jinkS: 0, pantS: 0, regrabS: 0, stuckS: 0 });
 }
 
 export const dwellFor = (profile: DogProfile, control: number): number => profile.dwellS + DWELL_PER_CONTROL * (control - 1);
@@ -219,6 +224,22 @@ function grab(w: World, d: DogState, dt: number, ev: DogEvents): void {
   d.dwellS = 0;
   parkBall(w);
   ev.grabbed = true;
+}
+
+/**
+ * Pinned with the ball (in a corner, say, with Harrison in front): trying to
+ * run but held to under TRAPPED_SPEED by the bodies, boards and goals for
+ * TRAPPED_S, he gives up and sets it down. `movedPx` is how far he got this
+ * tick, once bodies are resolved. Returns whether he set it down.
+ */
+export function checkPinned(w: World, intent: PlayerIntent, movedPx: number, dt: number): boolean {
+  const d = w.dog!;
+  const trying = intent.moveX !== 0 || intent.moveZ !== 0;
+  d.stuckS = d.carrying && trying && movedPx < TRAPPED_SPEED * dt ? d.stuckS + dt : 0;
+  if (d.stuckS < TRAPPED_S) return false;
+  dropBall(w, false);
+  d.stuckS = 0;
+  return true;
 }
 
 /**

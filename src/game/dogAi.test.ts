@@ -51,6 +51,8 @@ describe('dogThink', () => {
     expect(intent.moveX).toBeLessThan(0);
     stepWorld(w, NO_INTENT, intent, STEP);
     expect(w.events.dog.jinked).toBe(true);
+    // Harrison steps out of the way, so the jink runs its course with the ball.
+    w.home.z = 60;
     const step = stepper(w, brain);
     while (w.dog!.jinkS > 0) step();
     expect(w.dog!.jinkCooldownS).toBeGreaterThan(0);
@@ -72,6 +74,27 @@ describe('dogThink', () => {
     expect(w.dog!.jinkSide).toBe(-1);
   });
 
+  it('dodges a Harrison charging at him at full speed: no jink, no window', () => {
+    const w = carrying(scene({ dog: 200, home: 178, ball: 190 }));
+    w.home.vx = 150;
+    const brain = createDogBrain(DOG_DIFFICULTY.normal);
+    const intent = dogThink(brain, w, STEP);
+    expect(w.dog!.jinkS).toBe(0);
+    expect(intent.sprint).toBe(true);
+    expect(intent.moveX).toBeLessThan(0);
+    expect(intent.moveZ).not.toBe(0);
+    expect(brain.plan).toBe('carry');
+  });
+
+  it('never jinks into a goal: beside its post he cuts the other way', () => {
+    const w = carrying(scene({ dog: 612, home: 594, ball: 602 }));
+    [w.away.z, w.home.z] = [52, 52];
+    const brain = createDogBrain(DOG_DIFFICULTY.normal);
+    dogThink(brain, w, STEP);
+    expect(w.dog!.jinkS).toBe(JINK_S);
+    expect(w.dog!.jinkSide).toBe(1);
+  });
+
   it('does not jink for a fallen Harrison or one off the lane', () => {
     const fallen = carrying(scene({ dog: 200, home: 180, ball: 190 }));
     fallen.home.state = 'fallen';
@@ -81,6 +104,21 @@ describe('dogThink', () => {
     wide.home.z = 50;
     dogThink(createDogBrain(DOG_DIFFICULTY.normal), wide, STEP);
     expect(wide.dog!.jinkS).toBe(0);
+  });
+
+  it('knocked off the ball, he stands shaking it off until he can grab again', () => {
+    const w = scene({ dog: 300, home: 240, ball: 330 });
+    w.dog!.regrabS = 0.5;
+    const brain = createDogBrain(DOG_DIFFICULTY.normal);
+    const intent = dogThink(brain, w, STEP);
+    expect(brain.plan).toBe('dazed');
+    expect([intent.moveX, intent.moveZ]).toEqual([0, 0]);
+    // Shaken off, he goes for the loose ball after his reaction time, as Max would.
+    w.dog!.regrabS = 0;
+    let ticks = 0;
+    while (dogThink(brain, w, STEP).moveX === 0 && ticks < 60) ticks++;
+    expect(brain.plan).toBe('chase');
+    expect(ticks * STEP).toBeCloseTo(DOG_DIFFICULTY.normal.reactionS, 1);
   });
 
   it("chases a loose ball and a ball at Harrison's feet", () => {
@@ -102,6 +140,25 @@ describe('dogThink', () => {
     const brain = createDogBrain(DOG_DIFFICULTY.normal);
     const step = stepper(w, brain);
     for (let i = 0; i < 90 && !w.dog!.carrying; i++) step();
+    expect(w.dog!.carrying).toBe(true);
+  });
+
+  it('never sidesteps into a goal: beside it, he still reaches a ball in the corner', () => {
+    const w = scene({ dog: 607, home: 615, ball: 614 });
+    [w.away.z, w.home.z] = [25, 13];
+    Object.assign(w.ball, { z: 5 });
+    const brain = createDogBrain(DOG_DIFFICULTY.hard);
+    const step = stepper(w, brain);
+    for (let i = 0; i < 120 && !w.dog!.carrying; i++) step();
+    expect(w.dog!.carrying).toBe(true);
+  });
+
+  it('from beside a goal, he goes round its post to a ball in its mouth', () => {
+    const w = scene({ dog: 25, home: 200, ball: 25.5 });
+    [w.away.z, w.ball.z] = [51, 37];
+    const brain = createDogBrain(DOG_DIFFICULTY.normal);
+    const step = stepper(w, brain);
+    for (let i = 0; i < 120 && !w.dog!.carrying; i++) step();
     expect(w.dog!.carrying).toBe(true);
   });
 

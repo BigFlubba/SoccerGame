@@ -2,7 +2,7 @@ import { seeded, type Rng } from '../engine/random';
 import { BALL_REST_Y, stepBall, type Ball, type BallEvents } from './ball';
 import { resolveBodies } from './bodies';
 import { resolveContacts, type ContactEvents } from './contact';
-import { createDog, dropBall, parkBall, quietDog, resetDog, stepDog, vulnerable, type DogEvents, type DogProfile, type DogState } from './dog';
+import { checkPinned, createDog, dropBall, parkBall, quietDog, resetDog, stepDog, vulnerable, type DogEvents, type DogProfile, type DogState } from './dog';
 import { BACKYARD, goalScored, type Field } from './field';
 import { createMatch, stepMatch, type MatchState, type Team } from './match';
 import { NO_INTENT, createPlayer, stepPlayer, type Player, type PlayerIntent } from './player';
@@ -170,17 +170,17 @@ function powerEnds(w: World, live: boolean, [, away]: ContactEvents[]): boolean 
 
 /**
  * Contacts with Biscuit on the pitch. Only Harrison plays the ball with his
- * feet, and never trips the dog. A carried ball is out of play, except while
- * the dog is slow (jinking) when it is contested where it would land, at the
- * muzzle on the ground: any slide, touch or kick that reaches it knocks it
- * out of his mouth. The dog's own grab reports as a touch.
+ * feet, never trips the dog, and never squeezes a 50/50 out of him. A
+ * carried ball is out of play, except while the dog is slow (jinking) when
+ * it is contested where it would land, at the muzzle on the ground: any
+ * slide, touch or kick that reaches it knocks it out of his mouth. The dog's own grab reports as a touch.
  */
 function dogContacts(w: World, dog: DogState, ev: DogEvents): ContactEvents[] {
   let home = quietContact();
   const carried = dog.carrying;
   if (!w.wave?.live && (!carried || vulnerable(dog))) {
     if (carried) w.ball.y = BALL_REST_Y;
-    home = resolveContacts(w.home, w.away, w.ball, w.aimErrorDeg.home, w.rng, w.field, { trips: false });
+    home = resolveContacts(w.home, w.away, w.ball, w.aimErrorDeg.home, w.rng, w.field, { trips: false, squeeze: false });
     if (carried && (home.tackledBall || home.touched || home.kicked)) {
       dropBall(w, true);
       ev.dropped = true;
@@ -215,6 +215,7 @@ export function stepWorld(w: World, homeIntent: PlayerIntent, awayIntent: Player
   stepOne(home, homeIntent, live, w, dt, waveDir);
   // The dog runs on his own legs; braced or blown away, his body is a player's like Max's.
   const dogBody = w.dog !== null && w.away.state !== 'bracing' && w.away.state !== 'blown';
+  const dogFrom = { x: w.away.x, z: w.away.z };
   const dog = dogBody ? stepDog(w, awayIntent, live, dt) : quietDog();
   if (!dogBody) stepOne(w.away, w.dog ? NO_INTENT : awayIntent, live, w, dt);
   if (w.power && home.powerArmed && canStartPower(w)) {
@@ -229,6 +230,7 @@ export function stepWorld(w: World, homeIntent: PlayerIntent, awayIntent: Player
     power.fired = true;
   }
   resolveBodies(home, w.away, w.field);
+  if (dogBody && live && checkPinned(w, awayIntent, Math.hypot(w.away.x - dogFrom.x, w.away.z - dogFrom.z), dt)) dog.dropped = true;
 
   const { braced, blown } = stepWave(w, dt);
   [power.braced, power.blown] = [braced, blown];

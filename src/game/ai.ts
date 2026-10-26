@@ -188,7 +188,7 @@ function crosses(a: { x: number; z: number }, b: { x: number; z: number }, box: 
 }
 
 /** A spot inside a goal moved out to the nearest place he can stand: in front of it, or past either post. */
-function outOfGoals(w: World, x: number, z: number): { x: number; z: number } {
+export function outOfGoals(w: World, x: number, z: number): { x: number; z: number } {
   for (const g of w.field.goals) {
     if (!inGoalBox(g, x, z, PLAYER_R)) continue;
     const box = goalBox(g, GOAL_CLEARANCE);
@@ -207,7 +207,7 @@ function outOfGoals(w: World, x: number, z: number): { x: number; z: number } {
  * The next spot on the way to (x, z): straight there, unless a goal is in
  * the way, in which case round its front, corner by corner.
  */
-function route(w: World, me: Player, x: number, z: number): { x: number; z: number } {
+export function route(w: World, me: Player, x: number, z: number): { x: number; z: number } {
   for (const g of w.field.goals) {
     const box = goalBox(g, PLAYER_R - EDGE_SLACK);
     if (!crosses(me, { x, z }, box)) continue;
