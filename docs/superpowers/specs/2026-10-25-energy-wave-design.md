@@ -147,21 +147,41 @@ disagree:
   and the power hair. A gold bar over his head counts down the power-up's
   time: about 2.5 s *(designer's pick within the parent's 2–3 s)*. SHOOT!
   flashes over him.
-- **His next kick, X, is the Energy Wave.** It fires at once at Max's
-  goal, with no shot charge. He turns to face that goal as he strikes,
-  and up/down aim it as before. The bracing and blow-away rules of *The
-  Energy Wave* are unchanged.
+- **The wave is ready about 1 s after he powers up** *(the parent chose a
+  short ready-up; 1 s is the designer's tuning of the suggested 0.75 s)*.
+  SHOOT! appears then, with a chime and a sharp rumble, and the aura
+  grows to full as it readies.
+- **Then his next kick, X, is the Energy Wave.** It fires at once at
+  Max's goal, from where the ball is, with no shot charge. He turns to
+  face that goal as he strikes, and up/down aim it as before. While he's
+  powered up, X never fires a normal shot: until the wave can fire, the
+  press does nothing. The bracing and blow-away rules of *The Energy
+  Wave* are unchanged.
 - **It ends without firing** when the time runs out, when Max plays the
   ball or knocks him down, when he makes any other move (a chip, a slide,
-  a volley, a header, or a shot from where the wave can't go in), when
-  play stops, and when the game pauses. The meter is kept: only a fired
-  wave spends it *(designer's call, in line with the anti-goal)*.
-- **Max plays as usual** while Harrison is powered up. Once the wave is on
-  its way, he stays square to it until it reaches him. The rush and the
-  release window are gone.
-- *Left to tune after Harrison plays:* Max usually defends close, so an
-  instant Y-then-X will usually blow him away. If that's too easy, the
-  first knob is Max backing off to brace when Harrison powers up.
+  a volley or a header), when play stops, and when the game pauses. The
+  meter is kept: only a fired wave spends it *(designer's call, in line
+  with the anti-goal)*.
+- **Max backs off and braces** *(the parent's choice, after an instant
+  wave scored almost every time)*. When Harrison powers up, Max reacts
+  after his usual reaction time and backpedals toward his own goal,
+  facing Harrison, to about 110–130 px away, then stands square. He
+  backpedals at 90% of his run, slower than Harrison can sprint, so
+  Harrison can chase him down; in front of his goal he runs out of room.
+  While Harrison is powered up, Max never challenges him: before he
+  reacts he hesitates where he is.
+- **Max doesn't always get it right** *(the parent's choice)*. Each
+  power-up he gets it right with a chance set by the difficulty: Easy
+  half the time, Normal three in four, Hard nine in ten. Otherwise he
+  makes one of three mistakes, each as likely: he reacts late, he stops
+  too close, or he hesitates where he is instead of backing off. It's a
+  dice roll, but its result is always on screen before Harrison shoots,
+  which keeps the anti-goal's "timing and position he can read".
+- **Measured in headless matches with Max's AI:** firing as soon as it's
+  ready, without chasing, scores about 46% on Easy, 35% on Normal and 24%
+  on Hard; chasing him down first scores nearly every time.
+- Once the wave is on its way, Max stays square to it until it reaches
+  him. The rush and the release window are gone.
 
 ### Powering up
 

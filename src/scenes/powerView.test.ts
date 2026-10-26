@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { BASE_STATS } from '../game/stats';
 import { createWorld, type World } from '../game/world';
+import { POWERED_S } from '../game/power';
 import type { MatchHud } from './matchView';
 import { auraStrength, homeSprites, powerPrompt, shakeFor } from './powerView';
 
@@ -61,19 +62,25 @@ describe('homeSprites', () => {
 });
 
 describe('powerPrompt', () => {
-  it('SHOOT! shows over him while he is powered up', () => {
+  it('SHOOT! shows over him once the wave is ready, not while it readies', () => {
     const w = world(false);
     expect(powerPrompt(w)).toBeNull();
-    w.power!.activeS = 1.2;
+    w.power!.activeS = POWERED_S - 0.2;
+    expect(powerPrompt(w)).toBeNull();
+    w.power!.activeS = 1;
     expect(powerPrompt(w)).toBe('SHOOT!');
   });
 });
 
 describe('auraStrength', () => {
-  it('full while powered up, flickering as the time runs out', () => {
+  it('building while the wave readies, full once ready, flickering as the time runs out', () => {
     const w = world(false);
     expect(auraStrength(w, hudWith(), 0)).toBe(0);
-    w.power!.activeS = 2;
+    w.power!.activeS = POWERED_S - 0.1;
+    const building = auraStrength(w, hudWith(), 0);
+    expect(building).toBeGreaterThan(0);
+    expect(building).toBeLessThan(1);
+    w.power!.activeS = 1.2;
     expect(auraStrength(w, hudWith(), 0)).toBe(1);
     w.power!.activeS = 0.3;
     const flicker = [0, 0.05, 0.1, 0.15].map(t => auraStrength(w, hudWith(), t));

@@ -37,6 +37,10 @@ const REFILL_CAP = 0.99;
 export const WAVE_MIN_DX = 24;
 /** How long a power-up lasts if he doesn't fire it: the parent asked for 2 to 3 s. */
 export const POWERED_S = 2.5;
+/** The wave is ready this long after he powers up: Max's moment to back off and square up. */
+export const WAVE_READY_S = 1;
+/** Slack for the ticks adding up to the ready moment. */
+const READY_EPS = 1e-9;
 
 export function createPower(kit: PowerKit): PowerState {
   return { golden: kit.golden, meter: 0, sinceFullS: Infinity, lastKind: null, activeS: 0 };
@@ -110,19 +114,12 @@ export function waveClear(ball: { x: number }, goal: Goal): boolean {
 
 /** A dribbled ball runs ahead of him between touches: this far ahead (ball centre from his), it's still his to power up with. */
 export const POWER_REACH = 26;
-/** Where a power-up traps the ball: just ahead of his boot. */
-const TRAP_AHEAD = 8;
 
 /** The ball is his: at his feet, or on the ground just ahead of him as he dribbles. */
 export function ballInControl(p: Player, ball: Ball): boolean {
   if (ballAtFeet(p, ball)) return true;
   const ahead = (ball.x - p.x) * p.facing;
   return p.y === 0 && ball.y <= BALL_REST_Y && ahead >= 0 && ahead <= POWER_REACH && Math.abs(ball.z - p.z) <= REACH_Z;
-}
-
-/** He traps the ball as he plants: dead, just ahead of his boot. */
-export function trapAtFeet(p: Player, ball: Ball): void {
-  Object.assign(ball, { x: p.x + p.facing * TRAP_AHEAD, z: p.z, y: BALL_REST_Y, vx: 0, vy: 0, vz: 0, spin: 0 });
 }
 
 /** The goal Harrison attacks. */
@@ -143,11 +140,17 @@ export function canStartPower(w: World): boolean {
   );
 }
 
-/** Whether an X press now fires the Energy Wave: powered up, on his feet with the ball, and a clean line into Max's goal. */
+/** He's powered up and the wave is ready to fire. */
+export const waveReady = (s: PowerState): boolean => s.activeS > 0 && POWERED_S - s.activeS >= WAVE_READY_S - READY_EPS;
+
+/** He's powered up, but the wave isn't ready yet. */
+export const waveReadying = (s: PowerState | null): boolean => s !== null && s.activeS > 0 && !waveReady(s);
+
+/** Whether an X press now fires the Energy Wave: powered up and ready, on his feet with the ball, and a clean line into Max's goal. */
 export function canFireWave(w: World): boolean {
   return (
     w.power !== null &&
-    w.power.activeS > 0 &&
+    waveReady(w.power) &&
     w.match.phase === 'playing' &&
     w.home.state === 'ground' &&
     ballInControl(w.home, w.ball) &&

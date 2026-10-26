@@ -24,6 +24,10 @@ export function matchFeedback(w: World, prevPhase: Phase): MatchFeedback {
     cues.add('powerUp').add('ooh');
     rumble.add('powerOn');
   }
+  if (power.ready) {
+    cues.add('powerReady');
+    rumble.add('ready');
+  }
   if (power.cancelled) cues.add('fizzle');
   if (power.fired) {
     cues.add('waveBlast').add('beam');

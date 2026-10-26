@@ -3,7 +3,7 @@ import { M, MASTER, masterPalette, type MasterColor, type ResolvedPalette } from
 import { BALL_REST_Y } from '../game/ball';
 import { VIEW_W, project, type Camera } from '../game/camera';
 import { BRACE_S, BRACE_SKID_SPEED, type Player } from '../game/player';
-import { POWERED_S, type PowerState } from '../game/power';
+import { POWERED_S, WAVE_READY_S, waveReady, type PowerState } from '../game/power';
 import { WAVE_LINGER_S, type Wave } from '../game/wave';
 import type { World } from '../game/world';
 import type { GameArt } from './art';
@@ -40,6 +40,8 @@ const POOL_W = 22;
 const ENDING_S = 0.6;
 const ENDING_FLICKER_HZ = 10;
 const ENDING_DIM = 0.4;
+/** While the wave readies, the aura grows from this to full. */
+const READYING_FROM = 0.3;
 /** The beam's band, in px either side of its centre line, which runs this high over the grass. */
 const BEAM = { centreY: 14, edge: 8, light: 4, core: 1, wobbleHz: 5 };
 const ORB_R = { origin: 5, head: 7 };
@@ -82,18 +84,19 @@ export function homeSprites(w: World, hud: MatchHud): 'home' | 'homePower' | 'ho
   return w.power?.golden ? 'homeGolden' : 'homePower';
 }
 
-/** How strongly his aura burns, 0..1, or 0 for none: full while powered up, flickering in its last moments. */
+/** How strongly his aura burns, 0..1, or 0 for none: building while the wave readies, full once it's ready, flickering in its last moments. */
 export function auraStrength(w: World, hud: MatchHud, nowS: number): number {
   if (hud.goldenCelebration || w.home.state === 'unleashing') return 1;
   const left = w.power?.activeS ?? 0;
   if (left <= 0) return 0;
+  if (!waveReady(w.power!)) return READYING_FROM + (1 - READYING_FROM) * ((POWERED_S - left) / WAVE_READY_S);
   if (left > ENDING_S) return 1;
   return Math.floor(nowS * ENDING_FLICKER_HZ * 2) % 2 === 0 ? 1 : ENDING_DIM;
 }
 
-/** What to tell him over his head: powered up, his next kick is the wave. */
+/** What to tell him over his head: once the wave is ready, his next kick fires it. */
 export function powerPrompt(w: World): string | null {
-  return poweredUp(w) ? 'SHOOT!' : null;
+  return w.power && waveReady(w.power) ? 'SHOOT!' : null;
 }
 
 /** The pitch's power shake in whole pixels: the scene's fired-wave and brace shakes. */

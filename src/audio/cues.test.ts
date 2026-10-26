@@ -56,7 +56,7 @@ describe('cue recipes', () => {
   });
 
   it('the power cues are short and no louder than a hard kick', () => {
-    for (const cue of ['powerUp', 'fizzle', 'waveBlast', 'beam', 'brace', 'whoosh'] as const) {
+    for (const cue of ['powerUp', 'powerReady', 'fizzle', 'waveBlast', 'beam', 'brace', 'whoosh'] as const) {
       expect(loudest(cue), cue).toBeLessThanOrEqual(loudest('kickHard'));
       for (const v of CUES[cue].voices) expect((v.at ?? 0) + v.dur, cue).toBeLessThanOrEqual(1.1);
     }

@@ -15,7 +15,8 @@ import {
   maxGoalDir,
   onTarget,
   tickPower,
-  trapAtFeet,
+  waveReady,
+  waveReadying,
   type PowerKit,
   type PowerState,
 } from './power';
@@ -26,6 +27,8 @@ import { ballAtFeet } from './zones';
 /** What Harrison's power-up did this tick. All false without a power move. */
 export interface PowerEvents {
   started: boolean;
+  /** The wave became ready to fire. */
+  ready: boolean;
   cancelled: boolean;
   fired: boolean;
   braced: boolean;
@@ -63,7 +66,7 @@ const KICKOFF_DEFENDER_DEPTH = 70;
 
 const attackDir = (team: Team): 1 | -1 => (team === 'home' ? 1 : -1);
 
-const quietPower = (): PowerEvents => ({ started: false, cancelled: false, fired: false, braced: false, blown: false });
+const quietPower = (): PowerEvents => ({ started: false, ready: false, cancelled: false, fired: false, braced: false, blown: false });
 const quietContact = (): ContactEvents => ({ touched: false, kicked: null, perfect: false, tackledBall: false, trippedOpponent: false });
 const quietEvents = (): WorldEvents => ({
   kicks: [],
@@ -122,7 +125,7 @@ export function placeForKickoff(w: World): void {
  * otherwise. Buttons held outside play still count as held, so one held
  * through a goal pause or kickoff needs a fresh press.
  */
-function stepOne(p: Player, intent: PlayerIntent, live: boolean, w: World, dt: number, waveDir: 1 | -1 | null = null): void {
+function stepOne(p: Player, intent: PlayerIntent, live: boolean, w: World, dt: number, waveDir: 1 | -1 | 'wait' | null = null): void {
   stepPlayer(p, live ? intent : NO_INTENT, dt, w.field, ballAtFeet(p, w.ball), waveDir);
   if (!live) p.held = { shoot: intent.shootHeld, chip: intent.chipHeld, power: intent.powerHeld };
 }
@@ -170,8 +173,11 @@ export function stepWorld(w: World, homeIntent: PlayerIntent, awayIntent: Player
   const power = quietPower();
   const home = w.home;
   const wasActive = (w.power?.activeS ?? 0) > 0;
+  const wasReadying = waveReadying(w.power);
   if (w.power) tickPower(w.power, dt);
-  const waveDir = live && canFireWave(w) ? maxGoalDir(w) : null;
+  if (wasReadying && w.power && waveReady(w.power)) power.ready = true;
+  // Powered up, X only ever fires the wave: until it can (ready, with the ball, a clean line), the press does nothing.
+  const waveDir = live && canFireWave(w) ? maxGoalDir(w) : live && (w.power?.activeS ?? 0) > 0 ? 'wait' : null;
   stepOne(home, homeIntent, live, w, dt, waveDir);
   stepOne(w.away, awayIntent, live, w, dt);
   if (w.power && home.powerArmed && canStartPower(w)) {
@@ -181,8 +187,6 @@ export function stepWorld(w: World, homeIntent: PlayerIntent, awayIntent: Player
   }
   if (w.power && home.state === 'unleashing' && home.kick?.kind === 'wave' && home.kick.active) {
     home.kick.active = false;
-    // He strikes it from his boot, wherever it was running ahead of him.
-    trapAtFeet(home, w.ball);
     w.wave = fireWave(w);
     w.power.activeS = 0;
     power.fired = true;

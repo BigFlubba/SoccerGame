@@ -1,5 +1,5 @@
 /** Controller rumbles: each a short or long pulse. */
-export type RumbleKind = 'hardShot' | 'post' | 'tackle' | 'goal' | 'maxGoal' | 'tap' | 'powerOn' | 'wave' | 'brace';
+export type RumbleKind = 'hardShot' | 'post' | 'tackle' | 'goal' | 'maxGoal' | 'tap' | 'powerOn' | 'ready' | 'wave' | 'brace';
 
 export const RUMBLE: Readonly<Record<RumbleKind, { ms: number; strong: number; weak: number }>> = {
   hardShot: { ms: 120, strong: 0.5, weak: 0.3 },
@@ -10,6 +10,8 @@ export const RUMBLE: Readonly<Record<RumbleKind, { ms: number; strong: number; w
   tap: { ms: 80, strong: 0.2, weak: 0.2 },
   /** Powering up kicks in with a firm pulse... */
   powerOn: { ms: 150, strong: 0.6, weak: 0.6 },
+  /** The wave is ready: a sharp knock that says shoot now. */
+  ready: { ms: 90, strong: 0.8, weak: 0.2 },
   /** ...and the wave goes off long and strong. */
   wave: { ms: 500, strong: 1, weak: 0.9 },
   brace: { ms: 150, strong: 0.7, weak: 0.4 },

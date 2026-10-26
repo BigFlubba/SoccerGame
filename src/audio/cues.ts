@@ -22,6 +22,7 @@ export type Cue =
   | 'levelUp'
   | 'nope'
   | 'powerUp'
+  | 'powerReady'
   | 'fizzle'
   | 'waveBlast'
   | 'beam'
@@ -164,6 +165,14 @@ export const CUES: Readonly<Record<Cue, CueRecipe>> = {
       { wave: 'noise', dur: 1, gain: 0.06, attack: 0.5, hold: 0.4, freq: 2000, toFreq: 5000, filter: { type: 'bandpass', q: 4 } },
     ],
     minGapS: 0.5,
+  },
+  /** The wave is ready: a bright two-note chime that says shoot now. */
+  powerReady: {
+    voices: [
+      { wave: 'square', dur: 0.07, gain: 0.12, freq: 1319 },
+      { wave: 'square', at: 0.07, dur: 0.14, gain: 0.12, freq: 1976 },
+    ],
+    minGapS: 0.3,
   },
   /** A power-up that runs out, or is knocked out of him, before he fires: it fizzles out. */
   fizzle: {

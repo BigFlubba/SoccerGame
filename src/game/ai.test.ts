@@ -5,7 +5,7 @@ import { BALL_REST_Y } from './ball';
 import { inGoalBox } from './field';
 import { NO_INTENT, PLAYER_R, type Player, type PlayerIntent } from './player';
 import type { Aim } from './kick';
-import { METER_MIN_REFILL_S, canStartPower } from './power';
+import { METER_MIN_REFILL_S, WAVE_READY_S, canStartPower } from './power';
 import { BASE_STATS, STAT_NAMES, type StatName, type Stats } from './stats';
 import { BRACE_DISTANCE } from './wave';
 import { createWorld, stepWorld, type World } from './world';
@@ -109,8 +109,8 @@ describe('think', () => {
   });
 
   it('difficulty profiles match the plan', () => {
-    expect(DIFFICULTY.easy).toEqual({ reactionS: 0.32, aimErrorDeg: 10, aggression: 0.3, shootRange: 150 });
-    expect(DIFFICULTY.hard).toEqual({ reactionS: 0.1, aimErrorDeg: 3, aggression: 0.8, shootRange: 210 });
+    expect(DIFFICULTY.easy).toEqual({ reactionS: 0.32, aimErrorDeg: 10, aggression: 0.3, shootRange: 150, braceSense: 0.5 });
+    expect(DIFFICULTY.hard).toEqual({ reactionS: 0.1, aimErrorDeg: 3, aggression: 0.8, shootRange: 210, braceSense: 0.9 });
   });
 
   it('a whole simulated match between two AIs finishes with a result and no exceptions', () => {
@@ -297,17 +297,17 @@ describe('think', () => {
 
   /**
    * Test-only Harrison who uses his power move a lot. He plays as the AI;
-   * whenever a power-up can start he presses Y, then shoots with X after
-   * 0 to 3 s (his own seeded generator picks), so some run out, some are
-   * ended by Max, and the rest fire at whatever range they find. Half are
-   * staged at random ranges, since Max rarely stands far off while
-   * Harrison has the ball: Max is put 20 to 260 px down the lane facing
-   * him, and X comes at once. The meter is refilled whenever no wave is
-   * live, to force many waves.
+   * whenever a power-up can start he presses Y, then shoots with X once
+   * the wave is ready, up to 2 s later (his own seeded generator picks),
+   * so some run out, some are ended by Max, and the rest fire at whatever
+   * range they find. Half are staged at random ranges: just before X, Max
+   * is put 20 to 260 px down the lane facing him. The meter is refilled
+   * whenever no wave is live, to force many waves.
    */
   function powerBot(brain: AiBrain, seed: number): (w: World) => PlayerIntent {
     const rng = seeded(seed * 7 + 1);
     let shootInS = -1;
+    let staged = false;
     let lastShoot = false;
     return w => {
       const intent = think(brain, w, w.home, w.away, STEP);
@@ -315,18 +315,17 @@ describe('think', () => {
       if (w.power && w.power.activeS > 0 && shootInS >= 0) {
         shootInS -= STEP;
         const shoot = shootInS <= 0 && !lastShoot;
+        if (shoot && staged) {
+          const x = Math.min(w.ball.x + 20 + rng() * 240, w.field.fenceR - PLAYER_R);
+          Object.assign(w.away, { x, z: w.ball.z + (rng() - 0.5) * 20, facing: -1, vx: 0, vz: 0 });
+        }
         lastShoot = shoot;
         return { ...intent, shootHeld: shoot };
       }
       lastShoot = false;
       if (!canStartPower(w) || w.home.held.power) return intent;
-      if (rng() < 0.5) {
-        const x = Math.min(w.ball.x + 20 + rng() * 240, w.field.fenceR - PLAYER_R);
-        Object.assign(w.away, { x, z: w.ball.z + (rng() - 0.5) * 20, facing: -1, vx: 0, vz: 0 });
-        shootInS = 2 * STEP;
-      } else {
-        shootInS = rng() * 3;
-      }
+      staged = rng() < 0.5;
+      shootInS = WAVE_READY_S + (staged ? 2 * STEP : rng() * 2);
       return { ...intent, shootHeld: false, powerHeld: true };
     };
   }
@@ -443,47 +442,90 @@ describe('think', () => {
 });
 
 describe('Max and the Energy Wave', () => {
-  /**
-   * Max's AI in the loop: Harrison with the ball and a full meter, Max
-   * `gap` px down the lane facing him. Harrison presses Y, then X a few
-   * ticks later. What stopped the wave, or didn't.
-   */
-  function outcome(profile: AiProfile, gap: number): 'braced' | 'blown' | 'none' {
-    const w = createWorld(BASE_STATS, BASE_STATS, 9, { home: 0, away: profile.aimErrorDeg }, { golden: false });
-    w.match.phase = 'playing';
-    w.power!.meter = 1;
-    Object.assign(w.home, { x: 60, z: 32, facing: 1 });
-    Object.assign(w.ball, { x: 68, y: BALL_REST_Y, z: 32, vx: 0, vy: 0, vz: 0 });
-    Object.assign(w.away, { x: 68 + gap, z: 32, facing: -1 });
-    const brain = createBrain(profile);
-    const script: PlayerIntent[] = [{ ...NO_INTENT, powerHeld: true }, NO_INTENT, { ...NO_INTENT, shootHeld: true }];
-    for (let i = 0; i < 60 * 3; i++) {
-      stepWorld(w, script[i] ?? NO_INTENT, think(brain, w, w.away, w.home, STEP), STEP);
-      if (w.events.power.braced) return 'braced';
-      if (w.events.power.blown) return 'blown';
-    }
-    return 'none';
-  }
-
-  it.each(['easy', 'normal', 'hard'] as const)('on %s, a wave fired into a far, square Max is braced', difficulty => {
-    for (const gap of [150, 250, 350]) expect(outcome(DIFFICULTY[difficulty], gap), `gap ${gap}`).toBe('braced');
-  });
-
-  it.each(['easy', 'normal', 'hard'] as const)('on %s, a wave fired at a Max inside the bracing distance blows him away', difficulty => {
-    for (const gap of [30, BRACE_DISTANCE - 10]) expect(outcome(DIFFICULTY[difficulty], gap), `gap ${gap}`).toBe('blown');
-  });
-
-  it('Max plays as usual while Harrison is powered up: he comes to defend', () => {
-    const w = createWorld(BASE_STATS, BASE_STATS, 9, { home: 0, away: 6 }, { golden: false });
+  /** Harrison on the ball at x 200 with a full meter, Max at maxX facing him; Harrison presses Y. */
+  function poweredUp(profile: AiProfile, seed: number, maxX = 240) {
+    const w = createWorld(BASE_STATS, BASE_STATS, seed, { home: 0, away: profile.aimErrorDeg }, { golden: false });
     w.match.phase = 'playing';
     w.power!.meter = 1;
     Object.assign(w.home, { x: 200, z: 32, facing: 1 });
     Object.assign(w.ball, { x: 208, y: BALL_REST_Y, z: 32, vx: 0, vy: 0, vz: 0 });
-    Object.assign(w.away, { x: 400, z: 32, facing: -1 });
-    const brain = createBrain(DIFFICULTY.normal);
-    stepWorld(w, { ...NO_INTENT, powerHeld: true }, think(brain, w, w.away, w.home, STEP), STEP);
-    for (let i = 0; i < 60; i++) stepWorld(w, NO_INTENT, think(brain, w, w.away, w.home, STEP), STEP);
-    expect(w.away.x).toBeLessThan(330);
-    expect(brain.plan).toBe('defend');
+    Object.assign(w.away, { x: maxX, z: 32, facing: -1 });
+    const brain = createBrain(profile);
+    const step = (home: PlayerIntent = NO_INTENT) => stepWorld(w, home, think(brain, w, w.away, w.home, STEP), STEP);
+    step({ ...NO_INTENT, powerHeld: true });
+    return { w, brain, step };
+  }
+
+  /** Steps until the wave is ready. */
+  const untilReady = (w: World, step: (h?: PlayerIntent) => void) => {
+    for (let i = 0; i < 120 && !w.events.power.ready; i++) step();
+  };
+
+  /** What the wave does to Max once fired; null if it never reached him. */
+  const result = (w: World, step: (h?: PlayerIntent) => void): 'braced' | 'blown' | 'none' => {
+    for (let i = 0; i < 40; i++) {
+      step();
+      if (w.events.power.braced) return 'braced';
+      if (w.events.power.blown) return 'blown';
+    }
+    return 'none';
+  };
+
+  const sure = (p: AiProfile) => ({ ...p, braceSense: 1 });
+  const unsure = { ...DIFFICULTY.normal, braceSense: 0 };
+
+  it('when Harrison powers up, Max backs off to bracing range, facing him, and stands square', () => {
+    const { w, step } = poweredUp(sure(DIFFICULTY.normal), 4);
+    for (let i = 0; i < 100; i++) step();
+    expect(w.away.x - w.ball.x).toBeGreaterThan(BRACE_DISTANCE + PLAYER_R + 20);
+    expect(w.away.facing).toBe(-1);
+    expect(Math.abs(w.away.vx)).toBeLessThan(5);
+  });
+
+  it.each(['easy', 'normal', 'hard'] as const)('on %s, a Max who got it right braces a wave fired from far, square', difficulty => {
+    for (const maxX of [360, 460, 560]) {
+      const { w, step } = poweredUp(sure(DIFFICULTY[difficulty]), 4, maxX);
+      untilReady(w, step);
+      step({ ...NO_INTENT, shootHeld: true });
+      expect(result(w, step), `from ${maxX}`).toBe('braced');
+    }
+  });
+
+  it('on Normal, firing as soon as it is ready, a Max who got it right braces it, every time', () => {
+    for (let seed = 1; seed <= 12; seed++) {
+      const { w, step } = poweredUp(sure(DIFFICULTY.normal), seed);
+      untilReady(w, step);
+      step({ ...NO_INTENT, shootHeld: true });
+      expect(result(w, step), `seed ${seed}`).toBe('braced');
+    }
+  });
+
+  it('he backs off slower than Harrison sprints: chased down once it is ready and fired from close, he is blown away', () => {
+    for (let seed = 1; seed <= 6; seed++) {
+      const { w, step } = poweredUp(sure(DIFFICULTY.normal), seed);
+      untilReady(w, step);
+      let fired = false;
+      for (let i = 0; i < 90 && !fired; i++) {
+        step({ ...NO_INTENT, moveX: 1, sprint: true, shootHeld: w.away.x - w.ball.x < BRACE_DISTANCE - 10 });
+        fired = w.events.power.fired;
+      }
+      expect(fired, `seed ${seed}`).toBe(true);
+      expect(result(w, step), `seed ${seed}`).toBe('blown');
+    }
+  });
+
+  it('getting it wrong (late, too close, or not backing off), he is mostly blown away by a wave fired as soon as it is ready', () => {
+    let blown = 0;
+    for (let seed = 1; seed <= 12; seed++) {
+      const { w, step } = poweredUp(unsure, seed);
+      untilReady(w, step);
+      step({ ...NO_INTENT, shootHeld: true });
+      if (result(w, step) === 'blown') blown++;
+    }
+    expect(blown).toBeGreaterThanOrEqual(8);
+  });
+
+  it('Easy gets it right about half the time, Normal three in four, Hard nine in ten', () => {
+    expect([DIFFICULTY.easy.braceSense, DIFFICULTY.normal.braceSense, DIFFICULTY.hard.braceSense]).toEqual([0.5, 0.75, 0.9]);
   });
 });

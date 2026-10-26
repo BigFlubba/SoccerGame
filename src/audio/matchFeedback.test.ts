@@ -109,7 +109,7 @@ describe('matchFeedback', () => {
 describe('matchFeedback: the power-up', () => {
   const powered = (flags: Partial<World['events']['power']>): World => {
     const w = world();
-    w.events.power = { started: false, cancelled: false, fired: false, braced: false, blown: false, ...flags };
+    w.events.power = { started: false, ready: false, cancelled: false, fired: false, braced: false, blown: false, ...flags };
     return w;
   };
 
@@ -132,5 +132,8 @@ describe('matchFeedback: the power-up', () => {
   it('a cancelled power-up fizzles', () => {
     expect(matchFeedback(powered({ cancelled: true }), 'playing').cues).toEqual(['fizzle']);
   });
-});
 
+  it('the wave becoming ready chimes and pulses: shoot now', () => {
+    expect(matchFeedback(powered({ ready: true }), 'playing')).toEqual({ cues: ['powerReady'], rumble: ['ready'] });
+  });
+});

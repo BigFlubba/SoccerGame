@@ -5,6 +5,7 @@ import type { GameContext } from './context';
 import { DIFFICULTY } from '../game/ai';
 import { GOAL_PAUSE_S } from '../game/match';
 import { BASE_STATS } from '../game/stats';
+import { WAVE_READY_S } from '../game/power';
 import { maxStats } from '../meta/ladder';
 import { newProfile } from '../meta/profile';
 import { DEFAULT_SETTINGS } from '../meta/settings';
@@ -556,10 +557,10 @@ describe('match scene: the Energy Wave', () => {
     return { s, ctx };
   }
 
-  /** Powers up with Y, then fires with X. */
+  /** Powers up with Y, waits for the wave to be ready, then fires with X. */
   function fire(s: MatchScene): void {
     s.update(frame(['power']), STEP);
-    s.update(frame(), STEP);
+    run(s, WAVE_READY_S + 0.05);
     s.update(frame(['shoot']), STEP);
   }
 

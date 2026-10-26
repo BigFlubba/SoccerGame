@@ -4,7 +4,7 @@ import { BALL_R } from '../art/ball';
 import { POST_R } from './constants';
 import { BACKYARD } from './field';
 import { POST_INSET } from './kick';
-import { METER_MIN_REFILL_S, POWERED_S, TOUCH_CEILING, WAVE_MIN_DX, addMeter, canFireWave, canStartPower, createPower, onTarget, powerHint, tickPower, waveTarget, type PowerState } from './power';
+import { METER_MIN_REFILL_S, POWERED_S, TOUCH_CEILING, WAVE_MIN_DX, WAVE_READY_S, addMeter, canFireWave, canStartPower, createPower, onTarget, powerHint, tickPower, waveTarget, type PowerState } from './power';
 import { BASE_STATS } from './stats';
 import { createWorld, type World } from './world';
 
@@ -154,9 +154,17 @@ describe('starting a power-up', () => {
 describe('firing the wave', () => {
   const powered = (x = 400) => {
     const r = ready(x);
-    r.power.activeS = 1;
+    r.power.activeS = POWERED_S - WAVE_READY_S - 0.1;
     return r;
   };
+
+  it('it is not ready until WAVE_READY_S after powering up', () => {
+    const { w, power } = ready();
+    power.activeS = POWERED_S - WAVE_READY_S + 0.05;
+    expect(canFireWave(w)).toBe(false);
+    power.activeS = POWERED_S - WAVE_READY_S;
+    expect(canFireWave(w)).toBe(true);
+  });
 
   it('X fires it while powered up with the ball, facing either way', () => {
     expect(canFireWave(powered().w)).toBe(true);

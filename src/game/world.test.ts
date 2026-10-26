@@ -4,7 +4,7 @@ import { inGoalBox } from './field';
 import { NO_INTENT, PLAYER_R, type PlayerIntent } from './player';
 import { BASE_STATS } from './stats';
 import { BALL_REST_Y } from './ball';
-import { POWERED_S } from './power';
+import { POWERED_S, WAVE_READY_S } from './power';
 import { createWorld, placeForKickoff, stepWorld, type World } from './world';
 
 const STEP = 1 / 60;
@@ -231,13 +231,31 @@ describe('world: the power-up', () => {
     return w;
   }
 
-  /** Powered up: Y pressed, then let go. */
+  /** Powered up, and the wave ready: Y pressed, then let go, then WAVE_READY_S. */
   function powered(): World {
     const w = ready();
     stepWorld(w, press, NO_INTENT, STEP);
-    stepWorld(w, NO_INTENT, NO_INTENT, STEP);
+    for (let i = 0; i < ticks(WAVE_READY_S) + 1; i++) stepWorld(w, NO_INTENT, NO_INTENT, STEP);
     return w;
   }
+
+  it('X while the wave readies does nothing; it is ready WAVE_READY_S after powering up, reported once', () => {
+    const w = ready();
+    stepWorld(w, press, NO_INTENT, STEP);
+    for (let i = 0; i < ticks(0.3); i++) stepWorld(w, NO_INTENT, NO_INTENT, STEP);
+    stepWorld(w, shoot, NO_INTENT, STEP);
+    expect(w.events.power.fired).toBe(false);
+    expect(w.home.state).toBe('ground');
+    expect(w.power?.activeS).toBeGreaterThan(0);
+    let readies = 0;
+    for (let i = 0; i < ticks(1); i++) {
+      stepWorld(w, NO_INTENT, NO_INTENT, STEP);
+      if (w.events.power.ready) readies++;
+    }
+    expect(readies).toBe(1);
+    stepWorld(w, shoot, NO_INTENT, STEP);
+    expect(w.events.power.fired).toBe(true);
+  });
 
   it('without a kit, power is null and holding Y changes nothing', () => {
     const plain = createWorld(BASE_STATS, BASE_STATS, 7, ERR);
@@ -249,7 +267,7 @@ describe('world: the power-up', () => {
       const i2: PlayerIntent = { ...NO_INTENT, moveX: rng() * 2 - 1 };
       stepWorld(plain, i1, i2, STEP);
       stepWorld(holding, { ...i1, powerHeld: true }, i2, STEP);
-      expect(holding.events.power).toEqual({ started: false, cancelled: false, fired: false, braced: false, blown: false });
+      expect(holding.events.power).toEqual({ started: false, ready: false, cancelled: false, fired: false, braced: false, blown: false });
     }
     expect([holding.home.x, holding.home.z, holding.ball.x, holding.ball.z]).toEqual([plain.home.x, plain.home.z, plain.ball.x, plain.ball.z]);
     expect(holding.match.score).toEqual(plain.match.score);

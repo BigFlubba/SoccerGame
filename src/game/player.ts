@@ -18,6 +18,8 @@ export interface PlayerIntent {
   chipHeld: boolean;
   powerHeld: boolean;
   sprint: boolean;
+  /** Face this way whatever way he moves, as when backing off from someone. */
+  faceX?: 1 | -1;
 }
 
 export const NO_INTENT: Readonly<PlayerIntent> = Object.freeze({
@@ -337,9 +339,17 @@ function dropWallSpeed(p: Player, intent: PlayerIntent, field: Field): void {
 /**
  * `waveDir`: while he's powered up with the ball and a clear line, the way
  * to Max's goal; an X press then strikes the Energy Wave, turning him to
- * face it. Null otherwise, when X is a normal shot.
+ * face it. 'wait' while the wave readies, when X does nothing. Null
+ * otherwise, when X is a normal shot.
  */
-export function stepPlayer(p: Player, intent: PlayerIntent, dt: number, field: Field, ballAtFeet: boolean, waveDir: 1 | -1 | null = null): void {
+export function stepPlayer(
+  p: Player,
+  intent: PlayerIntent,
+  dt: number,
+  field: Field,
+  ballAtFeet: boolean,
+  waveDir: 1 | -1 | 'wait' | null = null,
+): void {
   const shootPressed = intent.shootHeld && !p.held.shoot;
   const chipPressed = intent.chipHeld && !p.held.chip;
   if (intent.powerHeld && !p.held.power) p.powerArmed = true;
@@ -352,9 +362,12 @@ export function stepPlayer(p: Player, intent: PlayerIntent, dt: number, field: F
 
   if (p.state === 'ground') {
     if (shootPressed && waveDir !== null) {
-      p.facing = waveDir;
-      p.kick = { kind: 'wave', aim: intent.aim, active: true, charge: 1, overchargeS: 0 };
-      enter(p, 'unleashing');
+      // While the wave readies the press is spent, so he doesn't shoot instead.
+      if (waveDir !== 'wait') {
+        p.facing = waveDir;
+        p.kick = { kind: 'wave', aim: intent.aim, active: true, charge: 1, overchargeS: 0 };
+        enter(p, 'unleashing');
+      }
     } else if (intent.jump) {
       enter(p, 'air');
       p.vy = jumpVelocity(p.stats);
@@ -377,6 +390,7 @@ export function stepPlayer(p: Player, intent: PlayerIntent, dt: number, field: F
   const runTarget = (runSpeed(p.stats) * (sprinting ? SPRINT_MULTIPLIER : 1)) / moveLen;
   const canTurn = p.state === 'ground' || (p.state === 'air' && !p.kick);
   if (canTurn && intent.moveX !== 0) p.facing = intent.moveX > 0 ? 1 : -1;
+  if (canTurn && intent.faceX) p.facing = intent.faceX;
 
   switch (p.state) {
     case 'ground':

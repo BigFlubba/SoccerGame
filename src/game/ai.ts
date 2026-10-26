@@ -18,23 +18,31 @@ export interface AiProfile {
   aggression: number;
   /** Distance from the goal line it starts shooting from. */
   shootRange: number;
+  /** Chance (0..1) that it backs off and squares up properly when Harrison powers up. */
+  braceSense: number;
 }
 
 export const DIFFICULTY: Record<Difficulty, AiProfile> = {
-  easy: { reactionS: 0.32, aimErrorDeg: 10, aggression: 0.3, shootRange: 150 },
-  normal: { reactionS: 0.18, aimErrorDeg: 6, aggression: 0.55, shootRange: 180 },
-  hard: { reactionS: 0.1, aimErrorDeg: 3, aggression: 0.8, shootRange: 210 },
+  easy: { reactionS: 0.32, aimErrorDeg: 10, aggression: 0.3, shootRange: 150, braceSense: 0.5 },
+  normal: { reactionS: 0.18, aimErrorDeg: 6, aggression: 0.55, shootRange: 180, braceSense: 0.75 },
+  hard: { reactionS: 0.1, aimErrorDeg: 3, aggression: 0.8, shootRange: 210, braceSense: 0.9 },
 };
 
 export interface AiBrain {
   profile: AiProfile;
   nextDecisionS: number;
   intent: PlayerIntent;
-  plan: 'chase' | 'dribble' | 'charge' | 'defend' | 'jump' | 'faceWave';
+  plan: 'chase' | 'dribble' | 'charge' | 'defend' | 'jump' | 'faceWave' | 'backOff' | 'hesitate';
   /** Time left on the current charge before it releases the shot. */
   chargeLeftS: number;
   /** Time until it may slide again. */
   slideReadyS: number;
+  /**
+   * While Harrison is powered up: how far off it means to stand, and how
+   * long until it starts backing off; 'stay' when it just keeps defending.
+   * Null when he isn't powered up.
+   */
+  backOff: null | 'stay' | { gap: number; inS: number };
 }
 
 /** The ball counts as at someone's feet within this distance, on the ground. */
@@ -78,6 +86,13 @@ const CORNER_CLEARANCE = PLAYER_R + ARRIVE + 1;
 const LEAD_S = 0.25;
 /** Facing a wave, it runs at a spot on the beam's line this far ahead of it, so it stays in the lane as it closes. */
 const LANE_LOOKAHEAD = 12;
+/** Backing off from a powered-up Harrison: where it means to stand, how fast it backpedals, and the room it keeps in front of its goal. */
+const BACK_OFF_GAP = { from: 110, spread: 20 };
+const BACKPEDAL_PACE = 0.9;
+const BACK_OFF_GOAL_ROOM = 10;
+/** Its mistakes: reacting late, or misjudging and stopping too close. */
+const LATE_REACTION = { from: 0.6, spread: 0.3 };
+const TOO_CLOSE_GAP = { from: 35, spread: 25 };
 /** Where it aims its shots: mostly the far post, then the near post, sometimes straight. */
 const AIM_ODDS: readonly (readonly [Aim, number])[] = [
   ['far', 1 / 2],
@@ -86,7 +101,7 @@ const AIM_ODDS: readonly (readonly [Aim, number])[] = [
 ];
 
 export function createBrain(profile: AiProfile): AiBrain {
-  return { profile, nextDecisionS: 0, intent: { ...NO_INTENT }, plan: 'chase', chargeLeftS: 0, slideReadyS: 0 };
+  return { profile, nextDecisionS: 0, intent: { ...NO_INTENT }, plan: 'chase', chargeLeftS: 0, slideReadyS: 0, backOff: null };
 }
 
 const attackDir = (me: Player): 1 | -1 => (me.team === 'home' ? 1 : -1);
@@ -220,6 +235,39 @@ function pickAim(w: World): Aim {
 }
 
 /**
+ * How it means to answer a power-up: usually back off to just outside
+ * blow-away range and square up; otherwise one of its mistakes, each as
+ * likely: reacting late, stopping too close, or hesitating where it is
+ * instead of backing off. Rolled once per power-up. Whatever it rolls,
+ * Harrison can see where it ends up before he shoots.
+ */
+function rollBackOff(profile: AiProfile, rng: () => number): 'stay' | { gap: number; inS: number } {
+  const gap = BACK_OFF_GAP.from + rng() * BACK_OFF_GAP.spread;
+  if (rng() < profile.braceSense) return { gap, inS: profile.reactionS };
+  const mistake = Math.floor(rng() * 3);
+  if (mistake === 0) return { gap, inS: LATE_REACTION.from + rng() * LATE_REACTION.spread };
+  if (mistake === 1) return { gap: TOO_CLOSE_GAP.from + rng() * TOO_CLOSE_GAP.spread, inS: profile.reactionS };
+  return 'stay';
+}
+
+/**
+ * Harrison is powered up: it backpedals toward its own goal, facing him,
+ * to `gap` px from the ball, in line with it, and stands square there. It
+ * backpedals slower than he runs, so he can chase it down, and in front of
+ * its goal it runs out of room.
+ */
+function backOff(brain: AiBrain, w: World, me: Player, them: Player, gap: number): void {
+  brain.plan = 'backOff';
+  const ball = w.ball;
+  const dir = -attackDir(me);
+  const own = w.field.goals.find(g => g.side === (dir > 0 ? 'right' : 'left'))!;
+  const x = dir > 0 ? Math.min(ball.x + gap, own.lineX - BACK_OFF_GOAL_ROOM) : Math.max(ball.x - gap, own.lineX + BACK_OFF_GOAL_ROOM);
+  const z = ball.z + (goalCentreZ(own) - ball.z) * DEFEND_COVER;
+  const [mx, mz] = goRound(w, me, them, steer(me, x, z), z);
+  brain.intent = { ...NO_INTENT, moveX: mx * BACKPEDAL_PACE, moveZ: mz * BACKPEDAL_PACE, faceX: Math.sign(ball.x - me.x) >= 0 ? 1 : -1 };
+}
+
+/**
  * The Energy Wave Harrison just fired is on its way: Max stays square to
  * it and keeps coming along its line, so whether he braces is the wave's
  * to decide, not a turn to chase the loose ball.
@@ -335,8 +383,22 @@ export function think(brain: AiBrain, w: World, me: Player, them: Player, dt: nu
   }
   // The wave Harrison just fired, still on its way: it stays square to it every tick until it arrives.
   const wave = them.team === 'home' && w.wave?.live && w.wave.outcome === null ? w.wave : null;
+  const powered = them.team === 'home' && (w.power?.activeS ?? 0) > 0;
+  if (!powered) brain.backOff = null;
+  else if (brain.backOff === null) brain.backOff = rollBackOff(brain.profile, w.rng);
+  const backing = brain.backOff !== null && brain.backOff !== 'stay' ? brain.backOff : null;
+  if (backing) backing.inS -= dt;
   if (wave) {
     faceWave(brain, w, me, wave);
+    brain.nextDecisionS = brain.profile.reactionS;
+  } else if (backing && backing.inS <= 0) {
+    // Committed: it re-aims every tick to keep its distance while he's powered up.
+    backOff(brain, w, me, them, backing.gap);
+    brain.nextDecisionS = brain.profile.reactionS;
+  } else if (powered) {
+    // Before it reacts, or when it doesn't back off at all, it hesitates where it is: it never challenges a powered-up Harrison.
+    brain.plan = 'hesitate';
+    brain.intent = { ...NO_INTENT, faceX: Math.sign(w.ball.x - me.x) >= 0 ? 1 : -1 };
     brain.nextDecisionS = brain.profile.reactionS;
   } else if (!released && brain.nextDecisionS <= 1e-9) {
     // A decision on the release tick could start a new charge and swallow the shot, so it waits a tick.

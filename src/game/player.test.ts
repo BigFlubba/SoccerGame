@@ -68,6 +68,13 @@ describe('stepPlayer: moving', () => {
     expect(p.z).toBeLessThan(z);
   });
 
+  it('faceX keeps him facing one way while he backs off the other', () => {
+    const p = harrison();
+    tick(p, { moveX: 0.7, faceX: -1 }, ticks(0.5));
+    expect(p.facing).toBe(-1);
+    expect(p.x).toBeGreaterThan(320);
+  });
+
   it('turns to face where he runs', () => {
     const p = harrison();
     tick(p, { moveX: -1 });
@@ -414,7 +421,7 @@ describe('stepPlayer: stamina and falls', () => {
 
 describe('stepPlayer: the Energy Wave strike', () => {
   /** Ticks with the ball at his feet, and a wave direction when X should fire the wave. */
-  function wave(p: Player, i: Partial<PlayerIntent>, n = 1, waveDir: 1 | -1 | null = 1): void {
+  function wave(p: Player, i: Partial<PlayerIntent>, n = 1, waveDir: 1 | -1 | 'wait' | null = 1): void {
     for (let k = 0; k < n; k++) stepPlayer(p, intent(i), STEP, BACKYARD, true, waveDir);
   }
 
@@ -425,6 +432,13 @@ describe('stepPlayer: the Energy Wave strike', () => {
     expect(p.facing).toBe(1);
     expect(p.kick).toEqual({ kind: 'wave', aim: 'far', active: true, charge: 1, overchargeS: 0 });
     wave(p, {}, ticks(1));
+    expect(p.state).toBe('ground');
+    expect(p.kick).toBeNull();
+  });
+
+  it('while the wave readies, X does nothing', () => {
+    const p = harrison();
+    wave(p, { shootHeld: true }, 1, 'wait');
     expect(p.state).toBe('ground');
     expect(p.kick).toBeNull();
   });
