@@ -5,6 +5,17 @@ import type { Profile } from './profile';
 /** The goals that pay a style bonus. The bicycle kick and other power moves join when they're built. */
 export type StyleKind = 'header' | 'volley' | 'chip' | 'wave';
 
+/** The kick a goal came from. */
+export type GoalKind = 'shot' | 'chip' | 'volley' | 'header' | 'wave';
+
+/** One of Harrison's goals: the clock minute, the kick, and whether it was a perfect strike. */
+export interface GoalRecord {
+  minute: number;
+  /** Null when no kick of his was still live when the ball crossed the line. */
+  kind: GoalKind | null;
+  perfect: boolean;
+}
+
 /** A finished match, from Harrison's side. */
 export interface MatchSummary {
   result: 'win' | 'draw' | 'lose';
@@ -12,6 +23,8 @@ export interface MatchSummary {
   goalsAgainst: number;
   /** One entry per style goal he scored, in any order. */
   styleGoals: readonly StyleKind[];
+  /** Every goal he scored, in order. */
+  goals: readonly GoalRecord[];
 }
 
 /** One line of the Results tally, e.g. WIN +60. */

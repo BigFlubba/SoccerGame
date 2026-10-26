@@ -4,8 +4,8 @@ import { newProfile, type Profile } from './profile';
 import { applyMatch, localDate } from './progress';
 
 const TODAY = '2026-10-23';
-const win30: MatchSummary = { result: 'win', goalsFor: 3, goalsAgainst: 0, styleGoals: [] };
-const loss03: MatchSummary = { result: 'lose', goalsFor: 0, goalsAgainst: 3, styleGoals: [] };
+const win30: MatchSummary = { result: 'win', goalsFor: 3, goalsAgainst: 0, styleGoals: [], goals: [] };
+const loss03: MatchSummary = { result: 'lose', goalsFor: 0, goalsAgainst: 3, styleGoals: [], goals: [] };
 const labels = (p: Profile, s: MatchSummary, match: number, today = TODAY) => applyMatch(p, s, match, today).reward.lines.map(l => l.label);
 
 describe('applyMatch', () => {
@@ -28,7 +28,7 @@ describe('applyMatch', () => {
   });
 
   it('counts style goals in the totals', () => {
-    const { profile } = applyMatch(newProfile(), { result: 'win', goalsFor: 2, goalsAgainst: 1, styleGoals: ['header', 'chip'] }, 1, TODAY);
+    const { profile } = applyMatch(newProfile(), { result: 'win', goalsFor: 2, goalsAgainst: 1, styleGoals: ['header', 'chip'], goals: [] }, 1, TODAY);
     expect(profile.totals.styleGoals).toBe(2);
   });
 
@@ -40,7 +40,7 @@ describe('applyMatch', () => {
 
   it('a draw or a loss pays but does not advance the ladder or use the daily bonus', () => {
     const start = { ...newProfile(), ladderWins: 2 };
-    for (const s of [loss03, { result: 'draw', goalsFor: 1, goalsAgainst: 1, styleGoals: [] } as MatchSummary]) {
+    for (const s of [loss03, { result: 'draw', goalsFor: 1, goalsAgainst: 1, styleGoals: [], goals: [] } as MatchSummary]) {
       const { profile, reward } = applyMatch(start, s, 3, TODAY);
       expect(reward.coins).toBeGreaterThan(0);
       expect(profile.ladderWins).toBe(2);
@@ -66,7 +66,7 @@ describe('applyMatch', () => {
   });
 
   it('several levels at once pay a bonus each', () => {
-    const { reward } = applyMatch({ ...newProfile(), xp: 99 }, { result: 'win', goalsFor: 9, goalsAgainst: 0, styleGoals: Array(9).fill('header') }, 1, TODAY);
+    const { reward } = applyMatch({ ...newProfile(), xp: 99 }, { result: 'win', goalsFor: 9, goalsAgainst: 0, styleGoals: Array(9).fill('header'), goals: [] }, 1, TODAY);
     // 60 + 90 + 135 + 20 = 305 XP on top of 99: past 100 and 150 more.
     expect(reward.after.level).toBe(3);
     expect(reward.levelBonus).toBe(100);

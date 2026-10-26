@@ -128,7 +128,7 @@ export function createMatchScene(ctx: GameContext, seed: number): MatchScene {
   /** Saved at once, so closing the tab during the FULL TIME banner loses nothing. Called once, on the full-time tick. */
   const award = (result: NonNullable<World['match']['result']>) => {
     const { home, away } = world.match.score;
-    const done = applyMatch(ctx.profile, { result, goalsFor: home, goalsAgainst: away, styleGoals: [...styleGoals] }, ladderMatch, ctx.today());
+    const done = applyMatch(ctx.profile, { result, goalsFor: home, goalsAgainst: away, styleGoals: [...styleGoals], goals: [] }, ladderMatch, ctx.today());
     ctx.saveProfile(done.profile);
     reward = done.reward;
   };

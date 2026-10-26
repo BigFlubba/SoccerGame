@@ -7,7 +7,7 @@ const pairs = (s: MatchSummary, dailyWin = false) => matchLines(s, dailyWin).map
 
 describe('match rewards', () => {
   it('a 3-1 win with a header and a chip', () => {
-    expect(pairs({ result: 'win', goalsFor: 3, goalsAgainst: 1, styleGoals: ['chip', 'header'] })).toEqual([
+    expect(pairs({ result: 'win', goalsFor: 3, goalsAgainst: 1, styleGoals: ['chip', 'header'], goals: [] })).toEqual([
       ['WIN', 60],
       ['3 GOALS', 30],
       ['HEADER', 15],
@@ -16,14 +16,14 @@ describe('match rewards', () => {
   });
 
   it('a 0-0 draw keeps a clean sheet', () => {
-    expect(pairs({ result: 'draw', goalsFor: 0, goalsAgainst: 0, styleGoals: [] })).toEqual([
+    expect(pairs({ result: 'draw', goalsFor: 0, goalsAgainst: 0, styleGoals: [], goals: [] })).toEqual([
       ['DRAW', 30],
       ['CLEAN SHEET', 20],
     ]);
   });
 
   it('a hat-trick of headers groups them', () => {
-    expect(pairs({ result: 'win', goalsFor: 3, goalsAgainst: 2, styleGoals: ['header', 'header', 'header'] })).toEqual([
+    expect(pairs({ result: 'win', goalsFor: 3, goalsAgainst: 2, styleGoals: ['header', 'header', 'header'], goals: [] })).toEqual([
       ['WIN', 60],
       ['3 GOALS', 30],
       ['3 HEADERS', 45],
@@ -31,7 +31,7 @@ describe('match rewards', () => {
   });
 
   it('one goal is a GOAL, and volleys come between headers and chips', () => {
-    expect(pairs({ result: 'lose', goalsFor: 1, goalsAgainst: 2, styleGoals: ['chip', 'volley', 'volley'] })).toEqual([
+    expect(pairs({ result: 'lose', goalsFor: 1, goalsAgainst: 2, styleGoals: ['chip', 'volley', 'volley'], goals: [] })).toEqual([
       ['LOSS', 15],
       ['1 GOAL', 10],
       ['2 VOLLEYS', 30],
@@ -40,7 +40,7 @@ describe('match rewards', () => {
   });
 
   it('an Energy Wave goal is a style line worth 15', () => {
-    expect(pairs({ result: 'win', goalsFor: 2, goalsAgainst: 1, styleGoals: ['wave', 'chip'] })).toEqual([
+    expect(pairs({ result: 'win', goalsFor: 2, goalsAgainst: 1, styleGoals: ['wave', 'chip'], goals: [] })).toEqual([
       ['WIN', 60],
       ['2 GOALS', 20],
       ['CHIP', 15],
@@ -49,11 +49,11 @@ describe('match rewards', () => {
   });
 
   it('a loss with no goals still pays', () => {
-    expect(pairs({ result: 'lose', goalsFor: 0, goalsAgainst: 3, styleGoals: [] })).toEqual([['LOSS', 15]]);
+    expect(pairs({ result: 'lose', goalsFor: 0, goalsAgainst: 3, styleGoals: [], goals: [] })).toEqual([['LOSS', 15]]);
   });
 
   it('the daily bonus pays coins but no XP', () => {
-    const lines = matchLines({ result: 'win', goalsFor: 1, goalsAgainst: 0, styleGoals: [] }, true);
+    const lines = matchLines({ result: 'win', goalsFor: 1, goalsAgainst: 0, styleGoals: [], goals: [] }, true);
     expect(lines.map(l => [l.label, l.coins]).at(-1)).toEqual(['FIRST WIN TODAY', 50]);
     expect(matchXp(lines)).toBe(60 + 10 + 20);
   });

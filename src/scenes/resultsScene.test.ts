@@ -10,8 +10,8 @@ import { TEST_TODAY, testContext } from './testContext';
 import { frame } from './testInput';
 
 const STEP = 1 / 60;
-const WIN_3_0: MatchSummary = { result: 'win', goalsFor: 3, goalsAgainst: 0, styleGoals: [] };
-const LOSS_0_2: MatchSummary = { result: 'lose', goalsFor: 0, goalsAgainst: 2, styleGoals: [] };
+const WIN_3_0: MatchSummary = { result: 'win', goalsFor: 3, goalsAgainst: 0, styleGoals: [], goals: [] };
+const LOSS_0_2: MatchSummary = { result: 'lose', goalsFor: 0, goalsAgainst: 2, styleGoals: [], goals: [] };
 
 /** A context whose profile has had `s` applied, as the match scene leaves it, and the reward for it. */
 function after(s: MatchSummary, from: Profile = newProfile(), match = nextMatch(from.ladderWins)) {
@@ -192,7 +192,7 @@ describe('ladderLine', () => {
     expect(ladderLine(after(WIN_3_0, { ...newProfile(), ladderWins: 9 }).reward)).toBe('BACKYARD CHAMPION!');
     expect(ladderLine(after(WIN_3_0, { ...newProfile(), ladderWins: 10 }).reward)).toBe('REMATCH WON!');
     expect(ladderLine(after(LOSS_0_2).reward)).toMatch(/GO AGAIN!$/);
-    expect(ladderLine(after({ result: 'draw', goalsFor: 1, goalsAgainst: 1, styleGoals: [] }).reward)).toMatch(/GO AGAIN!$/);
+    expect(ladderLine(after({ result: 'draw', goalsFor: 1, goalsAgainst: 1, styleGoals: [], goals: [] }).reward)).toMatch(/GO AGAIN!$/);
   });
 });
 

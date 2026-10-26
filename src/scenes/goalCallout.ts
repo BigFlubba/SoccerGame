@@ -1,8 +1,9 @@
 import type { World } from '../game/world';
+import type { GoalKind } from '../meta/economy';
 
 /** Harrison's last kick, while the ball is still his: what it was and how far from Max's goal line. */
 export interface LastKick {
-  kind: 'shot' | 'chip' | 'volley' | 'header' | 'wave';
+  kind: GoalKind;
   perfect: boolean;
   distance: number;
 }
