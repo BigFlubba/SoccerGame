@@ -89,7 +89,7 @@ const LANE_LOOKAHEAD = 12;
 /** Backing off from a powered-up Harrison: where it means to stand, how fast it backpedals, and the room it keeps in front of its goal. */
 const BACK_OFF_GAP = { from: 110, spread: 20 };
 const BACKPEDAL_PACE = 0.9;
-const BACK_OFF_GOAL_ROOM = 10;
+export const BACK_OFF_GOAL_ROOM = 10;
 /** Its mistakes: reacting late, or misjudging and stopping too close. */
 const LATE_REACTION = { from: 0.6, spread: 0.3 };
 const TOO_CLOSE_GAP = { from: 35, spread: 25 };
@@ -241,7 +241,7 @@ function pickAim(w: World): Aim {
  * instead of backing off. Rolled once per power-up. Whatever it rolls,
  * Harrison can see where it ends up before he shoots.
  */
-function rollBackOff(profile: AiProfile, rng: () => number): 'stay' | { gap: number; inS: number } {
+export function rollBackOff(profile: Pick<AiProfile, 'reactionS' | 'braceSense'>, rng: () => number): 'stay' | { gap: number; inS: number } {
   const gap = BACK_OFF_GAP.from + rng() * BACK_OFF_GAP.spread;
   if (rng() < profile.braceSense) return { gap, inS: profile.reactionS };
   const mistake = Math.floor(rng() * 3);
