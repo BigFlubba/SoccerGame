@@ -41,6 +41,11 @@ describe('padActions', () => {
     expect([...padActions(fakePad({}, [0, -0.8])).held]).toEqual(['up']);
   });
 
+  it('Y on the pad and V on the keyboard hold power', () => {
+    expect([...padActions(fakePad({ 3: true })).held]).toEqual(['power']);
+    expect([...keyActions(new Set(['KeyV'])).held]).toEqual(['power']);
+  });
+
   it('a missing pad holds nothing', () => {
     expect(padActions(null)).toEqual({ held: new Set(), moveX: 0, moveY: 0 });
   });
@@ -74,6 +79,12 @@ describe('mergeActions', () => {
 });
 
 describe('InputTracker', () => {
+  it('the tracker passes typed text through, and frames default to none', () => {
+    const t = new InputTracker();
+    expect(t.next(new Set(), 0, 0).typed).toBe('');
+    expect(t.next(new Set(), 0, 0, 'ab').typed).toBe('ab');
+  });
+
   it('reports pressed and released edges once', () => {
     const t = new InputTracker();
     expect(t.next(new Set(['shoot']), 0, 0).pressed.has('shoot')).toBe(true);
@@ -91,6 +102,63 @@ describe('InputTracker', () => {
 describe('createInput', () => {
   /** Enough of a Window for createInput: events plus a pad-less navigator. */
   const fakeWindow = () => Object.assign(new EventTarget(), { navigator: { getGamepads: () => [] } }) as unknown as Window;
+
+  /** A keydown with the fields createInput reads. */
+  const keydown = (code: string, key: string, mods: { ctrlKey?: boolean } = {}) =>
+    Object.assign(new Event('keydown', { cancelable: true }), { code, key, ctrlKey: false, metaKey: false, ...mods });
+
+  it('in text mode Z, X, C and V type letters and act as nothing; Enter and Esc still act', () => {
+    const target = fakeWindow();
+    const input = createInput(target);
+    input.setTextMode(true);
+    for (const [code, key] of [['KeyZ', 'z'], ['KeyX', 'x'], ['KeyC', 'c'], ['KeyV', 'v']]) target.dispatchEvent(keydown(code, key));
+    const typing = input.poll();
+    expect(typing.typed).toBe('zxcv');
+    expect([...typing.held]).toEqual([]);
+    target.dispatchEvent(keydown('Enter', 'Enter'));
+    expect(input.poll().held.has('confirm')).toBe(true);
+    target.dispatchEvent(keydown('Escape', 'Escape'));
+    expect(input.poll().held.has('back')).toBe(true);
+  });
+
+  it('in text mode Backspace types a delete, and typed text is read once', () => {
+    const target = fakeWindow();
+    const input = createInput(target);
+    input.setTextMode(true);
+    target.dispatchEvent(keydown('KeyA', 'a'));
+    target.dispatchEvent(keydown('Backspace', 'Backspace'));
+    const f = input.poll();
+    expect(f.typed).toBe('a\b');
+    expect(f.held.has('back')).toBe(false);
+    expect(input.poll().typed).toBe('');
+  });
+
+  it('a paste in text mode arrives as typed text, and Ctrl+V is left to the browser', () => {
+    const target = fakeWindow();
+    const input = createInput(target);
+    input.setTextMode(true);
+    const ctrlV = keydown('KeyV', 'v', { ctrlKey: true });
+    target.dispatchEvent(ctrlV);
+    expect(ctrlV.defaultPrevented).toBe(false);
+    target.dispatchEvent(Object.assign(new Event('paste', { cancelable: true }), { clipboardData: { getData: () => 'ab12-CD34' } }));
+    expect(input.poll().typed).toBe('ab12-CD34');
+  });
+
+  it('outside text mode keys act and nothing is typed; leaving text mode drops what was held and typed', () => {
+    const target = fakeWindow();
+    const input = createInput(target);
+    target.dispatchEvent(keydown('KeyV', 'v'));
+    const f = input.poll();
+    expect(f.typed).toBe('');
+    expect(f.held.has('power')).toBe(true);
+    input.setTextMode(true);
+    target.dispatchEvent(keydown('Enter', 'Enter'));
+    target.dispatchEvent(keydown('KeyQ', 'q'));
+    input.setTextMode(false);
+    const after = input.poll();
+    expect(after.typed).toBe('');
+    expect(after.held.size).toBe(0);
+  });
 
   it('reports a disconnected gamepad once, so the game can pause', () => {
     const target = fakeWindow();

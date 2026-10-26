@@ -15,10 +15,15 @@ import { createPressStartScene } from './titleScene';
 
 const NONE: ReadonlySet<never> = new Set();
 
-/** Folds a new frame into one not yet consumed, so a quick tap between fixed steps isn't lost. */
+/** Folds a new frame into one not yet consumed, so a quick tap (or typing) between fixed steps isn't lost. */
 function carry(pending: InputFrame | null, next: InputFrame): InputFrame {
   if (!pending) return next;
-  return { ...next, pressed: new Set([...pending.pressed, ...next.pressed]), released: new Set([...pending.released, ...next.released]) };
+  return {
+    ...next,
+    pressed: new Set([...pending.pressed, ...next.pressed]),
+    released: new Set([...pending.released, ...next.released]),
+    typed: pending.typed + next.typed,
+  };
 }
 
 /** localStorage, or nothing if the browser refuses access to it (some private modes throw). */
@@ -70,7 +75,7 @@ export function startGame(canvas: HTMLCanvasElement): void {
 
   // Each press reaches exactly one fixed step: the first one after it happened.
   const stepper = createStepper(dt => {
-    const frame = pending ?? { ...latest, pressed: NONE, released: NONE };
+    const frame = pending ?? { ...latest, pressed: NONE, released: NONE, typed: '' };
     pending = null;
     // Only where the browser says it would be allowed, so a refused start doesn't log a warning.
     if (frame.pressed.size > 0 && padMayUnlock(navigator)) audio.unlock();
@@ -96,6 +101,7 @@ export function startGame(canvas: HTMLCanvasElement): void {
     dt => {
       nowS += dt;
       if (input.takePadLost()) scene.onHidden?.();
+      input.setTextMode(scene.wantsText === true);
       latest = input.poll();
       pending = carry(pending, latest);
       stepper.advance(dt);

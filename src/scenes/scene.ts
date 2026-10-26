@@ -10,4 +10,6 @@ export interface Scene {
   draw(g: CanvasRenderingContext2D, nowS: number): void;
   /** The tab was hidden. */
   onHidden?(): void;
+  /** The keyboard types text instead of acting (InputFrame.typed), while this is true. */
+  wantsText?: boolean;
 }
