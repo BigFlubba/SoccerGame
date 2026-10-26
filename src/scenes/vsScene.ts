@@ -1,4 +1,5 @@
 import { ANCHOR } from '../art/body/pose';
+import { BISCUIT_ANCHOR } from '../art/opponents/biscuit';
 import { MASTER } from '../art/colors';
 import { BASE_W } from '../engine/viewport';
 import type { Camera } from '../game/camera';
@@ -22,21 +23,29 @@ export const VS_AUTO_S = 2;
 
 /** The venue behind the card, still, as the road map shows it. */
 const CAM: Camera = { x: 40 };
-/** The band behind the three lines is dimmed, as the venue screen's header is: the sky's cloud streak and the washing line are behind them. */
-const HEADER = { h: 86, dim: 0.45 };
-const LINE_YS = [30, 52, 74] as const;
-const LINE_SCALES = [2, 2, 1] as const;
+/** The band behind the lines is dimmed, as the venue screen's header is: the sky's cloud streak and the washing line are behind them. */
+const HEADER = { h: 86, tipH: 98, dim: 0.45 };
+/** The match, who plays, the bonus, and the boss's tip once he has beaten Harrison. */
+const LINE_YS = [30, 52, 74, 86] as const;
+const LINE_SCALES = [2, 2, 1, 1] as const;
+const LINE_COLOURS = ['energyGold', 'white', 'white', 'volt'] as const;
+export const BOSS_TIP = 'TIP: GET BETWEEN HIM AND YOUR GOAL';
 /** The two of them stand facing each other on the pitch line. */
 const PITCH_Y = 150;
 const HOME_X = 110;
 const AWAY_X = 210;
 const HINT_Y = 160;
 
-/** The card's lines: the match, who plays, and the bonus. Part 2 adds the boss's tip line after a loss. */
-export function vsLines(match: CareerMatch, _p: Profile): string[] {
+/**
+ * The card's lines: the match, who plays, and the bonus. Once Harrison has
+ * lost to the boss, and until he beats him, the boss's card adds one tip.
+ */
+export function vsLines(match: CareerMatch, p: Profile): string[] {
   const venue = VENUES.find(v => v.id === match.venue)!;
   const title = match.kind === 'boss' ? `${venue.name} BOSS` : `MATCH ${match.rung}`;
-  return [title, `HARRISON VS ${match.name}`, `BONUS: ${BONUSES[match.bonus].label}`];
+  const lines = [title, `HARRISON VS ${match.name}`, `BONUS: ${BONUSES[match.bonus].label}`];
+  if (match.kind === 'boss' && (p.career.lossStreaks[match.id] ?? 0) >= 1) lines.push(BOSS_TIP);
+  return lines;
 }
 
 /**
@@ -47,6 +56,8 @@ export function vsLines(match: CareerMatch, _p: Profile): string[] {
 export function createVsScene(ctx: GameContext, match: CareerMatch, back: () => Scene): VsScene {
   const { art } = ctx;
   const lines = vsLines(match, ctx.profile);
+  const boss = match.kind === 'boss';
+  if (boss) ctx.audio.play('bossSting');
   let t = 0;
   const kickOff = () => createMatchScene(ctx, newSeed(), match);
   return {
@@ -71,15 +82,18 @@ export function createVsScene(ctx: GameContext, match: CareerMatch, back: () => 
       g.save();
       g.globalAlpha = HEADER.dim;
       g.fillStyle = MASTER.ink;
-      g.fillRect(0, 0, BASE_W, HEADER.h);
+      g.fillRect(0, 0, BASE_W, lines.length > 3 ? HEADER.tipH : HEADER.h);
       g.restore();
       lines.forEach((line, i) => {
-        const text = art.text(line, LINE_SCALES[i] ?? 1, i === 0 ? 'energyGold' : 'white', 'outline');
+        const text = art.text(line, LINE_SCALES[i] ?? 1, LINE_COLOURS[i] ?? 'white', 'outline');
         g.drawImage(text, Math.round(BASE_W / 2 - text.width / 2), LINE_YS[i] ?? HINT_Y);
       });
-      // The stand-in draws Max until Biscuit lands (plan part 2).
       g.drawImage(art.home.right.idle[0]!, HOME_X - ANCHOR.x, PITCH_Y - ANCHOR.y);
-      g.drawImage(art.away.left.idle[0]!, AWAY_X - ANCHOR.x, PITCH_Y - ANCHOR.y);
+      if (boss) {
+        // He faces Harrison: left, so the anchor column mirrors.
+        const dog = art.biscuit.idle.left[0]!;
+        g.drawImage(dog, AWAY_X - (dog.width - 1 - BISCUIT_ANCHOR.x), PITCH_Y - BISCUIT_ANCHOR.y);
+      } else g.drawImage(art.away.left.idle[0]!, AWAY_X - ANCHOR.x, PITCH_Y - ANCHOR.y);
       drawButtonHint(g, art, art.buttons.A, 'KICK OFF', BASE_W / 2, HINT_Y);
     },
   };

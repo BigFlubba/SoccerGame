@@ -6,6 +6,7 @@ import { BONUSES } from '../meta/objectives';
 import { drawBackdrop } from './backdrop';
 import type { GameContext } from './context';
 import { menuAudio } from './menu';
+import { silhouette } from './powerView';
 import { STAR_W, drawPanel, drawStar, drawStars } from './panel';
 import { createRoadMapScene } from './roadMapScene';
 import type { Scene } from './scene';
@@ -31,6 +32,8 @@ const NEXT_Y = 35;
 const NODE_STARS_Y = 63;
 const BOSS_NODE = { x: 268, y: 38, size: 28 };
 const BOSS_LABEL_Y = 69;
+/** His face fills the boss node at twice its size. */
+const BOSS_FACE_SCALE = 2;
 const PANEL = { x: 8, y: 96, w: 304, h: 74 };
 const FACE_AT = { x: 14, y: 100 };
 const PANEL_TEXT_X = 32;
@@ -121,9 +124,11 @@ export function createVenueScene(ctx: GameContext, venue: VenueId, cursorId?: st
         const selected = i === index;
         if (m.kind === 'boss') {
           drawNode(g, BOSS_NODE.x, BOSS_NODE.y, BOSS_NODE.size, BOSS_NODE.size, 'charcoal', look.border, selected);
-          // Part 2 draws Biscuit's face here; until then a question mark, dark until he's unlocked.
-          const mark = art.text('?', 2, state === 'locked' ? 'slate' : 'white', 'outline');
-          g.drawImage(mark, Math.round(BOSS_NODE.x + BOSS_NODE.size / 2 - mark.width / 2), Math.round(BOSS_NODE.y + BOSS_NODE.size / 2 - mark.height / 2));
+          // Biscuit's face, a dark silhouette until he's unlocked.
+          const face = state === 'locked' ? silhouette(art.biscuitFace) : art.biscuitFace;
+          const size = face.width * BOSS_FACE_SCALE;
+          const at = Math.round(BOSS_NODE.size / 2 - size / 2);
+          g.drawImage(face, BOSS_NODE.x + at, BOSS_NODE.y + at, size, size);
           const label = art.text('BOSS', 1, look.number, 'outline');
           g.drawImage(label, Math.round(BOSS_NODE.x + BOSS_NODE.size / 2 - label.width / 2), BOSS_LABEL_Y);
           return;
@@ -140,7 +145,9 @@ export function createVenueScene(ctx: GameContext, venue: VenueId, cursorId?: st
       });
 
       drawPanel(g, PANEL.x, PANEL.y, PANEL.w, PANEL.h);
-      g.drawImage(art.maxFace, FACE_AT.x, FACE_AT.y);
+      const chosen = cursor();
+      const bossFace = matchState(p, chosen) === 'locked' ? silhouette(art.biscuitFace) : art.biscuitFace;
+      g.drawImage(chosen.kind === 'boss' ? bossFace : art.maxFace, FACE_AT.x, FACE_AT.y);
       panelLines(cursor()).forEach((line, i) => {
         const last = i === panelLines(cursor()).length - 1;
         const colour: MasterColor = i === 0 ? 'energyGold' : last ? 'white' : 'silver';

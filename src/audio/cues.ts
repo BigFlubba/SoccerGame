@@ -28,7 +28,10 @@ export type Cue =
   | 'beam'
   | 'brace'
   | 'whoosh'
-  | 'star';
+  | 'star'
+  | 'bark'
+  | 'pant'
+  | 'bossSting';
 
 export type Wave = 'square' | 'triangle' | 'noise';
 
@@ -216,5 +219,28 @@ export const CUES: Readonly<Record<Cue, CueRecipe>> = {
       { wave: 'square', at: 0.08, dur: 0.2, gain: 0.1, freq: 2349 },
     ],
     minGapS: 0.2,
+  },
+  /** Biscuit grabs the ball: a short gruff woof, a noisy bark over a falling tone. By design, not by ear. */
+  bark: {
+    voices: [
+      { wave: 'square', dur: 0.12, gain: 0.12, freq: 330, toFreq: 180, filter: { type: 'lowpass', q: 2 } },
+      { wave: 'noise', dur: 0.1, gain: 0.2, freq: 900, toFreq: 500, filter: { type: 'bandpass', q: 1.5 } },
+    ],
+    minGapS: 0.4,
+  },
+  /** Biscuit panting: three breathy huffs across his pant. */
+  pant: {
+    voices: [0, 0.35, 0.7].map(at => ({ wave: 'noise' as const, at, dur: 0.18, gain: 0.12, attack: 0.04, freq: 1800, toFreq: 1200, filter: { type: 'bandpass' as const, q: 2 } })),
+    minGapS: 1,
+  },
+  /** The boss's VS card: a low three-note sting, falling, with a thump. */
+  bossSting: {
+    voices: [
+      { wave: 'triangle', dur: 0.25, gain: 0.5, freq: 110, toFreq: 55 },
+      { wave: 'square', dur: 0.15, gain: 0.1, freq: 392 },
+      { wave: 'square', at: 0.15, dur: 0.15, gain: 0.1, freq: 370 },
+      { wave: 'square', at: 0.3, dur: 0.5, gain: 0.1, hold: 0.2, freq: 262 },
+    ],
+    minGapS: 1,
   },
 };

@@ -137,3 +137,20 @@ describe('matchFeedback: the power-up', () => {
     expect(matchFeedback(powered({ ready: true }), 'playing')).toEqual({ cues: ['powerReady'], rumble: ['ready'] });
   });
 });
+
+describe('matchFeedback with Biscuit', () => {
+  it('a grab barks instead of tapping, a pant pants', () => {
+    const w = world({}, { touched: true });
+    w.events.dog.grabbed = true;
+    expect(matchFeedback(w, 'playing').cues).toEqual(['bark']);
+    const p = world();
+    p.events.dog.panted = true;
+    expect(matchFeedback(p, 'playing').cues).toEqual(['pant']);
+  });
+
+  it('knocking the ball out of his mouth is a tackle', () => {
+    const w = world({ tackledBall: true });
+    w.events.dog.dropped = true;
+    expect(matchFeedback(w, 'playing')).toEqual({ cues: ['tackle'], rumble: ['tackle'] });
+  });
+});

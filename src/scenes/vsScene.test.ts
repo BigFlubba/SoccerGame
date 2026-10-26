@@ -46,3 +46,25 @@ describe('the VS card', () => {
     }
   });
 });
+
+describe("Biscuit's card", () => {
+  it('the tip appears only after a loss to Biscuit, and not for Max', () => {
+    const fresh = newProfile();
+    expect(vsLines(matchById(BOSS_ID)!, fresh)).toHaveLength(3);
+    const lost = { ...fresh, career: { ...fresh.career, lossStreaks: { 'backyard-boss': 1 } } };
+    expect(vsLines(matchById(BOSS_ID)!, lost).at(-1)).toBe('TIP: GET BETWEEN HIM AND YOUR GOAL');
+    for (const l of vsLines(matchById(BOSS_ID)!, lost)) expect(l).toMatch(CHARSET);
+    const lostToMax = { ...fresh, career: { ...fresh.career, lossStreaks: { 'backyard-3': 2 } } };
+    expect(vsLines(matchById('backyard-3')!, lostToMax)).toHaveLength(3);
+    expect(vsLines(matchById(BOSS_ID)!, lostToMax)).toHaveLength(3);
+  });
+
+  it('the boss card plays the sting, a rung card does not', () => {
+    const boss = testContext();
+    createVsScene(boss, matchById(BOSS_ID)!, () => createHubScene(boss));
+    expect(boss.audio.played).toContain('bossSting');
+    const rung = testContext();
+    createVsScene(rung, matchById('backyard-2')!, () => createHubScene(rung));
+    expect(rung.audio.played).not.toContain('bossSting');
+  });
+});

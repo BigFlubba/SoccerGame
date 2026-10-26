@@ -65,3 +65,9 @@ describe('help', () => {
     expect(createHelpScene(CTX, () => BEHIND).update(frame(['pause', 'confirm']), STEP)).toBeNull();
   });
 });
+
+describe('Help about Biscuit', () => {
+  it('THE MATCH page tells him how to beat the dog', () => {
+    expect(HELP_PAGES[1]!.lines.at(-1)).toBe("BISCUIT CAN'T SHOOT: BLOCK HIS WAY TO YOUR GOAL.");
+  });
+});

@@ -3,6 +3,7 @@ import { recordingAudio } from '../audio/testAudio';
 import { recordingRumble } from '../engine/testRumble';
 import type { GameContext } from './context';
 import { DIFFICULTY } from '../game/ai';
+import { DOG_DIFFICULTY } from '../game/dog';
 import { GOAL_PAUSE_S } from '../game/match';
 import { BASE_STATS } from '../game/stats';
 import { WAVE_READY_S } from '../game/power';
@@ -128,11 +129,27 @@ describe('match scene', () => {
     expect(again.world.away.stats).toEqual(maxStats(2));
   });
 
-  it('the boss is a stand-in for now: Max at rung 10 under his name', () => {
+  it('the boss match has a dog, no stand-in', () => {
     const s = createMatchScene(testContext({ profile: { ...newProfile(), ladderWins: 10 } }), 1);
     expect(s.match.id).toBe('backyard-boss');
     expect(s.match.hudName).toBe('BISCUIT');
-    expect(s.world.away.stats).toEqual(maxStats(10));
+    expect(s.dog).not.toBeNull();
+    expect(s.world.dog?.profile).toEqual(DOG_DIFFICULTY.normal);
+  });
+
+  it('a rung has no dog', () => {
+    expect(createMatchScene(testContext(), 1).dog).toBeNull();
+  });
+
+  it('in the boss match the dog plays: he takes the ball off a Harrison who stands still', () => {
+    const s = createMatchScene(testContext({ profile: { ...newProfile(), ladderWins: 10 } }), 1);
+    s.world.match.phase = 'playing';
+    let took = false;
+    for (let i = 0; i < 180 && !took; i++) {
+      s.update(frame(), STEP);
+      took = s.dog?.carrying ?? false;
+    }
+    expect(took).toBe(true);
   });
 
   describe('the goal record', () => {
@@ -315,6 +332,16 @@ describe('match scene: pause menu screens', () => {
     expect(ctx.settings.difficulty).toBe('hard');
     expect(s.world.aimErrorDeg.away).toBe(DIFFICULTY.hard.aimErrorDeg);
     expect(s.difficulty).toBe('hard');
+  });
+
+  it('Options mid-match re-applies the dog profile', () => {
+    const ctx = testContext({ profile: { ...newProfile(), ladderWins: 10 } });
+    const s = liveWith(ctx);
+    const options = pick(s, 'OPTIONS')!;
+    options.update(frame(['right']), STEP);
+    options.update(frame(['back']), STEP);
+    expect(ctx.settings.difficulty).toBe('hard');
+    expect(s.world.dog!.profile).toEqual(DOG_DIFFICULTY.hard);
   });
 
   it('backing out of Help with B and resuming does not slide or chip', () => {

@@ -15,11 +15,14 @@ export interface MatchFeedback {
  * The sounds and rumbles one tick's events make. The kicks are [home, away].
  * The rumble only ever reflects what Harrison feels. A ball resting against
  * the net reports a hit every tick, so the net only sounds on a goal.
+ * Biscuit's grab (his touch) barks rather than taps, and he pants aloud.
  */
 export function matchFeedback(w: World, prevPhase: Phase): MatchFeedback {
   const cues = new Set<Cue>();
   const rumble = new Set<RumbleKind>();
-  const { ball, kicks, goal, power } = w.events;
+  const { ball, kicks, goal, power, dog } = w.events;
+  if (dog.grabbed) cues.add('bark');
+  if (dog.panted) cues.add('pant');
   if (power.started) {
     cues.add('powerUp').add('ooh');
     rumble.add('powerOn');
@@ -43,7 +46,7 @@ export function matchFeedback(w: World, prevPhase: Phase): MatchFeedback {
     if (k.kicked) {
       cues.add(hard ? 'kickHard' : 'kickSoft');
       if (hard && i === 0) rumble.add('hardShot');
-    } else if (k.touched) {
+    } else if (k.touched && !(i === 1 && dog.grabbed)) {
       cues.add('tap');
     }
     if (k.perfect) cues.add('perfect');

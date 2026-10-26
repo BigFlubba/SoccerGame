@@ -3,15 +3,18 @@ import type { InputFrame } from '../engine/input';
 import { BASE_W } from '../engine/viewport';
 import { DIFFICULTY, createBrain, think, type Difficulty } from '../game/ai';
 import { updateCamera, type Camera } from '../game/camera';
+import { DOG_DIFFICULTY, type DogState } from '../game/dog';
+import { createDogBrain, dogThink } from '../game/dogAi';
 import { HUMAN_AIM_ERROR_DEG, type Aim } from '../game/kick';
 import { cancelCharge, type PlayerIntent } from '../game/player';
 import { endPower } from '../game/power';
 import { createWorld, stepWorld, type World } from '../game/world';
+import { BASE_STATS } from '../game/stats';
 import { clockMinute, endGoalPause } from '../game/match';
 import { nextCareerMatch, type CareerMatch } from '../meta/career';
 import { powerKit } from '../meta/catalog';
 import type { GoalRecord, StyleKind } from '../meta/economy';
-import { LADDER_MATCHES, maxStats } from '../meta/ladder';
+import { maxStats } from '../meta/ladder';
 import { BONUSES } from '../meta/objectives';
 import { applyMatch, type MatchReward } from '../meta/progress';
 import type { GameContext } from './context';
@@ -30,8 +33,10 @@ import { createHubScene } from './hubScene';
 export interface MatchScene extends Scene {
   readonly world: World;
   readonly paused: boolean;
-  /** Max's difficulty right now: a change in Options mid-match applies at once. */
+  /** The opponent's difficulty right now: a change in Options mid-match applies at once. */
   readonly difficulty: Difficulty;
+  /** Biscuit, in the boss match; null against Max. */
+  readonly dog: DogState | null;
   /** Harrison's goal moment, while it runs. */
   readonly moment: GoalMoment | null;
   /** The line under GOAL!!! naming his goal (HEADER!, HAT-TRICK!...), while the moment runs. */
@@ -88,30 +93,29 @@ function harrisonIntent(input: InputFrame): PlayerIntent {
   };
 }
 
-/** The away stats for a career match: Max at the rung's stats. */
-function awayStats(match: CareerMatch) {
-  // Stand-in until Biscuit lands (plan part 2): the boss plays as Max at rung 10.
-  if (match.kind === 'boss') return maxStats(LADDER_MATCHES);
-  return maxStats(match.rung);
-}
-
 /**
  * A 90-second career match, by default the next one: Harrison with his
- * bought stats, Max with the match's. It pays out on the tick it reaches
- * full time, then hands over to Results after the FULL TIME banner.
+ * bought stats against Max at the rung's, or against Biscuit the Dog, who
+ * has his own body and brain and no stats of a player's. It pays out on the
+ * tick it reaches full time, then hands over to Results after the FULL TIME
+ * banner.
  */
 export function createMatchScene(ctx: GameContext, seed: number, match: CareerMatch = nextCareerMatch(ctx.profile)): MatchScene {
   const { art } = ctx;
   let difficulty = ctx.settings.difficulty;
   const thinking = DIFFICULTY[difficulty];
+  const boss = match.kind === 'boss';
   const world = createWorld(
     { ...ctx.profile.stats },
-    awayStats(match),
+    boss ? { ...BASE_STATS } : maxStats(match.rung),
     seed,
     { home: HUMAN_AIM_ERROR_DEG, away: thinking.aimErrorDeg },
     powerKit(ctx.profile),
+    boss ? DOG_DIFFICULTY[difficulty] : null,
   );
   const brain = createBrain(thinking);
+  const dogBrain = boss ? createDogBrain(DOG_DIFFICULTY[difficulty]) : null;
+  const awayIntent = (dt: number): PlayerIntent => (dogBrain ? dogThink(dogBrain, world, dt) : think(brain, world, world.away, world.home, dt));
   const cam: Camera = { x: world.ball.x - BASE_W / 2 };
   const hud: MatchHud = {
     perfect: null,
@@ -172,11 +176,12 @@ export function createMatchScene(ctx: GameContext, seed: number, match: CareerMa
     const { home, away } = world.match.score;
     bonusOwed = bonus.done({ goalsFor: home, goalsAgainst: away, goals, result: null });
   };
-  /** Help and Options come back to this match, still paused, with any new difficulty applied to Max. */
+  /** Help and Options come back to this match, still paused, with any new difficulty applied to Max or the dog. */
   const backHere = (): Scene => {
     difficulty = ctx.settings.difficulty;
     brain.profile = DIFFICULTY[difficulty];
     world.aimErrorDeg.away = brain.profile.aimErrorDeg;
+    if (dogBrain && world.dog) dogBrain.profile = world.dog.profile = DOG_DIFFICULTY[difficulty];
     return scene;
   };
 
@@ -189,6 +194,7 @@ export function createMatchScene(ctx: GameContext, seed: number, match: CareerMa
     get difficulty() {
       return difficulty;
     },
+    dog: world.dog,
     get moment() {
       return hud.moment;
     },
@@ -246,7 +252,7 @@ export function createMatchScene(ctx: GameContext, seed: number, match: CareerMa
       const simDt = dt * (moment ? simScale(moment) : 1);
       if (simDt > 0) {
         const prevPhase = world.match.phase;
-        stepWorld(world, harrisonIntent(input), think(brain, world, world.away, world.home, simDt), simDt);
+        stepWorld(world, harrisonIntent(input), awayIntent(simDt), simDt);
         const feedback = matchFeedback(world, prevPhase);
         for (const cue of feedback.cues) ctx.audio.play(cue);
         for (const kind of feedback.rumble) ctx.rumble.pulse(kind);

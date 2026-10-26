@@ -36,6 +36,7 @@ export const HELP_PAGES: readonly { title: string; lines: readonly string[] }[] 
       'LEVEL AT 90? GOLDEN GOAL: THE NEXT GOAL WINS.',
       "NOBODY SCORES IN 45 MORE SECONDS? IT'S A DRAW.",
       'PLAYERS ARE SOLID: GO ROUND MAX, NOT THROUGH HIM.',
+      "BISCUIT CAN'T SHOOT: BLOCK HIS WAY TO YOUR GOAL.",
     ],
   },
   {
