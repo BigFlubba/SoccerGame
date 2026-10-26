@@ -1,5 +1,4 @@
 import { MASTER } from '../art/colors';
-import { BASE_W } from '../engine/viewport';
 import { STAT_NAMES, type StatName, type Stats } from '../game/stats';
 import { xpToNext } from '../meta/economy';
 import { isChampion, nextMatch, nextMatchLine, trainingLine } from '../meta/ladder';
@@ -23,6 +22,8 @@ const PORTRAIT_AT = { x: CARD.x + 6, y: CARD.y + 8 };
 const TEXT_X = CARD.x + 80;
 const XP_BAR = { gap: 6, w: 70, h: 4 };
 const MENU_TOP = 98;
+/** Right of centre, so the backdrop's juggling Harrison (who drifts across the left and middle) is never hidden behind it. */
+const MENU_CX = 248;
 
 /** His four stats in short, e.g. SPD 3  PWR 2  JMP 1  CTL 4. */
 export function statsLine(s: Stats): string {
@@ -71,7 +72,7 @@ export function createHubScene(ctx: GameContext, index = 0): Scene {
       g.drawImage(art.text(nextMatchLine(p.ladderWins), 1, 'energyGold', 'outline'), TEXT_X, CARD.y + 54);
       const second = isChampion(p.ladderWins) ? 'BACKYARD CHAMPION!' : trainingLine(nextMatch(p.ladderWins));
       if (second) g.drawImage(art.text(second, 1, 'silver', 'outline'), TEXT_X, CARD.y + 65);
-      drawMenu(g, art, menu, BASE_W / 2, MENU_TOP);
+      drawMenu(g, art, menu, MENU_CX, MENU_TOP);
     },
   };
 }

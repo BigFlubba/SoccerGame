@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { STAT_NAMES } from '../game/stats';
 import { newProfile } from '../meta/profile';
 import type { Scene } from './scene';
-import { createShopScene, shopRow } from './shopScene';
+import { createShopScene, moveRow, shopRow } from './shopScene';
 import { testContext } from './testContext';
 import { frame } from './testInput';
 
@@ -56,11 +56,11 @@ describe('shop', () => {
     expect(ctx.savedProfiles).toHaveLength(0);
   });
 
-  it('up and down pick a stat, wrapping, and buy that one', () => {
+  it('up and down pick a stat, wrapping through the Energy Wave, and buy that one', () => {
     const ctx = withCoins(1000);
     const s = createShopScene(ctx, () => BEHIND);
     s.update(frame(['up']), STEP);
-    expect(s.row).toBe(3);
+    expect(s.row).toBe(4);
     s.update(frame(['down']), STEP);
     s.update(frame(['down']), STEP);
     expect(s.row).toBe(1);
@@ -98,3 +98,76 @@ describe('shop', () => {
     expect(ctx.audio.music).toBe('title');
   });
 });
+
+describe('shop: power moves', () => {
+  const at = (level: number, coins: number) => testContext({ profile: { ...newProfile(), level, coins } });
+  /** Opens the Shop with the Energy Wave row selected. */
+  const onWave = (ctx: ReturnType<typeof at>) => {
+    const s = createShopScene(ctx, () => BEHIND);
+    s.update(frame(['up']), STEP);
+    return s;
+  };
+
+  it('the Energy Wave row: locked, for sale, owned', () => {
+    expect(moveRow({ ...newProfile(), level: 2 })).toBe('ENERGY WAVE  LV 3 TO UNLOCK');
+    expect(moveRow({ ...newProfile(), level: 3 })).toBe('ENERGY WAVE  600');
+    expect(moveRow({ ...newProfile(), level: 3, powerMoves: { owned: ['energyWave'], equipped: 'energyWave' } })).toBe('ENERGY WAVE  OWNED');
+  });
+
+  it('the cursor wraps through five rows', () => {
+    const s = createShopScene(at(1, 0), () => BEHIND);
+    s.update(frame(['up']), STEP);
+    expect(s.row).toBe(4);
+    s.update(frame(['down']), STEP);
+    expect(s.row).toBe(0);
+    for (let i = 0; i < 4; i++) s.update(frame(['down']), STEP);
+    expect(s.row).toBe(4);
+  });
+
+  it('a locked Energy Wave plays nope and says REACH LEVEL 3', () => {
+    const ctx = at(2, 5000);
+    const s = onWave(ctx);
+    s.update(frame(['confirm']), STEP);
+    expect(s.message).toBe('REACH LEVEL 3');
+    expect(ctx.audio.played).toContain('nope');
+    expect(ctx.savedProfiles).toHaveLength(0);
+  });
+
+  it('too few coins: nope and how many more', () => {
+    const ctx = at(3, 450);
+    const s = onWave(ctx);
+    s.update(frame(['confirm']), STEP);
+    expect(s.message).toBe('NEED 150 MORE');
+    expect(ctx.audio.played).toContain('nope');
+    expect(ctx.savedProfiles).toHaveLength(0);
+  });
+
+  it('buying the Energy Wave saves, owns it and teaches the button', () => {
+    const ctx = at(3, 650);
+    const s = onWave(ctx);
+    s.update(frame(['confirm']), STEP);
+    expect(ctx.savedProfiles).toHaveLength(1);
+    expect(ctx.profile.coins).toBe(50);
+    expect(ctx.profile.powerMoves).toEqual({ owned: ['energyWave'], equipped: 'energyWave' });
+    expect(ctx.audio.played).toContain('buy');
+    expect(s.message).toBe('HOLD Y WITH A FULL POWER METER');
+  });
+
+  it('A on an owned Energy Wave buys nothing and reminds him how to use it', () => {
+    const ctx = at(3, 1300);
+    const s = onWave(ctx);
+    s.update(frame(['confirm']), STEP);
+    s.update(frame(['confirm']), STEP);
+    expect(ctx.savedProfiles).toHaveLength(1);
+    expect(ctx.audio.played.at(-1)).toBe('nope');
+    expect(s.message).toBe('HOLD Y WITH A FULL POWER METER');
+  });
+
+  it('the Shop turns the crowd off', () => {
+    const ctx = at(1, 0);
+    ctx.audio.setCrowd('roar');
+    createShopScene(ctx, () => BEHIND);
+    expect(ctx.audio.crowd).toBe('off');
+  });
+});
+

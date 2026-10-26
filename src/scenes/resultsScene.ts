@@ -2,7 +2,7 @@ import { MASTER } from '../art/colors';
 import type { Expression } from '../art/harrison/portrait';
 import { BASE_W } from '../engine/viewport';
 import { addXp, canUpgrade, xpToNext } from '../meta/economy';
-import type { MatchReward } from '../meta/progress';
+import type { MatchReward, Unlock } from '../meta/progress';
 import { drawBackdrop } from './backdrop';
 import type { GameContext } from './context';
 import { createHubScene } from './hubScene';
@@ -66,20 +66,49 @@ export function ladderLine(reward: MatchReward): string {
   return reward.summary.result === 'draw' ? 'ALL SQUARE. GO AGAIN!' : 'MAX TAKES THIS ONE. GO AGAIN!';
 }
 
+const UNLOCK_TEXT: Record<Unlock, string> = {
+  energyWave: 'ENERGY WAVE UNLOCKED IN THE SHOP!',
+  goldenForm: 'GOLDEN FORM UNLOCKED!',
+};
+const UPGRADE_READY = 'UPGRADE READY IN THE SHOP!';
+/** The centred lines under the tally: room for this many. */
+const FOOT_LINES = 3;
+
+/** What this match's level-ups unlocked, as Results announces it. */
+export function unlockLines(reward: MatchReward): string[] {
+  return reward.unlocked.map(u => UNLOCK_TEXT[u]);
+}
+
+/**
+ * The centred lines under the tally, in order: the ladder's news once it's
+ * done, the unlocks from the level-up on, then UPGRADE READY if there's
+ * still room.
+ */
+export function footLines(reward: MatchReward, tally: Tally, upgradeReady: boolean): string[] {
+  const lines = [...(tally.done ? [ladderLine(reward)] : []), ...(tally.levelUp ? unlockLines(reward) : [])];
+  if (tally.done && upgradeReady) lines.push(UPGRADE_READY);
+  return lines.slice(0, FOOT_LINES);
+}
+
 export function resultsItems(reward: MatchReward): string[] {
   return [reward.summary.result === 'win' ? 'NEXT MATCH' : 'TRY AGAIN', 'SHOP', 'HUB'];
 }
 
 const RESULT_TEXT = { win: 'YOU WIN!', lose: 'YOU LOSE', draw: 'DRAW' } as const;
 const FACE: Record<MatchReward['summary']['result'], Expression> = { win: 'celebrate', draw: 'determined', lose: 'disappointed' };
-const PANEL = { x: 8, y: 30, w: 304, h: 100 };
+/** Tall enough for three centred lines under the tally, with the menu still on screen below it. */
+const PANEL = { x: 8, y: 30, w: 304, h: 104 };
 const PORTRAIT_AT = { x: PANEL.x + 8, y: PANEL.y + 6 };
 const LINES = { x: PANEL.x + 80, right: PANEL.x + 192, y: PANEL.y + 6, h: 9 };
 const SUMMARY_X = PANEL.x + 204;
 const XP_BAR = { w: 90, h: 4 };
-const LADDER_Y = PANEL.y + 80;
-const MENU_TOP = PANEL.y + PANEL.h + 6;
+const LADDER_Y = PANEL.y + 77;
+const FOOT_LINE_H = 9;
+const MENU_TOP = PANEL.y + PANEL.h + 5;
 const SKIP_Y = MENU_TOP + 14;
+/** After a press skips the tally, the menu ignores presses this long, so mashing A can't pick NEXT MATCH at once. */
+export const SKIP_GRACE_S = 0.25;
+const GRACE_IGNORES = ['confirm', 'shoot', 'pause'] as const;
 
 /**
  * The match's reward, tallied a line at a time with coin ticks, then the XP
@@ -94,6 +123,7 @@ export function createResultsScene(ctx: GameContext, reward: MatchReward, skipTa
   let t = 0;
   let tally = tallyAt(reward, 0);
   let menu: MenuState | null = null;
+  let graceS = 0;
   /** Jumps to the end of the tally. A skip still sounds a level-up the tally hadn't reached. */
   const finish = (fanfare: boolean) => {
     if (fanfare && end.levelUp && !tally.levelUp) ctx.audio.play('levelUp');
@@ -129,6 +159,7 @@ export function createResultsScene(ctx: GameContext, reward: MatchReward, skipTa
         }
         if (input.pressed.has('confirm') || input.pressed.has('shoot') || input.pressed.has('pause')) {
           finish(true);
+          graceS = SKIP_GRACE_S;
           return null;
         }
         t += dt;
@@ -139,6 +170,8 @@ export function createResultsScene(ctx: GameContext, reward: MatchReward, skipTa
         if (tally.done) finish(true);
         return null;
       }
+      graceS = Math.max(0, graceS - dt);
+      if (graceS > 0) input = { ...input, pressed: new Set([...input.pressed].filter(a => !(GRACE_IGNORES as readonly string[]).includes(a))) };
       // Start confirms here, as on the Hub; Esc (pause plus back) backs out.
       const r = stepMenu(menu, input);
       const chosen = r.back ? null : (r.chosen ?? (input.pressed.has('pause') ? r.m.items[r.m.index]! : null));
@@ -181,10 +214,12 @@ export function createResultsScene(ctx: GameContext, reward: MatchReward, skipTa
         g.drawImage(art.text(`LEVEL BONUS +${reward.levelBonus}`, 1, 'white', 'outline'), SUMMARY_X, y + 9);
       }
 
-      if (tally.done) {
-        centre(art.text(ladderLine(reward), 1, reward.ladder.beaten ? 'energyGold' : 'white', 'outline'), LADDER_Y);
-        if (scene.upgradeReady) centre(art.text('UPGRADE READY IN THE SHOP!', 1, 'volt', 'outline'), LADDER_Y + 9);
-      }
+      // The ladder's line comes first once the tally is done; unlocks shown before then keep their place below it.
+      const firstSlot = tally.done ? 0 : 1;
+      footLines(reward, tally, scene.upgradeReady).forEach((line, i) => {
+        const colour = line === UPGRADE_READY ? 'volt' : line === ladderLine(reward) && !reward.ladder.beaten ? 'white' : 'energyGold';
+        centre(art.text(line, 1, colour, 'outline'), LADDER_Y + (firstSlot + i) * FOOT_LINE_H);
+      });
       if (menu) drawMenu(g, art, menu, BASE_W / 2, MENU_TOP);
       else drawButtonHint(g, art, art.buttons.A, 'SKIP', BASE_W / 2, SKIP_Y);
     },

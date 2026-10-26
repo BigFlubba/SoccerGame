@@ -4,7 +4,7 @@ import { nextMatch } from '../meta/ladder';
 import { newProfile, type Profile } from '../meta/profile';
 import { applyMatch } from '../meta/progress';
 import type { MatchScene } from './matchScene';
-import { LINE_S, XP_FILL_S, createResultsScene, ladderLine, resultsItems, tallyAt, type ResultsScene } from './resultsScene';
+import { LINE_S, SKIP_GRACE_S, XP_FILL_S, createResultsScene, footLines, ladderLine, resultsItems, tallyAt, unlockLines, type ResultsScene } from './resultsScene';
 import type { ShopScene } from './shopScene';
 import { TEST_TODAY, testContext } from './testContext';
 import { frame } from './testInput';
@@ -195,3 +195,39 @@ describe('ladderLine', () => {
     expect(ladderLine(after({ result: 'draw', goalsFor: 1, goalsAgainst: 1, styleGoals: [] }).reward)).toMatch(/GO AGAIN!$/);
   });
 });
+
+describe('results: unlocks and the skip grace', () => {
+  it('unlock lines show with the level-up', () => {
+    const { reward } = after(WIN_3_0, { ...newProfile(), level: 2, xp: 140 });
+    expect(unlockLines(reward)).toEqual(['ENERGY WAVE UNLOCKED IN THE SHOP!']);
+    const before = tallyAt(reward, (reward.lines.length + 1) * LINE_S);
+    expect(footLines(reward, before, false)).toEqual([]);
+    const levelUp = tallyAt(reward, (reward.lines.length + 1) * LINE_S + XP_FILL_S);
+    expect(footLines(reward, levelUp, false)).toEqual(['ENERGY WAVE UNLOCKED IN THE SHOP!']);
+    expect(footLines(reward, tallyAt(reward, Infinity), true)).toEqual([ladderLine(reward), 'ENERGY WAVE UNLOCKED IN THE SHOP!', 'UPGRADE READY IN THE SHOP!']);
+  });
+
+  it('Golden Form is announced too, and both together still fit three lines', () => {
+    const { reward } = after(WIN_3_0, { ...newProfile(), level: 2, xp: 790 });
+    expect(unlockLines(reward)).toEqual(['ENERGY WAVE UNLOCKED IN THE SHOP!', 'GOLDEN FORM UNLOCKED!']);
+    expect(footLines(reward, tallyAt(reward, Infinity), true)).toHaveLength(3);
+  });
+
+  it('a confirm 0.1 s after skipping the tally does not pick NEXT MATCH', () => {
+    const { ctx, reward } = after(WIN_3_0);
+    const s = createResultsScene(ctx, reward);
+    s.update(frame(['confirm']), STEP);
+    run(s, 0.1);
+    expect(s.update(frame(['confirm']), STEP)).toBeNull();
+    expect(s.update(frame(['shoot']), STEP)).toBeNull();
+  });
+
+  it('a confirm after the grace picks it', () => {
+    const { ctx, reward } = after(WIN_3_0);
+    const s = createResultsScene(ctx, reward);
+    s.update(frame(['confirm']), STEP);
+    run(s, SKIP_GRACE_S + 0.05);
+    expect(s.update(frame(['confirm']), STEP)?.kind).toBe('match');
+  });
+});
+

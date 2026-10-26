@@ -12,19 +12,26 @@ const allText = () => HELP_PAGES.flatMap(p => [p.title, ...p.lines]).join('\n');
 
 describe('help', () => {
   it('help covers the controls, the match and the moves', () => {
-    expect(HELP_PAGES.map(p => p.title)).toEqual(['CONTROLS', 'THE MATCH', 'MOVES']);
+    expect(HELP_PAGES.map(p => p.title)).toEqual(['CONTROLS', 'THE MATCH', 'MOVES', 'POWER MOVES']);
     for (const phrase of ['PERFECT', 'FAR POST', 'NEAR POST', 'GOLDEN GOAL']) expect(allText()).toContain(phrase);
   });
 
   it('covers every control on the gamepad and the keyboard', () => {
     const controls = HELP_PAGES[0]!.lines.join('\n');
-    for (const word of ['A:', 'B:', 'X:', 'RT:', 'START:', 'STICK', 'ARROWS', 'KEY Z', 'KEY X', 'KEY C', 'SHIFT', 'ENTER']) expect(controls).toContain(word);
+    for (const word of ['A:', 'B:', 'X:', 'Y:', 'RT:', 'START:', 'STICK', 'ARROWS', 'KEY Z', 'KEY X', 'KEY C', 'KEY V', 'SHIFT', 'ENTER']) {
+      expect(controls).toContain(word);
+    }
   });
 
   it('explains the match format and the moves', () => {
     for (const phrase of ['90 SECONDS', 'KICKS OFF', 'CHARGE', 'GOLD', 'CHIP', 'SLIDE', 'HEADER', 'VOLLEY', 'SPRINT', 'STAMINA']) {
       expect(allText()).toContain(phrase);
     }
+  });
+
+  it('the power moves page explains buying, filling, holding and Max', () => {
+    const page = HELP_PAGES[3]!.lines.join(' ');
+    for (const phrase of ['BUY THE ENERGY WAVE IN THE SHOP', 'POWER METER', 'HOLD Y OR V', 'LET GO TO UNLEASH', 'BRACE', 'TACKLES']) expect(page).toContain(phrase);
   });
 
   it('every help line fits the screen and uses only font characters', () => {

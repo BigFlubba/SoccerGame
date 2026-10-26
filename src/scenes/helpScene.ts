@@ -10,7 +10,7 @@ export interface HelpScene extends Scene {
   readonly page: number;
 }
 
-/** Three pages in the pixel font. A line starting "A:", "X:" and so on is drawn with that button's picture. */
+/** Four pages in the pixel font. A line starting "A:", "X:" and so on is drawn with that button's picture. */
 export const HELP_PAGES: readonly { title: string; lines: readonly string[] }[] = [
   {
     title: 'CONTROLS',
@@ -19,6 +19,7 @@ export const HELP_PAGES: readonly { title: string; lines: readonly string[] }[] 
       'A: JUMP. THE BALL ON YOUR HEAD IS A HEADER. KEY Z',
       'X: SHOOT. TAP IT, OR HOLD TO CHARGE. KEY X',
       'B: CHIP WITH THE BALL, SLIDE TACKLE WITHOUT. KEY C',
+      'Y: POWER UP WITH A FULL POWER METER. KEY V',
       'RT: SPRINT. KEY SHIFT',
       'START: PAUSE. KEY ENTER OR ESC',
       'MENUS: UP/DOWN TO CHOOSE, A TO PICK, B TO GO BACK',
@@ -53,6 +54,16 @@ export const HELP_PAGES: readonly { title: string; lines: readonly string[] }[] 
       'TOP LEFT. RUN IT DRY AND YOU SLOW DOWN FOR A BIT.',
     ],
   },
+  {
+    title: 'POWER MOVES',
+    lines: [
+      'BUY THE ENERGY WAVE IN THE SHOP. FILL THE POWER',
+      'METER, HOLD Y OR V TO POWER UP, LET GO TO UNLEASH.',
+      'GET CLOSE AND MAX GOES FLYING. FROM FAR AWAY HE',
+      'CAN BRACE AND STOP IT, AND IF HE REACHES YOU',
+      'FIRST, HE TACKLES YOU. PICK YOUR MOMENT!',
+    ],
+  },
 ];
 
 const PANEL = { x: 6, y: 4, w: BASE_W - 12, h: BASE_H - 8 };
@@ -66,7 +77,7 @@ const BUTTON_GAP = 4;
 /** The picture sits this far above the text's top, so their middles line up. */
 const BUTTON_RAISE = 2;
 const FOOTER_Y = BASE_H - 18;
-const BUTTON_LINE = /^(A|B|X|RT|START): (.*)$/;
+const BUTTON_LINE = /^(A|B|X|Y|RT|START): (.*)$/;
 
 /** CONTROLS, THE MATCH, MOVES: left/right flip the pages (wrapping); B, Backspace, C, Esc or Start goes back. */
 export function createHelpScene(ctx: GameContext, back: () => Scene): HelpScene {
