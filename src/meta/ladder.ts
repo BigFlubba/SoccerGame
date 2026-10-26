@@ -1,6 +1,8 @@
 import { STAT_NAMES, type Stats } from '../game/stats';
 import { STAT_INFO } from './economy';
-import { LADDER_MATCHES } from './profile';
+
+/** The Backyard Ladder's rungs: ten matches against Max. */
+export const LADDER_MATCHES = 10;
 
 /**
  * Max's stats on each match of the Backyard Ladder (index 0 is match 1): he

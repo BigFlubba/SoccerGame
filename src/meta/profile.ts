@@ -1,6 +1,9 @@
 import { BASE_STATS, MAX_STAT_LEVEL, MIN_STAT_LEVEL, STAT_NAMES, type Stats } from '../game/stats';
 import { FORM_IDS, MOVE_IDS, grantForms } from './catalog';
+import { LADDER_MATCHES } from './ladder';
 import { isRecord, readStored, writeUnlessNewer, type KeyValueStore } from './storage';
+
+export { LADDER_MATCHES } from './ladder';
 
 export type PowerMoveId = 'energyWave';
 export type PowerFormId = 'golden';
@@ -45,7 +48,6 @@ export interface Profile {
 /** Game-specific, so it never clashes with other pages on the same site. */
 export const PROFILE_KEY = 'harrisons-road-to-the-cup/profile';
 const VERSION = 2;
-export const LADDER_MATCHES = 10;
 
 /** Ceilings on loaded counts, so a tampered save can't make levelling run forever. */
 export const MAX_LOADED = { level: 999, xp: 1_000_000, count: 999_999_999 };
