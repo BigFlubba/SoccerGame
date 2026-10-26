@@ -1,9 +1,13 @@
 import { describe, expect, it } from 'vitest';
-import { DIFFICULTY, createBrain, think, type AiProfile } from './ai';
+import { seeded } from '../engine/random';
+import { DIFFICULTY, SLIDE_RANGE, createBrain, think, type AiBrain, type AiProfile } from './ai';
 import { BALL_REST_Y } from './ball';
-import { NO_INTENT, type Player } from './player';
+import { inGoalBox } from './field';
+import { NO_INTENT, PLAYER_R, type Player, type PlayerIntent } from './player';
 import type { Aim } from './kick';
+import { METER_MIN_REFILL_S, canStartPower, maxGoal, waveTarget } from './power';
 import { BASE_STATS, STAT_NAMES, type StatName, type Stats } from './stats';
+import { BRACE_DISTANCE, WAVE_HALF_WIDTH } from './wave';
 import { createWorld, stepWorld, type World } from './world';
 
 const STEP = 1 / 60;
@@ -105,8 +109,9 @@ describe('think', () => {
   });
 
   it('difficulty profiles match the plan', () => {
-    expect(DIFFICULTY.easy).toEqual({ reactionS: 0.32, aimErrorDeg: 10, aggression: 0.3, shootRange: 150 });
-    expect(DIFFICULTY.hard).toEqual({ reactionS: 0.1, aimErrorDeg: 3, aggression: 0.8, shootRange: 210 });
+    expect(DIFFICULTY.easy).toEqual({ reactionS: 0.32, aimErrorDeg: 10, aggression: 0.3, shootRange: 150, rushDelayS: 0.3, rushSprint: false });
+    expect(DIFFICULTY.normal).toMatchObject({ rushDelayS: 0.1, rushSprint: false });
+    expect(DIFFICULTY.hard).toEqual({ reactionS: 0.1, aimErrorDeg: 3, aggression: 0.8, shootRange: 210, rushDelayS: 0, rushSprint: true });
   });
 
   it('a whole simulated match between two AIs finishes with a result and no exceptions', () => {
@@ -235,17 +240,35 @@ describe('think', () => {
    * resting unreached for over 5 s, and nobody standing still for over 10 s in play. With
    * `bothScore`, each side must also score at least once across the seeds.
    */
-  function wholeMatches(difficulty: 'easy' | 'normal' | 'hard', homeStats: Stats, awayStats: Stats, seeds: readonly number[], bothScore: boolean): void {
+  function wholeMatches(
+    difficulty: 'easy' | 'normal' | 'hard',
+    homeStats: Stats,
+    awayStats: Stats,
+    seeds: readonly number[],
+    bothScore: boolean,
+    opts: { power?: boolean } = {},
+  ): { braced: number; blown: number; waveGoals: number } {
     const goals = { home: 0, away: 0 };
+    const waves = { braced: 0, blown: 0, waveGoals: 0 };
     for (const seed of seeds) {
-      const w = createWorld({ ...homeStats }, { ...awayStats }, seed, { home: DIFFICULTY[difficulty].aimErrorDeg, away: DIFFICULTY[difficulty].aimErrorDeg });
+      const kit = opts.power ? { golden: false } : null;
+      const w = createWorld({ ...homeStats }, { ...awayStats }, seed, { home: DIFFICULTY[difficulty].aimErrorDeg, away: DIFFICULTY[difficulty].aimErrorDeg }, kit);
       const home = createBrain(DIFFICULTY[difficulty]);
       const away = createBrain(DIFFICULTY[difficulty]);
+      const bot = powerBot(home, seed);
       const still = new Map<Player, { x: number; z: number; s: number }>();
       let unreachedS = 0;
       for (let t = 0; w.match.phase !== 'fullTime' && t < 60 * 200; t++) {
-        stepWorld(w, think(home, w, w.home, w.away, STEP), think(away, w, w.away, w.home, STEP), STEP);
+        const homeIntent = opts.power ? bot(w) : think(home, w, w.home, w.away, STEP);
+        stepWorld(w, homeIntent, think(away, w, w.away, w.home, STEP), STEP);
         for (const v of [w.ball.x, w.ball.y, w.ball.z, w.home.x, w.home.z, w.away.x, w.away.z]) expect(Number.isFinite(v)).toBe(true);
+        if (opts.power) {
+          for (const g of w.field.goals)
+            for (const p of [w.home, w.away]) expect(inGoalBox(g, p.x, p.z, 0), `seed ${seed}: ${p.team} in a goal`).toBe(false);
+          if (w.events.power.braced) waves.braced++;
+          if (w.events.power.blown) waves.blown++;
+          if (w.events.goal === 'home' && w.wave && w.wave.outcome !== 'braced') waves.waveGoals++;
+        }
         if (w.match.phase !== 'playing') {
           unreachedS = 0;
           still.clear();
@@ -270,13 +293,49 @@ describe('think', () => {
       expect(goals.home).toBeGreaterThan(0);
       expect(goals.away).toBeGreaterThan(0);
     }
+    return waves;
+  }
+
+  /**
+   * Test-only Harrison who uses his power move a lot. He plays as the AI,
+   * and whenever a power-up can start he holds it (his own seeded generator
+   * picks how long). Half the time it plays out as it would: held 0.2 to
+   * 2 s, so it's let go early, tackled, or fired. The other half are staged
+   * at random ranges, since Max rarely stands far off while Harrison has the
+   * ball: Max is put 20 to 260 px down the lane facing him, the charge
+   * completes at once, and it's held 0 to 0.6 s more. The meter is refilled
+   * whenever no wave is live, to force many waves.
+   */
+  function powerBot(brain: AiBrain, seed: number): (w: World) => PlayerIntent {
+    const rng = seeded(seed * 7 + 1);
+    let holdS = 0;
+    let staged = false;
+    return w => {
+      const intent = think(brain, w, w.home, w.away, STEP);
+      if (w.power && !w.wave?.live) w.power.meter = 1;
+      if (holdS > 0) {
+        if (staged && w.home.state === 'poweringUp') w.home.charge = 1;
+        holdS -= STEP;
+        return { ...NO_INTENT, aim: intent.aim, powerHeld: holdS > 0 };
+      }
+      if (!canStartPower(w) || w.home.held.power) return intent;
+      staged = rng() < 0.5;
+      if (staged) {
+        const x = Math.min(w.ball.x + 20 + rng() * 240, w.field.fenceR - PLAYER_R);
+        Object.assign(w.away, { x, z: w.ball.z + (rng() - 0.5) * 20, facing: -1, vx: 0, vz: 0 });
+        holdS = STEP + rng() * 0.6;
+      } else {
+        holdS = 0.2 + rng() * 1.8;
+      }
+      return { ...NO_INTENT, aim: intent.aim, powerHeld: true };
+    };
   }
 
   const allAt = (n: number): Stats => Object.fromEntries(STAT_NAMES.map(k => [k, n])) as Record<StatName, number>;
 
   it.each(['easy', 'normal', 'hard'] as const)(
     'a whole AI-vs-AI match on %s: result, no NaN, both sides score, the ball never rests unreached for over 5 s, and nobody stands still for over 10 s in play',
-    difficulty => wholeMatches(difficulty, BASE_STATS, BASE_STATS, [21, 22, 23], true),
+    difficulty => void wholeMatches(difficulty, BASE_STATS, BASE_STATS, [21, 22, 23], true),
   );
 
   it.each([
@@ -285,6 +344,37 @@ describe('think', () => {
     [1, 10],
   ] as const)('a whole AI-vs-AI match at stats %s vs %s on normal keeps every guarantee', (home, away) => {
     wholeMatches('normal', allAt(home), allAt(away), [31, 32, 33], home === 10 && away === 10);
+  });
+
+  it.each(['easy', 'normal', 'hard'] as const)('with Energy Waves in play on %s, every guarantee holds, and Max both braces and is blown away', difficulty => {
+    const waves = wholeMatches(difficulty, BASE_STATS, BASE_STATS, [41, 42, 43], false, { power: true });
+    expect(waves.braced).toBeGreaterThan(0);
+    expect(waves.blown).toBeGreaterThan(0);
+    expect(waves.waveGoals).toBeGreaterThan(0);
+  });
+
+  it('with no refills, the meter fills about once or twice in an AI-vs-AI match on Normal', () => {
+    const fills: number[][] = [];
+    for (const seed of [51, 52, 53, 54, 55]) {
+      const w = createWorld(BASE_STATS, BASE_STATS, seed, { home: 6, away: 6 }, { golden: false });
+      const home = createBrain(DIFFICULTY.normal);
+      const away = createBrain(DIFFICULTY.normal);
+      const at: number[] = [];
+      for (let t = 0; w.match.phase !== 'fullTime' && t < 60 * 200; t++) {
+        stepWorld(w, think(home, w, w.home, w.away, STEP), think(away, w, w.away, w.home, STEP), STEP);
+        // He'd use it at once: spend it as a fired wave would, so the next fill counts.
+        if (w.power!.meter === 1) {
+          at.push(t * STEP);
+          w.power!.meter = 0;
+        }
+      }
+      fills.push(at);
+    }
+    for (const at of fills) {
+      expect(at.length, JSON.stringify(fills)).toBeLessThanOrEqual(3);
+      for (let i = 1; i < at.length; i++) expect(at[i]! - at[i - 1]!).toBeGreaterThanOrEqual(METER_MIN_REFILL_S);
+    }
+    expect(fills.filter(at => at.length >= 1).length, JSON.stringify(fills)).toBeGreaterThanOrEqual(3);
   });
 
   it('reaches a ball beside its own side netting past a still Harrison at the goal\u2019s front corner', () => {
@@ -349,5 +439,91 @@ describe('think', () => {
     for (let seed = 1; seed <= 20; seed++) {
       expect(parkedMatch('normal', seed, { x: 36, z: 32 }).stuckS, `seed ${seed}`).toBeLessThanOrEqual(10);
     }
+  });
+});
+
+describe('Max and the power-up', () => {
+  const hold: PlayerIntent = { ...NO_INTENT, powerHeld: true };
+
+  /** Harrison on the ball at x 200 with a full meter, about to power up; Max placed by hand. */
+  function standoff(max: { x: number; z?: number }, profile: AiProfile = DIFFICULTY.normal): { w: World; brain: AiBrain } {
+    const w = createWorld(BASE_STATS, BASE_STATS, 5, { home: 0, away: profile.aimErrorDeg }, { golden: false });
+    w.match.phase = 'playing';
+    w.power!.meter = 1;
+    Object.assign(w.home, { x: 200, z: 32, facing: 1 });
+    Object.assign(w.ball, { x: 208, y: BALL_REST_Y, z: 32, vx: 0, vy: 0, vz: 0 });
+    Object.assign(w.away, { x: max.x, z: max.z ?? 32, facing: -1 });
+    return { w, brain: createBrain(profile) };
+  }
+
+  const step = (w: World, brain: AiBrain, home: PlayerIntent = hold) => stepWorld(w, home, think(brain, w, w.away, w.home, STEP), STEP);
+  const laneZ = (w: World, x: number, aim: Aim) => {
+    const goal = maxGoal(w);
+    return w.ball.z + ((waveTarget(goal, aim) - w.ball.z) * (x - w.ball.x)) / (goal.lineX - w.ball.x);
+  };
+
+  it('when Harrison powers up far away, Max steps into the lane and runs at him', () => {
+    const { w, brain } = standoff({ x: 450, z: 12 });
+    const far = { ...hold, aim: 'far' as Aim };
+    for (let i = 0; i < 30; i++) step(w, brain, far);
+    expect(w.home.state).toBe('poweringUp');
+    expect(w.away.x).toBeLessThan(420);
+    expect(Math.abs(w.away.z - laneZ(w, w.away.x, 'far'))).toBeLessThanOrEqual(WAVE_HALF_WIDTH);
+    expect(w.away.facing).toBe(-1);
+  });
+
+  it('when Harrison powers up close, Max slides in', () => {
+    const { w, brain } = standoff({ x: 230 });
+    let slid = false;
+    for (let i = 0; i < 40; i++) {
+      step(w, brain);
+      slid ||= w.away.state === 'sliding';
+    }
+    expect(slid).toBe(true);
+    expect(w.home.state).not.toBe('poweringUp');
+  });
+
+  /** Seconds from the press until Max rushes, and until he's inside the bracing distance of the ball. */
+  function closeIn(profile: AiProfile): { rushS: number; inRangeS: number } {
+    const { w, brain } = standoff({ x: 400 }, profile);
+    let rushS = Infinity;
+    for (let i = 1; i < 300; i++) {
+      step(w, brain);
+      if (brain.plan === 'rush') rushS = Math.min(rushS, i * STEP);
+      if (w.away.x - w.ball.x < BRACE_DISTANCE + PLAYER_R) return { rushS, inRangeS: i * STEP };
+    }
+    return { rushS, inRangeS: Infinity };
+  }
+
+  it('Easy Max starts later than Hard Max', () => {
+    const [easy, normal, hard] = [closeIn(DIFFICULTY.easy), closeIn(DIFFICULTY.normal), closeIn(DIFFICULTY.hard)];
+    expect(easy.rushS).toBeGreaterThan(normal.rushS);
+    expect(normal.rushS).toBeGreaterThan(hard.rushS);
+    expect(hard.inRangeS).toBeLessThan(normal.inRangeS);
+  });
+
+  it('the release window on Normal is about half a second', () => {
+    const { w, brain } = standoff({ x: 208 + 160 });
+    let inRange: number | null = null;
+    let slideRange: number | null = null;
+    for (let i = 1; i < 300 && slideRange === null; i++) {
+      step(w, brain);
+      const d = Math.hypot(w.away.x - w.ball.x, w.away.z - w.ball.z);
+      if (inRange === null && w.away.x - w.ball.x < BRACE_DISTANCE + PLAYER_R) inRange = i * STEP;
+      if (d <= SLIDE_RANGE) slideRange = i * STEP;
+    }
+    expect(inRange).not.toBeNull();
+    expect(slideRange! - inRange!).toBeGreaterThanOrEqual(0.35);
+    expect(slideRange! - inRange!).toBeLessThanOrEqual(0.8);
+  });
+
+  it('Max never plants and waits while Harrison holds a full charge', () => {
+    const { w, brain } = standoff({ x: 500 });
+    let minSpeed = Infinity;
+    for (let i = 0; i < 120; i++) {
+      step(w, brain);
+      if (i > 30 && w.home.state === 'poweringUp') minSpeed = Math.min(minSpeed, Math.abs(w.away.vx));
+    }
+    expect(minSpeed).toBeGreaterThan(50);
   });
 });

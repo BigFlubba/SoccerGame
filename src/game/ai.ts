@@ -4,6 +4,7 @@ import { GRAVITY } from './constants';
 import { inGoalBox, type Goal } from './field';
 import type { Aim } from './kick';
 import { NO_INTENT, PLAYER_R, type Player, type PlayerIntent } from './player';
+import { maxGoal, waveTarget } from './power';
 import type { World } from './world';
 import { REACH_Z } from './zones';
 
@@ -17,23 +18,29 @@ export interface AiProfile {
   aggression: number;
   /** Distance from the goal line it starts shooting from. */
   shootRange: number;
+  /** Seconds after Harrison starts powering up before it rushes him. */
+  rushDelayS: number;
+  /** Whether it sprints at him. */
+  rushSprint: boolean;
 }
 
 export const DIFFICULTY: Record<Difficulty, AiProfile> = {
-  easy: { reactionS: 0.32, aimErrorDeg: 10, aggression: 0.3, shootRange: 150 },
-  normal: { reactionS: 0.18, aimErrorDeg: 6, aggression: 0.55, shootRange: 180 },
-  hard: { reactionS: 0.1, aimErrorDeg: 3, aggression: 0.8, shootRange: 210 },
+  easy: { reactionS: 0.32, aimErrorDeg: 10, aggression: 0.3, shootRange: 150, rushDelayS: 0.3, rushSprint: false },
+  normal: { reactionS: 0.18, aimErrorDeg: 6, aggression: 0.55, shootRange: 180, rushDelayS: 0.1, rushSprint: false },
+  hard: { reactionS: 0.1, aimErrorDeg: 3, aggression: 0.8, shootRange: 210, rushDelayS: 0, rushSprint: true },
 };
 
 export interface AiBrain {
   profile: AiProfile;
   nextDecisionS: number;
   intent: PlayerIntent;
-  plan: 'chase' | 'dribble' | 'charge' | 'defend' | 'jump';
+  plan: 'chase' | 'dribble' | 'charge' | 'defend' | 'jump' | 'rush';
   /** Time left on the current charge before it releases the shot. */
   chargeLeftS: number;
   /** Time until it may slide again. */
   slideReadyS: number;
+  /** How long the opponent has been powering up. */
+  rushS: number;
 }
 
 /** The ball counts as at someone's feet within this distance, on the ground. */
@@ -45,7 +52,7 @@ const CHASE_OFFSET = 8;
 const DEFEND_OFFSET = 20;
 /** ...and this fraction of the way across from the ball toward its own goal's centre. */
 const DEFEND_COVER = 1 / 3;
-const SLIDE_RANGE = 26;
+export const SLIDE_RANGE = 26;
 const SLIDE_COOLDOWN_S = 1.2;
 const HIGH_BALL = 30;
 const HIGH_BALL_RANGE = 30;
@@ -75,6 +82,8 @@ const ARRIVE = 3;
 const CORNER_CLEARANCE = PLAYER_R + ARRIVE + 1;
 /** How far ahead it leads a rolling ball. */
 const LEAD_S = 0.25;
+/** Rushing a power-up, it runs at a spot on the beam's lane this far ahead of it, so it steps into the lane as it closes. */
+const LANE_LOOKAHEAD = 12;
 /** Where it aims its shots: mostly the far post, then the near post, sometimes straight. */
 const AIM_ODDS: readonly (readonly [Aim, number])[] = [
   ['far', 1 / 2],
@@ -83,7 +92,7 @@ const AIM_ODDS: readonly (readonly [Aim, number])[] = [
 ];
 
 export function createBrain(profile: AiProfile): AiBrain {
-  return { profile, nextDecisionS: 0, intent: { ...NO_INTENT }, plan: 'chase', chargeLeftS: 0, slideReadyS: 0 };
+  return { profile, nextDecisionS: 0, intent: { ...NO_INTENT }, plan: 'chase', chargeLeftS: 0, slideReadyS: 0, rushS: 0 };
 }
 
 const attackDir = (me: Player): 1 | -1 => (me.team === 'home' ? 1 : -1);
@@ -216,6 +225,31 @@ function pickAim(w: World): Aim {
   return 'straight';
 }
 
+/**
+ * The opponent is powering up: it comes for him. It runs at the ball along
+ * the beam's lane, facing him all the way, and slides in once close and in
+ * line. It never plants and waits, so every standoff ends: it braces from
+ * far, is blown away in range, or tackles him if he waits too long.
+ */
+function rush(brain: AiBrain, w: World, me: Player, them: Player): void {
+  brain.plan = 'rush';
+  const ball = w.ball;
+  const goal = maxGoal(w);
+  const dist = Math.hypot(ball.x - me.x, ball.z - me.z);
+  // Hard sprints all the way in; the others only from far, as they would to any distant ball.
+  const sprint = brain.profile.rushSprint ? !me.exhausted : dist > SPRINT_DISTANCE && me.stamina > SPRINT_MIN_STAMINA;
+  if (dist <= SLIDE_RANGE && Math.abs(ball.z - me.z) <= REACH_Z && brain.slideReadyS === 0 && Math.sign(ball.x - me.x) === me.facing) {
+    brain.slideReadyS = SLIDE_COOLDOWN_S;
+    brain.intent = { ...NO_INTENT, chipHeld: true };
+    return;
+  }
+  const toward = Math.sign(ball.x - me.x) || -me.facing;
+  const x = Math.abs(ball.x - me.x) > LANE_LOOKAHEAD ? me.x + toward * LANE_LOOKAHEAD : ball.x;
+  const laneZ = ball.z + ((waveTarget(goal, them.aim) - ball.z) * (x - ball.x)) / Math.max(1, Math.abs(goal.lineX - ball.x));
+  const [moveX, moveZ] = steer(me, x, dist <= LANE_LOOKAHEAD ? ball.z : laneZ);
+  brain.intent = { ...NO_INTENT, sprint, moveX: moveX || toward, moveZ };
+}
+
 function decide(brain: AiBrain, w: World, me: Player, them: Player): void {
   const { profile } = brain;
   const dir = attackDir(me);
@@ -315,8 +349,13 @@ export function think(brain: AiBrain, w: World, me: Player, them: Player, dt: nu
       released = true;
     }
   }
-  // A decision on the release tick could start a new charge and swallow the shot, so it waits a tick.
-  if (!released && brain.nextDecisionS <= 1e-9) {
+  brain.rushS = them.state === 'poweringUp' ? brain.rushS + dt : 0;
+  if (brain.rushS >= brain.profile.rushDelayS && them.state === 'poweringUp') {
+    // Committed: it re-aims every tick until he fires or is stopped.
+    rush(brain, w, me, them);
+    brain.nextDecisionS = brain.profile.reactionS;
+  } else if (!released && brain.nextDecisionS <= 1e-9) {
+    // A decision on the release tick could start a new charge and swallow the shot, so it waits a tick.
     decide(brain, w, me, them);
     brain.nextDecisionS = brain.profile.reactionS;
   }
