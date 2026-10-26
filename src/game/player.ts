@@ -5,8 +5,9 @@ import { TAP_CHARGE, type Aim } from './kick';
 import { SPRINT_MULTIPLIER, chargeTime, jumpVelocity, runSpeed, type Stats } from './stats';
 
 /**
- * jump is a one-tick pulse (pressed this tick); shootHeld/chipHeld are held
- * states whose release fires the kick. moveZ +1 is away from the camera.
+ * jump is a one-tick pulse (pressed this tick); shootHeld/chipHeld/powerHeld
+ * are held states whose release fires the kick. moveZ +1 is away from the
+ * camera.
  */
 export interface PlayerIntent {
   moveX: number;
@@ -15,6 +16,7 @@ export interface PlayerIntent {
   jump: boolean;
   shootHeld: boolean;
   chipHeld: boolean;
+  powerHeld: boolean;
   sprint: boolean;
 }
 
@@ -25,13 +27,25 @@ export const NO_INTENT: Readonly<PlayerIntent> = Object.freeze({
   jump: false,
   shootHeld: false,
   chipHeld: false,
+  powerHeld: false,
   sprint: false,
 });
 
-export type PlayerState = 'ground' | 'air' | 'charging' | 'kicking' | 'chipping' | 'sliding' | 'fallen';
+export type PlayerState =
+  | 'ground'
+  | 'air'
+  | 'charging'
+  | 'kicking'
+  | 'chipping'
+  | 'sliding'
+  | 'fallen'
+  | 'poweringUp'
+  | 'unleashing'
+  | 'bracing'
+  | 'blown';
 
 export interface Kick {
-  kind: 'shot' | 'chip' | 'volley' | 'header' | 'slide';
+  kind: 'shot' | 'chip' | 'volley' | 'header' | 'slide' | 'wave';
   charge: number;
   overchargeS: number;
   aim: Aim;
@@ -63,7 +77,7 @@ export interface Player {
   /** The stick's current aim, used for headers. */
   aim: Aim;
   /** Last tick's held buttons, so a press is only seen on its first tick. */
-  held: { shoot: boolean; chip: boolean };
+  held: { shoot: boolean; chip: boolean; power: boolean };
   slideCooldown: number;
   /** Time until he can take another dribble touch. */
   touchCooldown: number;
@@ -102,6 +116,21 @@ const IDLE_SPEED = 5;
 const JUMP_RISE_FRAME = 1;
 const JUMP_FALL_FRAME = 2;
 
+/** Seconds of powering up before the Energy Wave is ready. */
+export const POWER_UP_S = 1;
+/** A braced player is shoved back at this speed, easing to a stop over BRACE_S. */
+export const BRACE_SKID_SPEED = 100;
+export const BRACE_S = 0.5;
+/** Blown away: launched back along the beam and up, then down for longer than a fall. */
+export const BLOWN_SPEED = 260;
+export const BLOWN_VY = 220;
+export const BLOWN_DOWN_S = 1.5;
+/** Fall frames for being blown away: flat out in the air, then pushing up, kneeling and standing once landed. */
+const BLOWN_AIR_FRAME = 1;
+const BLOWN_GET_UP_FRAME = 2;
+/** How long a launch from the ground stays in the air. */
+const BLOWN_FLIGHT_S = (2 * BLOWN_VY) / GRAVITY;
+
 export function createPlayer(team: 'home' | 'away', stats: Stats, x: number, facing: 1 | -1, z = START_Z): Player {
   return {
     team,
@@ -122,7 +151,7 @@ export function createPlayer(team: 'home' | 'away', stats: Stats, x: number, fac
     kick: null,
     anim: { name: 'idle', frame: 0 },
     aim: 'straight',
-    held: { shoot: false, chip: false },
+    held: { shoot: false, chip: false, power: false },
     slideCooldown: 0,
     touchCooldown: 0,
     animT: 0,
@@ -149,7 +178,7 @@ function approach2(p: Player, tx: number, tz: number, dt: number, accel: number,
 
 /** Striking the ball: charging a shot or chip, or in the air. Up/down aims instead of moving him. */
 export function isStriking(p: Player): boolean {
-  return p.state === 'charging' || (p.state === 'chipping' && !p.kick) || p.state === 'air';
+  return p.state === 'charging' || (p.state === 'chipping' && !p.kick) || p.state === 'air' || p.state === 'poweringUp';
 }
 
 /** How long a kick's strike clip runs after release, and how long it can connect. */
@@ -204,9 +233,31 @@ export function knockDown(p: Player): void {
   p.vz = 0;
 }
 
-/** Drops a shot or chip that is still charging, without kicking (used when the game pauses). */
+/** Braced against a beam travelling along `beamDirX`: he faces it and is shoved back, skidding. */
+export function brace(p: Player, beamDirX: 1 | -1): void {
+  enter(p, 'bracing');
+  p.facing = beamDirX === 1 ? -1 : 1;
+  p.charge = 0;
+  p.overchargeS = 0;
+  p.kick = null;
+  p.vx = beamDirX * BRACE_SKID_SPEED;
+  p.vz = 0;
+}
+
+/** Knocked flying along (dirX, dirZ), a unit direction: no control until he's back up at BLOWN_DOWN_S. */
+export function blowAway(p: Player, dirX: number, dirZ: number): void {
+  enter(p, 'blown');
+  p.charge = 0;
+  p.overchargeS = 0;
+  p.kick = null;
+  p.vx = dirX * BLOWN_SPEED;
+  p.vz = dirZ * BLOWN_SPEED;
+  p.vy = BLOWN_VY;
+}
+
+/** Drops a shot, chip or power-up that is still charging, without kicking (used when the game pauses). */
 export function cancelCharge(p: Player): void {
-  const charging = p.state === 'charging' || (p.state === 'chipping' && !p.kick);
+  const charging = p.state === 'charging' || (p.state === 'chipping' && !p.kick) || p.state === 'poweringUp';
   if (!charging) return;
   enter(p, 'ground');
   p.charge = 0;
@@ -241,6 +292,20 @@ function chooseAnim(p: Player, sprinting: boolean): { name: AnimName; frame: num
     }
     case 'fallen':
       return { name: 'fall', frame: Math.min(CLIPS.fall.frameCount - 1, Math.floor((t / FALL_TIME) * CLIPS.fall.frameCount)) };
+    case 'poweringUp': {
+      const time = p.anim.name === 'powerUp' ? p.animT : 0;
+      return { name: 'powerUp', frame: Math.floor(time * CLIPS.powerUp.fps) % CLIPS.powerUp.frameCount };
+    }
+    case 'unleashing':
+      return { name: 'shoot', frame: clipFrame('shoot', SHOOT_STRIKE_FRAME, t) };
+    case 'bracing':
+      return { name: 'brace', frame: 0 };
+    case 'blown': {
+      if (p.y > 0 || p.vy > 0) return { name: 'fall', frame: BLOWN_AIR_FRAME };
+      const getUpFrames = CLIPS.fall.frameCount - BLOWN_GET_UP_FRAME;
+      const down = Math.max(0, (t - BLOWN_FLIGHT_S) / (BLOWN_DOWN_S - BLOWN_FLIGHT_S));
+      return { name: 'fall', frame: Math.min(CLIPS.fall.frameCount - 1, BLOWN_GET_UP_FRAME + Math.floor(down * getUpFrames)) };
+    }
     default: {
       const name: AnimName = Math.hypot(p.vx, p.vz) < IDLE_SPEED ? 'idle' : sprinting ? 'sprint' : 'run';
       const time = name === p.anim.name ? p.animT : 0;
@@ -268,17 +333,22 @@ function dropWallSpeed(p: Player, intent: PlayerIntent, field: Field): void {
   if (p.z >= field.depth - PLAYER_R && p.vz > 0 && intent.moveZ <= 0) p.vz = 0;
 }
 
-export function stepPlayer(p: Player, intent: PlayerIntent, dt: number, field: Field, ballAtFeet: boolean): void {
+/** `powerOk`: the world's say-so that a power press may start a power-up now (a full meter, the ball, a clear line). */
+export function stepPlayer(p: Player, intent: PlayerIntent, dt: number, field: Field, ballAtFeet: boolean, powerOk = false): void {
   const shootPressed = intent.shootHeld && !p.held.shoot;
   const chipPressed = intent.chipHeld && !p.held.chip;
-  p.held = { shoot: intent.shootHeld, chip: intent.chipHeld };
+  const powerPressed = intent.powerHeld && !p.held.power;
+  p.held = { shoot: intent.shootHeld, chip: intent.chipHeld, power: intent.powerHeld };
   p.aim = intent.aim;
   p.stateT += dt;
   p.slideCooldown = Math.max(0, p.slideCooldown - dt);
   p.touchCooldown = Math.max(0, p.touchCooldown - dt);
 
   if (p.state === 'ground') {
-    if (intent.jump) {
+    if (powerPressed && powerOk) {
+      enter(p, 'poweringUp');
+      p.charge = 0;
+    } else if (intent.jump) {
       enter(p, 'air');
       p.vy = jumpVelocity(p.stats);
       p.takeoffSpeed = Math.hypot(p.vx, p.vz);
@@ -362,6 +432,38 @@ export function stepPlayer(p: Player, intent: PlayerIntent, dt: number, field: F
       if (p.y > 0 || p.vy > 0) fall(p, dt);
       if (p.y <= 0) [p.y, p.vy] = [0, 0];
       if (p.stateT >= FALL_TIME) enter(p, 'ground');
+      break;
+    case 'poweringUp':
+      if (!intent.powerHeld) {
+        if (p.charge >= 1) {
+          p.kick = { kind: 'wave', aim: intent.aim, active: true, charge: 1, overchargeS: 0 };
+          enter(p, 'unleashing');
+        } else {
+          enter(p, 'ground');
+        }
+        p.charge = 0;
+      } else {
+        p.charge = Math.min(1, p.charge + dt / POWER_UP_S);
+        approach2(p, 0, 0, dt, ACCEL, DECEL);
+      }
+      break;
+    case 'unleashing':
+      // The world fires the wave as he enters this state (and clears kick.active); he just follows through.
+      approach2(p, 0, 0, dt, ACCEL, DECEL);
+      if (p.stateT >= SHOT_TIMING.doneS) {
+        p.kick = null;
+        enter(p, 'ground');
+      }
+      break;
+    case 'bracing':
+      p.vx = -p.facing * BRACE_SKID_SPEED * Math.max(0, 1 - p.stateT / BRACE_S);
+      p.vz = 0;
+      if (p.stateT >= BRACE_S) enter(p, 'ground');
+      break;
+    case 'blown':
+      if (p.y > 0 || p.vy > 0) fall(p, dt);
+      if (p.y <= 0 && p.vy <= 0) [p.y, p.vy, p.vx, p.vz] = [0, 0, 0, 0];
+      if (p.stateT >= BLOWN_DOWN_S) enter(p, 'ground');
       break;
   }
 

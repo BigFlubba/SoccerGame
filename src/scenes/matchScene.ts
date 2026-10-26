@@ -66,6 +66,7 @@ function harrisonIntent(input: InputFrame): PlayerIntent {
     jump: input.pressed.has('jump'),
     shootHeld: input.held.has('shoot'),
     chipHeld: input.held.has('chip'),
+    powerHeld: input.held.has('power'),
     sprint: input.held.has('sprint'),
   };
 }
@@ -164,7 +165,7 @@ export function createMatchScene(ctx: GameContext, seed: number): MatchScene {
           pause = null;
           ctx.audio.setCrowd(hud.moment ? 'roar' : 'match');
           // Buttons held while the menu closes (B is also "back") need a fresh press to act in play.
-          world.home.held = { shoot: input.held.has('shoot'), chip: input.held.has('chip') };
+          world.home.held = { shoot: input.held.has('shoot'), chip: input.held.has('chip'), power: input.held.has('power') };
         }
         return null;
       }

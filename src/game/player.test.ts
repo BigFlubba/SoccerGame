@@ -1,7 +1,24 @@
 import { describe, expect, it } from 'vitest';
 import { BACKYARD } from './field';
 import { TAP_CHARGE } from './kick';
-import { ACCEL, FALL_TIME, NO_INTENT, PLAYER_R, cancelCharge, createPlayer, isStriking, knockDown, stepPlayer, type Player, type PlayerIntent } from './player';
+import {
+  ACCEL,
+  BLOWN_DOWN_S,
+  BRACE_S,
+  FALL_TIME,
+  NO_INTENT,
+  PLAYER_R,
+  POWER_UP_S,
+  blowAway,
+  brace,
+  cancelCharge,
+  createPlayer,
+  isStriking,
+  knockDown,
+  stepPlayer,
+  type Player,
+  type PlayerIntent,
+} from './player';
 import { BASE_STATS, SPRINT_MULTIPLIER, chargeTime, runSpeed } from './stats';
 
 const STEP = 1 / 60;
@@ -392,6 +409,135 @@ describe('stepPlayer: stamina and falls', () => {
     expect(p.anim.name).toBe('fall');
     expect(p.vx).toBe(0);
     tick(p, { moveX: 1 }, ticks(FALL_TIME));
+    expect(p.state).toBe('ground');
+  });
+});
+
+describe('stepPlayer: powering up', () => {
+  /** Ticks with the ball at his feet and the power-up allowed (or not). */
+  function power(p: Player, i: Partial<PlayerIntent>, n = 1, powerOk = true): void {
+    for (let k = 0; k < n; k++) stepPlayer(p, intent(i), STEP, BACKYARD, true, powerOk);
+  }
+
+  it('a power press with powerOk starts powering up and stands him still', () => {
+    const p = harrison();
+    tick(p, { moveX: 1 }, ticks(0.5), true);
+    power(p, { moveX: 1, powerHeld: true }, ticks(0.5));
+    expect(p.state).toBe('poweringUp');
+    expect(p.charge).toBeCloseTo(0.5 / POWER_UP_S, 1);
+    expect(p.vx).toBe(0);
+    expect(p.anim.name).toBe('powerUp');
+  });
+
+  it('without powerOk, a power press does nothing', () => {
+    const p = harrison();
+    power(p, { powerHeld: true }, ticks(0.5), false);
+    expect(p.state).toBe('ground');
+    expect(p.charge).toBe(0);
+  });
+
+  it('holding a full second then letting go unleashes a wave kick aimed by the stick', () => {
+    const p = harrison();
+    power(p, { powerHeld: true }, ticks(POWER_UP_S));
+    expect(p.charge).toBe(1);
+    power(p, { aim: 'far' });
+    expect(p.state).toBe('unleashing');
+    expect(p.kick).toEqual({ kind: 'wave', aim: 'far', active: true, charge: 1, overchargeS: 0 });
+    power(p, {}, ticks(1));
+    expect(p.state).toBe('ground');
+    expect(p.kick).toBeNull();
+  });
+
+  it('letting go early drops back to ground with no kick', () => {
+    const p = harrison();
+    power(p, { powerHeld: true }, ticks(0.6));
+    expect(p.state).toBe('poweringUp');
+    power(p, {});
+    expect(p.state).toBe('ground');
+    expect(p.kick).toBeNull();
+    expect(p.charge).toBe(0);
+  });
+
+  it('holding past full keeps it ready until let go', () => {
+    const p = harrison();
+    power(p, { powerHeld: true }, ticks(3));
+    expect(p.state).toBe('poweringUp');
+    expect(p.charge).toBe(1);
+    power(p, {});
+    expect(p.state).toBe('unleashing');
+  });
+
+  it('he keeps facing the way he started while powering up', () => {
+    const p = harrison();
+    power(p, { powerHeld: true }, ticks(0.2));
+    power(p, { powerHeld: true, moveX: -1 }, ticks(0.2));
+    expect(p.facing).toBe(1);
+  });
+
+  it('a tackle cancels the power-up', () => {
+    const p = harrison();
+    power(p, { powerHeld: true }, ticks(0.5));
+    expect(p.state).toBe('poweringUp');
+    knockDown(p);
+    expect(p.state).toBe('fallen');
+    expect(p.charge).toBe(0);
+  });
+
+  it('cancelCharge drops a power-up', () => {
+    const p = harrison();
+    power(p, { powerHeld: true }, ticks(POWER_UP_S + 0.5));
+    expect(p.state).toBe('poweringUp');
+    cancelCharge(p);
+    expect(p.state).toBe('ground');
+    expect(p.charge).toBe(0);
+  });
+
+  it('Y still held after a cancel needs a fresh press', () => {
+    const p = harrison();
+    power(p, { powerHeld: true }, ticks(0.5));
+    cancelCharge(p);
+    for (let k = 0; k < 10; k++) {
+      power(p, { powerHeld: true });
+      expect(p.state, `tick ${k}`).toBe('ground');
+    }
+    power(p, {});
+    power(p, { powerHeld: true });
+    expect(p.state).toBe('poweringUp');
+  });
+});
+
+describe('bracing and blown away', () => {
+  it('bracing skids him about 25 px back over half a second', () => {
+    const p = createPlayer('away', BASE_STATS, 400, 1);
+    brace(p, 1);
+    expect(p.state).toBe('bracing');
+    expect(p.facing).toBe(-1);
+    tick(p, {}, ticks(BRACE_S) - 1);
+    expect(p.state).toBe('bracing');
+    expect(p.anim.name).toBe('brace');
+    tick(p, {}, 2);
+    expect(p.x - 400).toBeGreaterThanOrEqual(20);
+    expect(p.x - 400).toBeLessThanOrEqual(30);
+    expect(p.state).toBe('ground');
+  });
+
+  it('blown away he flies, lands and is up at 1.5 s', () => {
+    const p = createPlayer('away', BASE_STATS, 300, -1);
+    blowAway(p, 1, 0);
+    expect(p.state).toBe('blown');
+    tick(p, {}, ticks(0.1));
+    expect(p.y).toBeGreaterThan(0);
+    expect(p.anim).toEqual({ name: 'fall', frame: 1 });
+    tick(p, {}, ticks(0.8));
+    expect(p.y).toBe(0);
+    expect(p.vx).toBe(0);
+    expect(p.state).toBe('blown');
+    const landedX = p.x;
+    expect(landedX).toBeGreaterThan(340);
+    tick(p, { moveX: -1 }, ticks(BLOWN_DOWN_S - 0.9) - 1);
+    expect(p.state).toBe('blown');
+    expect(p.x).toBe(landedX);
+    tick(p, {}, 2);
     expect(p.state).toBe('ground');
   });
 });

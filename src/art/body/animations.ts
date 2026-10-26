@@ -1,7 +1,7 @@
 import { plantLeg, type ArmPose, type HeadFacing, type LegPose, type Pose } from './pose';
 import { HARRISON_BODY, standingHipHeight, type BodyProportions } from './proportions';
 
-export type AnimName = 'idle' | 'run' | 'jump' | 'shoot' | 'powerUp' | 'sprint' | 'chip' | 'header' | 'volley' | 'slide' | 'fall' | 'juggle' | 'celebrate';
+export type AnimName = 'idle' | 'run' | 'jump' | 'shoot' | 'powerUp' | 'sprint' | 'chip' | 'header' | 'volley' | 'slide' | 'fall' | 'juggle' | 'celebrate' | 'brace';
 
 /** Shoot frame held while a shot charges. */
 export const SHOOT_CHARGE_FRAME = 1;
@@ -227,6 +227,14 @@ export function clipsFor(body: BodyProportions): Record<AnimName, AnimationClip>
         k({ hip: -1, torso: 0, head: { dy: -1 }, near: { plant: 3 }, far: { plant: -2 }, nearArm: [140, 15], farArm: [-145, 15] }),
         k({ hip: 0, torso: -3, head: { dy: -1 }, near: { plant: 2 }, far: { plant: -1 }, nearArm: [145, 5], farArm: [-150, 5] }),
       ],
+    },
+    brace: {
+      name: 'brace',
+      frameCount: 1,
+      fps: 1,
+      loop: false,
+      // Leaning into a beam: both arms thrust forward, the front foot planted and the back leg driving.
+      keys: [k({ hip: -4, torso: 25, near: { plant: 8 }, far: { plant: -10 }, nearArm: [62, 5], farArm: [70, 10] })],
     },
   };
 }

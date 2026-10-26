@@ -80,7 +80,7 @@ const ballAtFeet = (p: Player, ball: Ball): boolean => p.y === 0 && ball.y <= BA
  */
 function stepOne(p: Player, intent: PlayerIntent, live: boolean, w: World, dt: number): void {
   stepPlayer(p, live ? intent : NO_INTENT, dt, w.field, ballAtFeet(p, w.ball));
-  if (!live) p.held = { shoot: intent.shootHeld, chip: intent.chipHeld };
+  if (!live) p.held = { shoot: intent.shootHeld, chip: intent.chipHeld, power: intent.powerHeld };
 }
 
 /**

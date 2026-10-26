@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { C, resolvePalette } from '../colors';
 import { HARRISON_HEADS, HARRISON_POWER_HEADS } from '../harrison/head';
 import { harrisonLook } from '../harrison/look';
+import { MAX_HEADS } from '../opponents/max';
 import { opaqueBounds } from '../raster';
 import { CLIPS } from './animations';
 import { bakeAll, frameIndexAt, samplePoses } from './bake';
@@ -31,7 +32,18 @@ describe('bakeAll', () => {
       fall: 5,
       juggle: 4,
       celebrate: 2,
+      brace: 1,
     });
+  });
+
+  it('bakes the one-frame brace clip for Harrison and Max, inside the frame and planted', () => {
+    for (const heads of [HARRISON_HEADS, MAX_HEADS]) {
+      const [f, ...rest] = bakeAll(HARRISON_BODY, heads).brace.frames;
+      expect(rest).toEqual([]);
+      const b = opaqueBounds(f!)!;
+      expect(b.x >= 1 && b.y >= 1 && b.x + b.w <= 48 && b.y + b.h <= 55).toBe(true);
+      expect(b.y + b.h - 1).toBe(54);
+    }
   });
 
   it('bakes the juggle clip with 4 frames: a looping keepy-uppie at 8 fps', () => {
