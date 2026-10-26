@@ -6,7 +6,7 @@ const ALPHABET = '0123456789ABCDEFGHJKMNPQRSTVWXYZ';
 
 /** A save with something in every field, both unlocks owned. */
 const RICH: Profile = {
-  version: 2,
+  version: 3,
   coins: 840,
   level: 6,
   xp: 125,
@@ -16,6 +16,7 @@ const RICH: Profile = {
   totals: { matches: 23, wins: 14, draws: 3, losses: 6, goalsFor: 51, goalsAgainst: 27, styleGoals: 9, xpEarned: 2140 },
   powerMoves: { owned: ['energyWave'], equipped: 'energyWave' },
   powerForms: { owned: ['golden'], equipped: 'golden' },
+  career: { stars: { 'backyard-1': 1, 'backyard-2': 1, 'backyard-3': 1, 'backyard-4': 1 }, milestonesPaid: 0, lossStreaks: {} },
 };
 
 describe('save code', () => {

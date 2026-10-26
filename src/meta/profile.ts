@@ -1,4 +1,5 @@
 import { BASE_STATS, MAX_STAT_LEVEL, MIN_STAT_LEVEL, STAT_NAMES, type Stats } from '../game/stats';
+import { MATCH_IDS, grantRungStars } from './career';
 import { FORM_IDS, MOVE_IDS, grantForms } from './catalog';
 import { LADDER_MATCHES } from './ladder';
 import { isRecord, readStored, writeUnlessNewer, type KeyValueStore } from './storage';
@@ -26,9 +27,19 @@ export interface Totals {
   xpEarned: number;
 }
 
+/** His career, keyed by the catalog's match ids. */
+export interface Career {
+  /** Best stars per career match. Missing means 0; an entry of 0 is never stored. */
+  stars: Record<string, number>;
+  /** How many star milestones have been paid, 0..4. */
+  milestonesPaid: number;
+  /** Consecutive losses per career match; a win removes the entry. */
+  lossStreaks: Record<string, number>;
+}
+
 /** Harrison's progress, versioned so every later build can read it. */
 export interface Profile {
-  version: 2;
+  version: 3;
   coins: number;
   /** Stored, never worked out from XP, so a change to the curve can't take a level away. */
   level: number;
@@ -43,14 +54,15 @@ export interface Profile {
   powerMoves: Owned<PowerMoveId>;
   /** Granted by level. Stored, so a later change to an unlock level can't take one away. */
   powerForms: Owned<PowerFormId>;
+  career: Career;
 }
 
 /** Game-specific, so it never clashes with other pages on the same site. */
 export const PROFILE_KEY = 'harrisons-road-to-the-cup/profile';
-const VERSION = 2;
+const VERSION = 3;
 
 /** Ceilings on loaded counts, so a tampered save can't make levelling run forever. */
-export const MAX_LOADED = { level: 999, xp: 1_000_000, count: 999_999_999 };
+export const MAX_LOADED = { level: 999, xp: 1_000_000, count: 999_999_999, stars: 3, milestones: 4, streak: 99 };
 
 export const TOTAL_NAMES: readonly (keyof Totals)[] = ['matches', 'wins', 'draws', 'losses', 'goalsFor', 'goalsAgainst', 'styleGoals', 'xpEarned'];
 const DATE = /^\d{4}-\d{2}-\d{2}$/;
@@ -67,6 +79,7 @@ export function newProfile(): Profile {
     totals: { matches: 0, wins: 0, draws: 0, losses: 0, goalsFor: 0, goalsAgainst: 0, styleGoals: 0, xpEarned: 0 },
     powerMoves: { owned: [], equipped: null },
     powerForms: { owned: [], equipped: null },
+    career: { stars: {}, milestonesPaid: 0, lossStreaks: {} },
   };
 }
 
@@ -88,6 +101,26 @@ function totalsFrom(v: unknown): Totals {
   return t;
 }
 
+/** Catalog ids only, each a whole number up to `max`; zeros are left out. */
+function countsFrom(v: unknown, max: number): Record<string, number> {
+  const r = isRecord(v) ? v : {};
+  const out: Record<string, number> = {};
+  for (const id of MATCH_IDS) {
+    const n = wholeOr(r[id], 0, 0, max);
+    if (n > 0) out[id] = n;
+  }
+  return out;
+}
+
+function careerFrom(v: unknown): Career {
+  const r = isRecord(v) ? v : {};
+  return {
+    stars: countsFrom(r.stars, MAX_LOADED.stars),
+    milestonesPaid: wholeOr(r.milestonesPaid, 0, 0, MAX_LOADED.milestones),
+    lossStreaks: countsFrom(r.lossStreaks, MAX_LOADED.streak),
+  };
+}
+
 /** Known names only, each once; an equipped one he doesn't own is dropped. */
 function ownedFrom<T extends string>(v: unknown, known: readonly T[]): Owned<T> {
   const r = isRecord(v) ? v : {};
@@ -99,14 +132,15 @@ function ownedFrom<T extends string>(v: unknown, known: readonly T[]): Owned<T> 
 
 /**
  * Reads a profile field by field, so one bad value falls back to its own
- * default and the rest load. A v1 save loads with no power moves; a newer
- * build's save is read as best it can be. Anything that isn't a save at all
- * is a new profile.
+ * default and the rest load. A v1 save loads with no power moves, a v1 or v2
+ * save with no career but the stars its ladder wins earn; a newer build's
+ * save is read as best it can be. Anything that isn't a save at all is a
+ * new profile.
  */
 export function profileFrom(v: unknown): Profile {
   const d = newProfile();
   if (!isRecord(v) || typeof v.version !== 'number' || !(v.version >= 1)) return d;
-  return grantForms({
+  return grantRungStars(grantForms({
     version: VERSION,
     coins: wholeOr(v.coins, d.coins, 0, MAX_LOADED.count),
     level: wholeOr(v.level, d.level, 1, MAX_LOADED.level),
@@ -117,7 +151,8 @@ export function profileFrom(v: unknown): Profile {
     totals: totalsFrom(v.totals),
     powerMoves: ownedFrom(v.powerMoves, MOVE_IDS),
     powerForms: ownedFrom(v.powerForms, FORM_IDS),
-  });
+    career: careerFrom(v.career),
+  }));
 }
 
 export function loadProfile(store: KeyValueStore | null): Profile {

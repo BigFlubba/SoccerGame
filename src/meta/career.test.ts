@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import { BACKYARD, BOSS_ID, MATCH_IDS, TOTAL_STARS, VENUES, VENUE_STARS, allBeaten, careerCardLines, careerStars, isBeaten, matchById, matchState, nextCareerMatch, rungId, starsAt, stopLabel, venueDone, venueStars } from './career';
+import { BACKYARD, BOSS_ID, MATCH_IDS, TOTAL_STARS, VENUES, VENUE_STARS, allBeaten, careerCardLines, careerStars, grantRungStars, isBeaten, matchById, matchState, nextCareerMatch, rungId, starsAt, stopLabel, venueDone, venueStars } from './career';
+import { newProfile, type Profile } from './profile';
 
-const p = (ladderWins: number, stars: Record<string, number> = {}) => ({ ladderWins, career: { stars } });
+const p = (ladderWins: number, stars: Record<string, number> = {}): Profile => ({ ...newProfile(), ladderWins, career: { ...newProfile().career, stars } });
 
 describe('the catalog', () => {
   it('five venues, the Backyard open with ten rungs then the boss', () => {
@@ -68,6 +69,13 @@ describe('progress', () => {
     expect(stopLabel(p(6), 'park')).toBe('LOCKED');
     expect(stopLabel(p(10, { [BOSS_ID]: 1 }), 'park')).toBe('COMING SOON');
     expect(stopLabel(p(10, { [BOSS_ID]: 1 }), 'school')).toBe('LOCKED');
+  });
+
+  it('grantRungStars adds one star per won rung and keeps better ones', () => {
+    const before = { ...newProfile(), ladderWins: 3, career: { stars: { 'backyard-2': 2 }, milestonesPaid: 0, lossStreaks: {} } };
+    const after = grantRungStars(before);
+    expect(after.career.stars).toEqual({ 'backyard-1': 1, 'backyard-2': 2, 'backyard-3': 1 });
+    expect(before.career.stars).toEqual({ 'backyard-2': 2 });
   });
 
   it('the Hub card lines', () => {

@@ -23,9 +23,6 @@ export interface Venue {
   matches: readonly CareerMatch[];
 }
 
-/** What the progress queries read. Task 5's profile carries the career; until then the field is optional. */
-type Progress = Pick<Profile, 'ladderWins'> & { career?: { stars: Record<string, number> } };
-
 export type MatchState = 'beaten' | 'next' | 'locked';
 
 export const rungId = (n: number): string => `backyard-${n}`;
@@ -76,54 +73,61 @@ export function matchById(id: string): CareerMatch | undefined {
 const venueById = (id: VenueId): Venue => VENUES.find(v => v.id === id)!;
 
 /** His best stars at a match; 0 when he has none there. */
-export function starsAt(p: Progress, id: string): number {
-  return p.career?.stars[id] ?? 0;
+export function starsAt(p: Profile, id: string): number {
+  return p.career.stars[id] ?? 0;
+}
+
+/** Every rung he has won carries at least one star: the retro grant for saves from before stars existed. Never changes `p`. */
+export function grantRungStars(p: Profile): Profile {
+  const stars = { ...p.career.stars };
+  for (let n = 1; n <= p.ladderWins; n++) stars[rungId(n)] = Math.max(stars[rungId(n)] ?? 0, 1);
+  return { ...p, career: { ...p.career, stars } };
 }
 
 /** A rung is beaten by the ladder wins; a boss by its star. */
-export function isBeaten(p: Progress, m: CareerMatch): boolean {
+export function isBeaten(p: Profile, m: CareerMatch): boolean {
   return m.kind === 'rung' ? p.ladderWins >= m.rung : starsAt(p, m.id) >= 1;
 }
 
 /** The first unbeaten Backyard match in order; the boss once every match is beaten, as a replay. */
-export function nextCareerMatch(p: Progress): CareerMatch {
+export function nextCareerMatch(p: Profile): CareerMatch {
   return BACKYARD.matches.find(m => !isBeaten(p, m)) ?? BOSS;
 }
 
-export function matchState(p: Progress, m: CareerMatch): MatchState {
+export function matchState(p: Profile, m: CareerMatch): MatchState {
   if (isBeaten(p, m)) return 'beaten';
   if (m.kind === 'boss' && p.ladderWins < LADDER_MATCHES) return 'locked';
   return nextCareerMatch(p).id === m.id ? 'next' : 'locked';
 }
 
-export function venueStars(p: Progress, venue: VenueId): number {
+export function venueStars(p: Profile, venue: VenueId): number {
   return venueById(venue).matches.reduce((sum, m) => sum + starsAt(p, m.id), 0);
 }
 
-export function careerStars(p: Progress): number {
+export function careerStars(p: Profile): number {
   return VENUES.reduce((sum, v) => sum + venueStars(p, v.id), 0);
 }
 
 /** A venue is done when its boss is beaten. */
-export function venueDone(p: Progress, venue: VenueId): boolean {
+export function venueDone(p: Profile, venue: VenueId): boolean {
   const boss = venueById(venue).matches.find(m => m.kind === 'boss');
   return boss !== undefined && isBeaten(p, boss);
 }
 
 /** Every match in every open venue is beaten. */
-export function allBeaten(p: Progress): boolean {
+export function allBeaten(p: Profile): boolean {
   return ALL_MATCHES.every(m => isBeaten(p, m));
 }
 
 /** The line under a stop on the road map. */
-export function stopLabel(p: Progress, venue: VenueId): string {
+export function stopLabel(p: Profile, venue: VenueId): string {
   if (venue === 'backyard') return `${venueStars(p, venue)}/${VENUE_STARS}`;
   if (venue === 'park' && venueDone(p, 'backyard')) return 'COMING SOON';
   return 'LOCKED';
 }
 
 /** The Hub card's two career lines; the second is null when there is nothing to add. */
-export function careerCardLines(p: Progress): { first: string; second: string | null } {
+export function careerCardLines(p: Profile): { first: string; second: string | null } {
   if (venueDone(p, 'backyard')) return { first: `BACKYARD DONE! STARS ${venueStars(p, 'backyard')}/${VENUE_STARS}`, second: 'THE PARK: COMING SOON' };
   const next = nextCareerMatch(p);
   if (next.kind === 'boss') return { first: `NEXT: ${next.name}`, second: 'BACKYARD BOSS!' };

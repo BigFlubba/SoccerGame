@@ -11,7 +11,15 @@ const STEP = 1 / 60;
 const BEHIND: Scene = { kind: 'options', update: () => null, draw: () => {} };
 const BAD = "THAT CODE DOESN'T WORK";
 
-const OTHER: Profile = { ...newProfile(), coins: 840, level: 6, ladderWins: 4, powerForms: { owned: ['golden'], equipped: 'golden' } };
+/** Four ladder wins, with the star each of them carries, so loading the code adds nothing. */
+const OTHER: Profile = {
+  ...newProfile(),
+  coins: 840,
+  level: 6,
+  ladderWins: 4,
+  powerForms: { owned: ['golden'], equipped: 'golden' },
+  career: { stars: { 'backyard-1': 1, 'backyard-2': 1, 'backyard-3': 1, 'backyard-4': 1 }, milestonesPaid: 0, lossStreaks: {} },
+};
 
 /** A frame with this text typed. */
 const typing = (text: string): InputFrame => ({ ...frame(), typed: text });
