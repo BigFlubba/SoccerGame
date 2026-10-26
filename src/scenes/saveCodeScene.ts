@@ -1,5 +1,6 @@
 import { MASTER } from '../art/colors';
 import { BASE_W } from '../engine/viewport';
+import { careerStars } from '../meta/career';
 import type { Profile } from '../meta/profile';
 import { LADDER_MATCHES } from '../meta/profile';
 import { decodeSaveCode, encodeSaveCode, groupCode, normaliseCode } from '../meta/saveCode';
@@ -29,18 +30,17 @@ const LOADED = 'SAVE LOADED!';
 export const BAD_CODE = "THAT CODE DOESN'T WORK";
 const SHOW_ITEMS = ['ENTER A CODE', 'BACK'] as const;
 const CONFIRM_ITEMS = ['NO', 'YES'] as const;
-/** Longer than any code (about 110 characters at the loader's ceilings), so a paste of junk can't grow the entry without end. */
-const MAX_ENTRY = 120;
+/** Longer than any code (125 characters at the loader's ceilings), so a paste of junk can't grow the entry without end. */
+export const MAX_ENTRY = 130;
 
 const PANEL = { x: 8, y: 6, w: 304, h: 168 };
 const TITLE_Y = PANEL.y + 6;
 const CODE = { y: PANEL.y + 28 };
-/** A code is shown big, four groups to a line; one too long for three lines that way goes small, eight to a line. */
+/** A code is shown big, four groups to a line; one too long for three lines that way goes small, eight to a line, up to four lines. */
 const CODE_SIZES = [
-  { scale: 2, groupsPerLine: 4, lineH: 16 },
-  { scale: 1, groupsPerLine: 8, lineH: 9 },
+  { scale: 2, groupsPerLine: 4, lineH: 16, maxLines: 3 },
+  { scale: 1, groupsPerLine: 8, lineH: 9, maxLines: 4 },
 ] as const;
-const CODE_MAX_LINES = 3;
 const STATUS_Y = PANEL.y + 96;
 const MENU_TOP = PANEL.y + 110;
 const FOOTER_Y = PANEL.y + PANEL.h - 14;
@@ -50,15 +50,15 @@ const ENTRY_DROP = 12;
 /** A code's groups of 5 laid out in lines: big if it fits in three lines, otherwise small. */
 export function codeLines(code: string): { lines: string[]; scale: number; lineH: number } {
   const groups = code.split('-').filter(g => g.length > 0);
-  const size = CODE_SIZES.find(s => Math.ceil(groups.length / s.groupsPerLine) <= CODE_MAX_LINES) ?? CODE_SIZES[CODE_SIZES.length - 1];
+  const size = CODE_SIZES.find(s => Math.ceil(groups.length / s.groupsPerLine) <= s.maxLines) ?? CODE_SIZES[CODE_SIZES.length - 1];
   const lines: string[] = [];
   for (let i = 0; i < groups.length; i += size.groupsPerLine) lines.push(groups.slice(i, i + size.groupsPerLine).join('-'));
   return { lines, scale: size.scale, lineH: size.lineH };
 }
 
-/** A decoded save in one line: LEVEL 6 - 840 COINS - LADDER 4/10. */
+/** A decoded save in one line: LEVEL 6 - 840 COINS - LADDER 4/10 - STARS 7. */
 export function summarise(p: Profile): string {
-  return `LEVEL ${p.level} - ${p.coins} COINS - LADDER ${p.ladderWins}/${LADDER_MATCHES}`;
+  return `LEVEL ${p.level} - ${p.coins} COINS - LADDER ${p.ladderWins}/${LADDER_MATCHES} - STARS ${careerStars(p)}`;
 }
 
 /**

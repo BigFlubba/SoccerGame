@@ -2,7 +2,8 @@ import { describe, expect, it } from 'vitest';
 import type { InputFrame } from '../engine/input';
 import { newProfile, type Profile } from '../meta/profile';
 import { encodeSaveCode } from '../meta/saveCode';
-import { codeLines, createSaveCodeScene } from './saveCodeScene';
+import { BACKYARD } from '../meta/career';
+import { MAX_ENTRY, codeLines, createSaveCodeScene } from './saveCodeScene';
 import type { Scene } from './scene';
 import { testContext } from './testContext';
 import { frame } from './testInput';
@@ -11,14 +12,14 @@ const STEP = 1 / 60;
 const BEHIND: Scene = { kind: 'options', update: () => null, draw: () => {} };
 const BAD = "THAT CODE DOESN'T WORK";
 
-/** Four ladder wins, with the star each of them carries, so loading the code adds nothing. */
+/** Four ladder wins, each with at least its star, so loading the code adds nothing: 7 stars in all. */
 const OTHER: Profile = {
   ...newProfile(),
   coins: 840,
   level: 6,
   ladderWins: 4,
   powerForms: { owned: ['golden'], equipped: 'golden' },
-  career: { stars: { 'backyard-1': 1, 'backyard-2': 1, 'backyard-3': 1, 'backyard-4': 1 }, milestonesPaid: 0, lossStreaks: {} },
+  career: { stars: { 'backyard-1': 1, 'backyard-2': 3, 'backyard-3': 2, 'backyard-4': 1 }, milestonesPaid: 0, lossStreaks: {} },
 };
 
 /** A frame with this text typed. */
@@ -67,7 +68,7 @@ describe('save code screen', () => {
     const { ctx, s } = entering();
     s.update(typing(encodeSaveCode(OTHER).toLowerCase()), STEP);
     s.update(frame(['confirm']), STEP);
-    expect(s.summary).toBe('LEVEL 6 - 840 COINS - LADDER 4/10');
+    expect(s.summary).toBe('LEVEL 6 - 840 COINS - LADDER 4/10 - STARS 7');
     s.update(frame(['down']), STEP);
     s.update(frame(['confirm']), STEP);
     expect(ctx.savedProfiles).toEqual([OTHER]);
@@ -131,16 +132,21 @@ describe('codeLines', () => {
     expect(long.lines.length).toBeLessThanOrEqual(3);
   });
 
-  it('the longest code the loader can hold still fits', () => {
+  it('the longest code the loader can hold still fits on the screen and in the entry', () => {
     const max: Profile = {
       ...OTHER,
       coins: 999_999_999,
       xp: 1_000_000,
       level: 999,
+      ladderWins: 10,
+      dailyWinDate: '2099-12-31',
       totals: { matches: 999_999_999, wins: 999_999_999, draws: 999_999_999, losses: 999_999_999, goalsFor: 999_999_999, goalsAgainst: 999_999_999, styleGoals: 999_999_999, xpEarned: 999_999_999 },
+      career: { stars: Object.fromEntries(BACKYARD.matches.map(m => [m.id, 3])), milestonesPaid: 4, lossStreaks: { 'backyard-boss': 99 } },
     };
-    expect(codeLines(encodeSaveCode(max)).lines.length).toBeLessThanOrEqual(3);
-    expect(normaliseLength(encodeSaveCode(max))).toBeLessThanOrEqual(120);
+    const shown = codeLines(encodeSaveCode(max));
+    expect(shown.scale).toBe(1);
+    expect(shown.lines.length).toBeLessThanOrEqual(4);
+    expect(normaliseLength(encodeSaveCode(max))).toBeLessThanOrEqual(MAX_ENTRY);
   });
 });
 

@@ -1,4 +1,5 @@
 import { STAT_NAMES } from '../game/stats';
+import { BACKYARD, BOSS_ID } from './career';
 import { FORM_IDS, MOVE_IDS } from './catalog';
 import { TOTAL_NAMES, profileFrom, type Owned, type Profile } from './profile';
 
@@ -143,6 +144,10 @@ export function encodeSaveCode(p: Profile): string {
     ...TOTAL_NAMES.map(k => p.totals[k]),
     ...ownedFields(p.powerMoves, MOVE_IDS),
     ...ownedFields(p.powerForms, FORM_IDS),
+    // v3: the Backyard's stars in match order, the milestones paid, and the boss's loss streak. Rung streaks stay home.
+    ...BACKYARD.matches.map(m => p.career.stars[m.id] ?? 0),
+    p.career.milestonesPaid,
+    p.career.lossStreaks[BOSS_ID] ?? 0,
   ]);
 }
 
@@ -163,6 +168,12 @@ export function decodeSaveCode(text: string): Profile | null {
     totals: Object.fromEntries(TOTAL_NAMES.map(k => [k, next()])),
     powerMoves: ownedOf(next(), next(), MOVE_IDS),
     powerForms: ownedOf(next(), next(), FORM_IDS),
+    // Missing fields are undefined here and fall back to nothing in the loader.
+    career: {
+      stars: Object.fromEntries(BACKYARD.matches.map(m => [m.id, next()])),
+      milestonesPaid: next(),
+      lossStreaks: { [BOSS_ID]: next() },
+    },
   };
   return profileFrom(record);
 }
