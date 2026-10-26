@@ -1,11 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { matchById, nextCareerMatch, type CareerMatch } from '../meta/career';
-import type { MatchSummary } from '../meta/economy';
+import { BOSS_ID, grantRungStars, matchById, nextCareerMatch, type CareerMatch } from '../meta/career';
+import type { GoalRecord, MatchSummary } from '../meta/economy';
 import { nextMatch } from '../meta/ladder';
 import { newProfile, type Profile } from '../meta/profile';
 import { applyMatch } from '../meta/progress';
 import type { MatchScene } from './matchScene';
-import { LINE_S, SKIP_GRACE_S, XP_FILL_S, createResultsScene, footLines, ladderLine, resultsItems, tallyAt, unlockLines, type ResultsScene } from './resultsScene';
+import { LINE_S, SKIP_GRACE_S, STAR_S, XP_FILL_S, bonusLine, careerLine, createResultsScene, footLines, milestoneLines, resultsItems, tallyAt, unlockLines, type ResultsScene } from './resultsScene';
 import type { ShopScene } from './shopScene';
 import { TEST_TODAY, testContext } from './testContext';
 import { frame } from './testInput';
@@ -13,6 +13,8 @@ import { frame } from './testInput';
 const STEP = 1 / 60;
 const WIN_3_0: MatchSummary = { result: 'win', goalsFor: 3, goalsAgainst: 0, styleGoals: [], goals: [] };
 const LOSS_0_2: MatchSummary = { result: 'lose', goalsFor: 0, goalsAgainst: 2, styleGoals: [], goals: [] };
+const boss = matchById(BOSS_ID)!;
+const g = (minute: number): GoalRecord => ({ minute, kind: 'shot', perfect: false });
 
 /** A context whose profile has had `s` applied, as the match scene leaves it, and the reward for it. */
 function after(s: MatchSummary, from: Profile = newProfile(), match: CareerMatch = nextCareerMatch(from)) {
@@ -36,13 +38,25 @@ describe('the tally', () => {
     expect(tallyAt(reward, (n + 1) * LINE_S + 0.01)).toMatchObject({ total: true, xpDone: false, levelUp: false });
     const xpEnd = (n + 1) * LINE_S + XP_FILL_S;
     expect(tallyAt(reward, xpEnd + 0.01)).toMatchObject({ xpDone: true, levelUp: true, done: false });
-    expect(tallyAt(reward, xpEnd + LINE_S + 0.01).done).toBe(true);
+    // A 3-0 win at rung 1 without its bonus is two stars: they light after the level-up beat.
+    expect(reward.career.stars).toBe(2);
+    expect(tallyAt(reward, xpEnd + LINE_S + 0.01)).toMatchObject({ stars: 0, starsDone: false, done: false });
+    expect(tallyAt(reward, xpEnd + LINE_S + STAR_S + 0.01)).toMatchObject({ stars: 1, starsDone: false });
+    expect(tallyAt(reward, xpEnd + LINE_S + STAR_S * 2 + 0.01)).toMatchObject({ stars: 2, starsDone: true, done: false });
+    expect(tallyAt(reward, xpEnd + LINE_S + STAR_S * 2 + LINE_S + 0.01).done).toBe(true);
   });
 
-  it('takes about 3 s', () => {
+  it('takes about 4 s with two stars', () => {
     const { reward } = after(WIN_3_0);
-    expect(tallyAt(reward, 2.4).done).toBe(false);
-    expect(tallyAt(reward, 3.2).done).toBe(true);
+    expect(tallyAt(reward, 3.6).done).toBe(false);
+    expect(tallyAt(reward, 3.8).done).toBe(true);
+  });
+
+  it('a loss has no star beat', () => {
+    const { reward } = after(LOSS_0_2);
+    expect(tallyAt(reward, 99)).toMatchObject({ stars: 0, starsDone: true, done: true });
+    const n = reward.lines.length;
+    expect(tallyAt(reward, (n + 1) * LINE_S + XP_FILL_S + LINE_S * 2 + 0.01).done).toBe(true);
   });
 
   it('without a level-up there is no level-up beat', () => {
@@ -75,6 +89,32 @@ describe('results screen', () => {
     expect(s.tallyDone).toBe(true);
     expect(ctx.audio.played.filter(c => c === 'levelUp')).toHaveLength(1);
     expect(ctx.audio.played.filter(c => c === 'coin')).toHaveLength(reward.lines.length + 1);
+  });
+
+  it('stars light one per STAR_S after the XP beat, each with the chime, the third with the fanfare', () => {
+    const { ctx, reward } = after({ ...WIN_3_0, goals: [g(10), g(20), g(30)] });
+    expect(reward.career.stars).toBe(3);
+    const s = createResultsScene(ctx, reward);
+    const xpEnd = (reward.lines.length + 1) * LINE_S + XP_FILL_S;
+    run(s, xpEnd + LINE_S + STAR_S * 2 + 0.05);
+    expect(ctx.audio.played.filter(c => c === 'star')).toHaveLength(2);
+    expect(ctx.audio.played.filter(c => c === 'levelUp')).toHaveLength(1);
+    run(s, STAR_S);
+    expect(ctx.audio.played.filter(c => c === 'star')).toHaveLength(3);
+    expect(ctx.audio.played.filter(c => c === 'levelUp')).toHaveLength(2);
+    expect(s.tallyDone).toBe(false);
+    run(s, LINE_S + 0.05);
+    expect(s.tallyDone).toBe(true);
+  });
+
+  it('a skip sounds the third star fanfare once, and a two-star win never does', () => {
+    const three = after({ ...WIN_3_0, goals: [g(10), g(20), g(30)] });
+    const s = createResultsScene(three.ctx, three.reward);
+    s.update(frame(['confirm']), STEP);
+    expect(three.ctx.audio.played.filter(c => c === 'levelUp')).toHaveLength(2);
+    const two = after(WIN_3_0);
+    createResultsScene(two.ctx, two.reward).update(frame(['confirm']), STEP);
+    expect(two.ctx.audio.played.filter(c => c === 'levelUp')).toHaveLength(1);
   });
 
   it('a fresh A skips to the end without choosing', () => {
@@ -187,13 +227,46 @@ describe('results screen', () => {
   });
 });
 
-describe('ladderLine', () => {
-  it('names a beaten match, the championship, a rematch win and a try-again', () => {
-    expect(ladderLine(after(WIN_3_0, { ...newProfile(), ladderWins: 2 }).reward)).toBe('MATCH 3 BEATEN!');
-    expect(ladderLine(after(WIN_3_0, { ...newProfile(), ladderWins: 9 }).reward)).toBe('BACKYARD CHAMPION!');
-    expect(ladderLine(after(WIN_3_0, { ...newProfile(), ladderWins: 10 }, matchById('backyard-10')!).reward)).toBe('REMATCH WON!');
-    expect(ladderLine(after(LOSS_0_2).reward)).toMatch(/GO AGAIN!$/);
-    expect(ladderLine(after({ result: 'draw', goalsFor: 1, goalsAgainst: 1, styleGoals: [], goals: [] }).reward)).toMatch(/GO AGAIN!$/);
+describe('careerLine', () => {
+  it('names a beaten match, the championship and the boss beaten', () => {
+    expect(careerLine(after(WIN_3_0, { ...newProfile(), ladderWins: 2 }).reward)).toBe('MATCH 3 BEATEN!');
+    expect(careerLine(after(WIN_3_0, { ...newProfile(), ladderWins: 9 }).reward)).toBe('BACKYARD CHAMPION! BISCUIT AWAITS');
+    expect(careerLine(after(WIN_3_0, { ...newProfile(), ladderWins: 10 }, boss).reward)).toBe('BISCUIT BEATEN! BACKYARD DONE!');
+  });
+
+  it('a replay win is a new best when its stars rose, else a rematch won', () => {
+    const replay = (star: number) => after(WIN_3_0, { ...newProfile(), ladderWins: 3, career: { stars: { 'backyard-1': star }, milestonesPaid: 0, lossStreaks: {} } }, matchById('backyard-1')!).reward;
+    expect(careerLine(replay(3))).toBe('REMATCH WON!');
+    expect(careerLine(replay(1))).toBe('NEW BEST: 2 STARS!');
+  });
+
+  it('a draw or a loss says go again, naming who took it', () => {
+    expect(careerLine(after(LOSS_0_2).reward)).toBe('MAX TAKES THIS ONE. GO AGAIN!');
+    expect(careerLine(after(LOSS_0_2, { ...newProfile(), ladderWins: 10 }, boss).reward)).toBe('BISCUIT TAKES THIS ONE. GO AGAIN!');
+    expect(careerLine(after({ result: 'draw', goalsFor: 1, goalsAgainst: 1, styleGoals: [], goals: [] }).reward)).toBe('ALL SQUARE. GO AGAIN!');
+  });
+
+  it('bonus and milestone lines', () => {
+    const { reward } = after({ ...WIN_3_0, goals: [g(10), g(20), g(30)] });
+    expect(bonusLine(reward)).toBe('BONUS DONE: SCORE 3 GOALS');
+    expect(bonusLine(after(LOSS_0_2).reward)).toBe('BONUS MISSED: SCORE 3 GOALS');
+    const paid = after(LOSS_0_2, grantRungStars({ ...newProfile(), ladderWins: 10 }), boss).reward;
+    expect(milestoneLines(paid)).toEqual(['10 STARS! +300 COINS']);
+    expect(milestoneLines(reward)).toEqual([]);
+    expect(footLines(paid, tallyAt(paid, Infinity), true)).toEqual(['BISCUIT TAKES THIS ONE. GO AGAIN!', '10 STARS! +300 COINS', 'UPGRADE READY IN THE SHOP!']);
+  });
+
+  it('NEXT MATCH plays the next unbeaten match; TRY AGAIN replays this one; CAREER once all is beaten', () => {
+    const next = after(WIN_3_0, { ...newProfile(), ladderWins: 3 }, matchById('backyard-1')!);
+    expect(resultsItems(next.reward)[0]).toBe('NEXT MATCH');
+    const s = createResultsScene(next.ctx, next.reward, true);
+    expect((s.update(frame(['confirm']), STEP) as MatchScene).match.id).toBe('backyard-4');
+    const lost = after(LOSS_0_2, { ...newProfile(), ladderWins: 10 }, boss);
+    expect(resultsItems(lost.reward)[0]).toBe('TRY AGAIN');
+    expect((createResultsScene(lost.ctx, lost.reward, true).update(frame(['confirm']), STEP) as MatchScene).match.id).toBe('backyard-boss');
+    const done = after(WIN_3_0, { ...newProfile(), ladderWins: 10 }, boss);
+    expect(resultsItems(done.reward)).toEqual(['CAREER', 'SHOP', 'HUB']);
+    expect(createResultsScene(done.ctx, done.reward, true).update(frame(['confirm']), STEP)?.kind).toBe('hub');
   });
 });
 
@@ -205,7 +278,7 @@ describe('results: unlocks and the skip grace', () => {
     expect(footLines(reward, before, false)).toEqual([]);
     const levelUp = tallyAt(reward, (reward.lines.length + 1) * LINE_S + XP_FILL_S);
     expect(footLines(reward, levelUp, false)).toEqual(['ENERGY WAVE UNLOCKED IN THE SHOP!']);
-    expect(footLines(reward, tallyAt(reward, Infinity), true)).toEqual([ladderLine(reward), 'ENERGY WAVE UNLOCKED IN THE SHOP!', 'UPGRADE READY IN THE SHOP!']);
+    expect(footLines(reward, tallyAt(reward, Infinity), true)).toEqual([careerLine(reward), 'ENERGY WAVE UNLOCKED IN THE SHOP!', 'UPGRADE READY IN THE SHOP!']);
   });
 
   it('Golden Form is announced too, and both together still fit three lines', () => {

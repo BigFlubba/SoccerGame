@@ -1,16 +1,18 @@
 import { MASTER } from '../art/colors';
 import type { Expression } from '../art/harrison/portrait';
 import { BASE_W } from '../engine/viewport';
+import { nextCareerMatch } from '../meta/career';
 import { addXp, canUpgrade, xpToNext } from '../meta/economy';
+import { BONUSES, MAX_STARS } from '../meta/objectives';
 import type { MatchReward, Unlock } from '../meta/progress';
 import { drawBackdrop } from './backdrop';
 import type { GameContext } from './context';
 import { createHubScene } from './hubScene';
-import { createMatchScene, newSeed } from './matchScene';
 import { drawMenu, menuCue, stepMenu, type MenuState } from './menu';
-import { drawBar, drawButtonHint, drawPanel } from './panel';
+import { STAR_GAP, STAR_W, drawBar, drawButtonHint, drawPanel, drawStars } from './panel';
 import type { Scene } from './scene';
 import { createShopScene } from './shopScene';
+import { startMatch } from './startMatch';
 
 export interface ResultsScene extends Scene {
   readonly tallyDone: boolean;
@@ -20,9 +22,10 @@ export interface ResultsScene extends Scene {
   readonly upgradeReady: boolean;
 }
 
-/** The tally's beats, in seconds: one reward line every LINE_S, then the XP bar fills over XP_FILL_S. */
+/** The tally's beats, in seconds: one reward line every LINE_S, then the XP bar fills over XP_FILL_S, then a star lights every STAR_S. */
 export const LINE_S = 0.3,
-  XP_FILL_S = 0.8;
+  XP_FILL_S = 0.8,
+  STAR_S = 0.4;
 
 /** What the tally shows `t` seconds in. */
 export interface Tally {
@@ -34,36 +37,58 @@ export interface Tally {
   xpFill: number;
   xpDone: boolean;
   levelUp: boolean;
+  /** How many of the match's stars are lit. */
+  stars: number;
+  starsDone: boolean;
   done: boolean;
 }
 
 /**
  * Lines appear one every LINE_S, the total lands one LINE_S after the last,
- * then the XP bar fills over XP_FILL_S. Then the level-up shows, if any, and
- * the tally is done one LINE_S later.
+ * then the XP bar fills over XP_FILL_S. Then the level-up shows, if any;
+ * one LINE_S later the stars light one every STAR_S, and the tally is done
+ * one LINE_S after the last star.
  */
 export function tallyAt(reward: MatchReward, t: number): Tally {
   const n = reward.lines.length;
   const totalAt = (n + 1) * LINE_S;
   const xpAt = totalAt + XP_FILL_S;
   const xpDone = t >= xpAt;
+  const starsAt = xpAt + LINE_S;
+  const earned = reward.career.stars;
+  const stars = Math.min(earned, Math.max(0, Math.floor((t - starsAt) / STAR_S + 1e-9)));
   return {
     lines: Math.min(n, Math.floor(t / LINE_S + 1e-9)),
     total: t >= totalAt,
     xpFill: Math.min(Math.max((t - totalAt) / XP_FILL_S, 0), 1),
     xpDone,
     levelUp: xpDone && reward.levelBonus > 0,
-    done: t >= xpAt + LINE_S,
+    stars,
+    starsDone: t >= starsAt + earned * STAR_S,
+    done: t >= starsAt + earned * STAR_S + LINE_S,
   };
 }
 
-/** The ladder's news: a beaten match, the championship, a rematch won, or a try-again. */
-export function ladderLine(reward: MatchReward): string {
-  const { firstWin, champion, match } = reward.career;
-  if (firstWin && champion) return 'BACKYARD CHAMPION!';
+/** The career's news: a beaten match, the championship, the boss beaten, a new best, a rematch won, or a try-again. */
+export function careerLine(reward: MatchReward): string {
+  const { firstWin, champion, improved, stars, match } = reward.career;
+  const { result } = reward.summary;
+  if (firstWin && champion) return 'BACKYARD CHAMPION! BISCUIT AWAITS';
+  if (firstWin && match.kind === 'boss') return 'BISCUIT BEATEN! BACKYARD DONE!';
   if (firstWin) return `MATCH ${match.rung} BEATEN!`;
-  if (reward.summary.result === 'win') return 'REMATCH WON!';
-  return reward.summary.result === 'draw' ? 'ALL SQUARE. GO AGAIN!' : 'MAX TAKES THIS ONE. GO AGAIN!';
+  if (result === 'win') return improved ? `NEW BEST: ${stars} STARS!` : 'REMATCH WON!';
+  return result === 'draw' ? 'ALL SQUARE. GO AGAIN!' : `${match.hudName} TAKES THIS ONE. GO AGAIN!`;
+}
+
+/** The match's bonus objective, done or missed. */
+export function bonusLine(reward: MatchReward): string {
+  const { label } = BONUSES[reward.career.match.bonus];
+  return `${reward.career.bonusDone ? 'BONUS DONE' : 'BONUS MISSED'}: ${label}`;
+}
+
+/** One line per milestone paid at this Results. */
+export function milestoneLines(reward: MatchReward): string[] {
+  return reward.career.milestones.map(m => `${m.stars} STARS! +${m.coins} COINS`);
 }
 
 const UNLOCK_TEXT: Record<Unlock, string> = {
@@ -80,24 +105,31 @@ export function unlockLines(reward: MatchReward): string[] {
 }
 
 /**
- * The centred lines under the tally, in order: the ladder's news once it's
- * done, the unlocks from the level-up on, then UPGRADE READY if there's
- * still room.
+ * The centred lines under the tally, in order: the career's news and any
+ * milestones once it's done, the unlocks from the level-up on, then
+ * UPGRADE READY if there's still room.
  */
 export function footLines(reward: MatchReward, tally: Tally, upgradeReady: boolean): string[] {
-  const lines = [...(tally.done ? [ladderLine(reward)] : []), ...(tally.levelUp ? unlockLines(reward) : [])];
+  const lines = [...(tally.done ? [careerLine(reward), ...milestoneLines(reward)] : []), ...(tally.levelUp ? unlockLines(reward) : [])];
   if (tally.done && upgradeReady) lines.push(UPGRADE_READY);
   return lines.slice(0, FOOT_LINES);
 }
 
+/** NEXT MATCH after a win, TRY AGAIN otherwise, or CAREER once every career match is beaten; then SHOP and HUB. */
 export function resultsItems(reward: MatchReward): string[] {
-  return [reward.summary.result === 'win' ? 'NEXT MATCH' : 'TRY AGAIN', 'SHOP', 'HUB'];
+  const win = reward.summary.result === 'win';
+  return [win && reward.career.allBeaten ? 'CAREER' : win ? 'NEXT MATCH' : 'TRY AGAIN', 'SHOP', 'HUB'];
 }
 
 const RESULT_TEXT = { win: 'YOU WIN!', lose: 'YOU LOSE', draw: 'DRAW' } as const;
 const FACE: Record<MatchReward['summary']['result'], Expression> = { win: 'celebrate', draw: 'determined', lose: 'disappointed' };
 /** Tall enough for three centred lines under the tally, with the menu still on screen below it. */
 const PANEL = { x: 8, y: 30, w: 304, h: 104 };
+const HEADER_Y = 4;
+/** The stars and the bonus line sit together under the header. */
+const STARS_Y = 20;
+const STARS_W = STAR_GAP * 2 + STAR_W;
+const STARS_GAP = 6;
 const PORTRAIT_AT = { x: PANEL.x + 8, y: PANEL.y + 6 };
 const LINES = { x: PANEL.x + 80, right: PANEL.x + 192, y: PANEL.y + 6, h: 9 };
 const SUMMARY_X = PANEL.x + 204;
@@ -124,9 +156,14 @@ export function createResultsScene(ctx: GameContext, reward: MatchReward, skipTa
   let tally = tallyAt(reward, 0);
   let menu: MenuState | null = null;
   let graceS = 0;
-  /** Jumps to the end of the tally. A skip still sounds a level-up the tally hadn't reached. */
+  /** The third star's fanfare: the level-up tune again. */
+  const starFanfare = (next: Tally) => {
+    if (next.stars === MAX_STARS && tally.stars < MAX_STARS) ctx.audio.play('levelUp');
+  };
+  /** Jumps to the end of the tally. A skip still sounds a level-up, or a third star, the tally hadn't reached. */
   const finish = (fanfare: boolean) => {
     if (fanfare && end.levelUp && !tally.levelUp) ctx.audio.play('levelUp');
+    if (fanfare) starFanfare(end);
     tally = end;
     menu = { items: resultsItems(reward), index };
   };
@@ -136,8 +173,9 @@ export function createResultsScene(ctx: GameContext, reward: MatchReward, skipTa
 
   const choose = (item: string): Scene | null => {
     if (item === 'SHOP') return createShopScene(ctx, () => createResultsScene(ctx, reward, true, 1));
-    if (item === 'HUB') return createHubScene(ctx);
-    return createMatchScene(ctx, newSeed());
+    if (item === 'HUB' || item === 'CAREER') return createHubScene(ctx);
+    if (item === 'TRY AGAIN') return startMatch(ctx, reward.career.match);
+    return startMatch(ctx, nextCareerMatch(ctx.profile));
   };
 
   const scene: ResultsScene = {
@@ -166,6 +204,8 @@ export function createResultsScene(ctx: GameContext, reward: MatchReward, skipTa
         const next = tallyAt(reward, t);
         if (next.lines > tally.lines || (next.total && !tally.total)) ctx.audio.play('coin');
         if (next.levelUp && !tally.levelUp) ctx.audio.play('levelUp');
+        if (next.stars > tally.stars) ctx.audio.play('star');
+        starFanfare(next);
         tally = next;
         if (tally.done) finish(true);
         return null;
@@ -182,11 +222,15 @@ export function createResultsScene(ctx: GameContext, reward: MatchReward, skipTa
       return chosen ? choose(chosen) : null;
     },
     draw(g, nowS) {
-      const { summary } = reward;
+      const { summary, career } = reward;
       drawBackdrop(g, art, nowS);
       const centre = (img: HTMLCanvasElement, y: number) => g.drawImage(img, Math.round(BASE_W / 2 - img.width / 2), y);
-      centre(art.text(RESULT_TEXT[summary.result], 2, 'energyGold', 'outline'), 4);
-      centre(art.text(`${summary.goalsFor} - ${summary.goalsAgainst}`, 1, 'white', 'outline'), 20);
+      centre(art.text(`${RESULT_TEXT[summary.result]} ${summary.goalsFor}-${summary.goalsAgainst}`, 2, 'energyGold', 'outline'), HEADER_Y);
+      // The stars and the bonus line, as one centred group.
+      const bonus = art.text(bonusLine(reward), 1, career.bonusDone ? 'energyGold' : 'white', 'outline');
+      const groupX = Math.round(BASE_W / 2 - (STARS_W + STARS_GAP + bonus.width) / 2);
+      drawStars(g, groupX, STARS_Y + 1, tally.stars);
+      g.drawImage(bonus, groupX + STARS_W + STARS_GAP, STARS_Y);
       drawPanel(g, PANEL.x, PANEL.y, PANEL.w, PANEL.h);
       g.drawImage(art.portraits[FACE[summary.result]], PORTRAIT_AT.x, PORTRAIT_AT.y);
 
@@ -197,8 +241,10 @@ export function createResultsScene(ctx: GameContext, reward: MatchReward, skipTa
         g.drawImage(amount, LINES.right - amount.width, y);
       });
 
-      // The total rolls up as the lines land, and takes the level bonus with the level-up.
-      const coins = reward.lines.slice(0, tally.lines).reduce((sum, l) => sum + l.coins, 0) + (tally.levelUp ? reward.levelBonus : 0);
+      // The total rolls up as the lines land, takes the level bonus with the level-up, and the milestones with their lines.
+      const coins = tally.done
+        ? reward.coins
+        : reward.lines.slice(0, tally.lines).reduce((sum, l) => sum + l.coins, 0) + (tally.levelUp ? reward.levelBonus : 0);
       let y = LINES.y;
       g.drawImage(art.text('COINS', 1, 'silver', 'outline'), SUMMARY_X, y);
       g.drawImage(art.text(`+${coins}`, 2, tally.total ? 'energyGold' : 'white', 'outline'), SUMMARY_X, y + 9);
@@ -214,10 +260,11 @@ export function createResultsScene(ctx: GameContext, reward: MatchReward, skipTa
         g.drawImage(art.text(`LEVEL BONUS +${reward.levelBonus}`, 1, 'white', 'outline'), SUMMARY_X, y + 9);
       }
 
-      // The ladder's line comes first once the tally is done; unlocks shown before then keep their place below it.
+      // The career's line comes first once the tally is done; unlocks shown before then keep their place below it.
       const firstSlot = tally.done ? 0 : 1;
+      const newsIsWhite = summary.result !== 'win';
       footLines(reward, tally, scene.upgradeReady).forEach((line, i) => {
-        const colour = line === UPGRADE_READY ? 'volt' : line === ladderLine(reward) && !reward.career.firstWin ? 'white' : 'energyGold';
+        const colour = line === UPGRADE_READY ? 'volt' : line === careerLine(reward) && newsIsWhite ? 'white' : 'energyGold';
         centre(art.text(line, 1, colour, 'outline'), LADDER_Y + (firstSlot + i) * FOOT_LINE_H);
       });
       if (menu) drawMenu(g, art, menu, BASE_W / 2, MENU_TOP);
