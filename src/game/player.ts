@@ -388,7 +388,9 @@ export function stepPlayer(
   // On the ground he runs the same speed in every direction, diagonals included.
   const moveLen = Math.max(1, Math.hypot(intent.moveX, intent.moveZ));
   const runTarget = (runSpeed(p.stats) * (sprinting ? SPRINT_MULTIPLIER : 1)) / moveLen;
-  const canTurn = p.state === 'ground' || (p.state === 'air' && !p.kick);
+  // He can turn while running, jumping, or still holding a shot or chip charge; not as he lets go, nor once a kick is swinging.
+  const stillCharging = (p.state === 'charging' && intent.shootHeld) || (p.state === 'chipping' && !p.kick && intent.chipHeld);
+  const canTurn = p.state === 'ground' || stillCharging || (p.state === 'air' && !p.kick);
   if (canTurn && intent.moveX !== 0) p.facing = intent.moveX > 0 ? 1 : -1;
   if (canTurn && intent.faceX) p.facing = intent.faceX;
 

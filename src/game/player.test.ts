@@ -339,10 +339,30 @@ describe('stepPlayer: shooting', () => {
     expect(p.state).toBe('kicking');
   });
 
-  it('facing is locked while charging', () => {
+  it('he can turn while charging a shot, and keeps the charge', () => {
     const p = harrison();
     tick(p, { shootHeld: true }, 5);
+    const charge = p.charge;
     tick(p, { shootHeld: true, moveX: -1 }, 10);
+    expect(p.facing).toBe(-1);
+    expect(p.state).toBe('charging');
+    expect(p.charge).toBeGreaterThan(charge);
+  });
+
+  it('he can turn while charging a chip', () => {
+    const p = harrison();
+    tick(p, { chipHeld: true }, 1, true);
+    expect([p.state, p.kick]).toEqual(['chipping', null]);
+    tick(p, { chipHeld: true, moveX: -1 }, 10, true);
+    expect(p.facing).toBe(-1);
+  });
+
+  it('the swing, once released, keeps his facing', () => {
+    const p = harrison();
+    tick(p, { shootHeld: true }, 5);
+    tick(p, { moveX: -1 });
+    expect(p.state).toBe('kicking');
+    tick(p, { moveX: -1 }, 3);
     expect(p.facing).toBe(1);
   });
 
