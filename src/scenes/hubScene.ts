@@ -5,7 +5,7 @@ import { xpToNext } from '../meta/economy';
 import { drawBackdrop } from './backdrop';
 import type { GameContext } from './context';
 import { createHelpScene } from './helpScene';
-import { drawMenu, menuCue, stepMenu, type MenuState } from './menu';
+import { drawMenu, menuAudio, menuCue, stepMenu, type MenuState } from './menu';
 import { createOptionsScene } from './optionsScene';
 import { drawBar, drawCoins, drawPanel } from './panel';
 import { createRoadMapScene } from './roadMapScene';
@@ -39,8 +39,7 @@ export function statsLine(s: Stats): string {
 export function createHubScene(ctx: GameContext, index = 0): Scene {
   const { art } = ctx;
   let menu: MenuState = { items: HUB_ITEMS, index };
-  ctx.audio.setCrowd('off');
-  ctx.audio.playMusic('title');
+  menuAudio(ctx);
   const backHere = () => createHubScene(ctx, menu.index);
   return {
     kind: 'hub',

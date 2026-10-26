@@ -2,6 +2,13 @@ import { MASTER } from '../art/colors';
 import type { Cue } from '../audio/cues';
 import type { InputFrame } from '../engine/input';
 import type { GameArt } from './art';
+import type { GameContext } from './context';
+
+/** A menu screen's sound, whatever came before it: the crowd off and the title theme on. */
+export function menuAudio(ctx: GameContext): void {
+  ctx.audio.setCrowd('off');
+  ctx.audio.playMusic('title');
+}
 
 export interface MenuState {
   items: readonly string[];

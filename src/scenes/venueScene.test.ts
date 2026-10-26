@@ -71,6 +71,15 @@ describe('the venue screen', () => {
     for (const l of panelLines(matchById(BOSS_ID)!)) expect(l).toMatch(CHARSET);
   });
 
+  it('turns the match crowd off and plays the title theme, as the Hub does', () => {
+    const ctx = ctx6();
+    ctx.audio.crowd = 'match';
+    ctx.audio.music = null;
+    createVenueScene(ctx, 'backyard');
+    expect(ctx.audio.crowd).toBe('off');
+    expect(ctx.audio.music).toBe('title');
+  });
+
   it('an unknown cursor id opens on the next match', () => {
     expect(createVenueScene(ctx6(), 'backyard', 'park-1').cursor.id).toBe('backyard-7');
   });

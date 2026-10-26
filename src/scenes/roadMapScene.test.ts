@@ -52,6 +52,15 @@ describe('the road map', () => {
     expect(hub.update(frame(['confirm']), STEP)?.kind).toBe('roadMap');
   });
 
+  it('turns the match crowd off and plays the title theme, as the Hub does', () => {
+    const ctx = testContext();
+    ctx.audio.crowd = 'match';
+    ctx.audio.music = null;
+    createRoadMapScene(ctx);
+    expect(ctx.audio.crowd).toBe('off');
+    expect(ctx.audio.music).toBe('title');
+  });
+
   it('B on the venue screen comes back to the map', () => {
     expect(createVenueScene(testContext(), 'backyard').update(frame(['back']), STEP)?.kind).toBe('roadMap');
   });

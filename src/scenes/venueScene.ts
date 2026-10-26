@@ -5,6 +5,7 @@ import { trainingLine } from '../meta/ladder';
 import { BONUSES } from '../meta/objectives';
 import { drawBackdrop } from './backdrop';
 import type { GameContext } from './context';
+import { menuAudio } from './menu';
 import { STAR_W, drawPanel, drawStar, drawStars } from './panel';
 import { createRoadMapScene } from './roadMapScene';
 import type { Scene } from './scene';
@@ -65,6 +66,8 @@ export function createVenueScene(ctx: GameContext, venue: VenueId, cursorId?: st
   let index = Math.max(0, matches.indexOf(start?.venue === venue ? start : nextCareerMatch(ctx.profile)));
   const cursor = () => matches[index]!;
   const back = (): Scene => createRoadMapScene(ctx, VENUES.findIndex(v => v.id === venue));
+  // B on the VS card lands here from wherever the card was reached.
+  menuAudio(ctx);
 
   const scene: VenueScene = {
     kind: 'venue',

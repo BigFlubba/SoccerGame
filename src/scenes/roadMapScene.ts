@@ -5,6 +5,7 @@ import { TOTAL_STARS, VENUES, careerStars, stopLabel, type Venue } from '../meta
 import type { GameContext } from './context';
 import { createHubScene } from './hubScene';
 import { drawLayers } from './matchView';
+import { menuAudio } from './menu';
 import { STAR_W, drawStar } from './panel';
 import type { Scene } from './scene';
 import { createVenueScene } from './venueScene';
@@ -51,6 +52,8 @@ const isOpen = (v: Venue) => v.matches.length > 0;
 export function createRoadMapScene(ctx: GameContext, index = 0): RoadMapScene {
   const { art } = ctx;
   let at = Math.min(Math.max(index, 0), VENUES.length - 1);
+  // Reached from Results too, where the match crowd is still murmuring.
+  menuAudio(ctx);
 
   return {
     kind: 'roadMap',
