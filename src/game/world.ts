@@ -1,4 +1,3 @@
-import { BALL_R } from '../art/ball';
 import { seeded, type Rng } from '../engine/random';
 import { BALL_REST_Y, stepBall, type Ball, type BallEvents } from './ball';
 import { resolveBodies } from './bodies';
@@ -7,7 +6,8 @@ import { BACKYARD, goalScored, type Field } from './field';
 import { createMatch, stepMatch, type MatchState, type Team } from './match';
 import { NO_INTENT, createPlayer, stepPlayer, type Player, type PlayerIntent } from './player';
 import type { Stats } from './stats';
-import { ballIn, footZone } from './zones';
+import type { PowerState } from './power';
+import { ballAtFeet } from './zones';
 
 export interface WorldEvents {
   kicks: ContactEvents[];
@@ -24,6 +24,8 @@ export interface World {
   rng: Rng;
   aimErrorDeg: { home: number; away: number };
   events: WorldEvents;
+  /** Harrison's super meter; null unless he owns a power move, and then the match plays exactly as before. */
+  power: PowerState | null;
   /** Fixed ticks so far; its parity decides who acts on the ball first. */
   tick: number;
 }
@@ -48,6 +50,7 @@ export function createWorld(homeStats: Stats, awayStats: Stats, seed: number, ai
     rng: seeded(seed),
     aimErrorDeg,
     events: quietEvents(),
+    power: null,
     tick: 0,
   };
   placeForKickoff(w);
@@ -69,9 +72,6 @@ export function placeForKickoff(w: World): void {
     reset(p, p.team === w.match.kickoffTeam ? centre - KICKOFF_GAP * dir : centre - KICKOFF_DEFENDER_DEPTH * dir, w.field.depth / 2);
   }
 }
-
-/** The ball is at his feet when it's on the ground in reach of his foot. */
-const ballAtFeet = (p: Player, ball: Ball): boolean => p.y === 0 && ball.y <= BALL_REST_Y && ballIn(footZone(p), ball, BALL_R);
 
 /**
  * Steps a player on his intent while the ball is in play, standing still

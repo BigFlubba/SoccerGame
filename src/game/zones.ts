@@ -1,3 +1,5 @@
+import { BALL_R } from '../art/ball';
+import { BALL_REST_Y, type Ball } from './ball';
 import { PLAYER_H, PLAYER_R, type Player } from './player';
 
 /** Every zone reaches this far either side of his line in depth. */
@@ -29,6 +31,9 @@ export const footZone = (p: Player): Rect => zone(p, 2, 14, 0, 12);
 export const headZone = (p: Player): Rect => zone(p, -4, 10, 30, 44);
 /** A slide tackle's reach, low to the ground. */
 export const slideZone = (p: Player): Rect => zone(p, 0, 16, 0, 8);
+
+/** The ball is at his feet when it's on the ground in reach of his foot. */
+export const ballAtFeet = (p: Player, ball: Ball): boolean => p.y === 0 && ball.y <= BALL_REST_Y && ballIn(footZone(p), ball, BALL_R);
 
 /** Where his foot meets the ball when he runs into it: just ahead of him along his run. */
 export function touchPoint(p: Player): null | { x: number; z: number } {
