@@ -14,6 +14,8 @@ export type TestContext = GameContext & {
   savedSettings: Settings[];
   /** Every profile save, in order. */
   savedProfiles: Profile[];
+  /** Every clipboard copy, in order. */
+  copied: string[];
 };
 
 /**
@@ -32,6 +34,11 @@ export function testContext(over: Partial<Pick<TestContext, 'art' | 'settings' |
     ...over,
     savedSettings: [],
     savedProfiles: [],
+    copied: [],
+    async copyText(s) {
+      ctx.copied.push(s);
+      return true;
+    },
     save(s) {
       ctx.savedSettings.push(s);
       ctx.settings = s;

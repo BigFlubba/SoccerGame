@@ -110,3 +110,37 @@ describe('options', () => {
     expect(ctx.savedSettings).toEqual([{ ...DEFAULT_SETTINGS, musicVolume: 7 }]);
   });
 });
+
+describe('options: save code and reset', () => {
+  it('from the Hub, Options has SAVE CODE and RESET SAVE', () => {
+    const ctx = testContext();
+    const s = createOptionsScene(ctx, () => BEHIND, true);
+    expect(s.rows).toEqual([...OPTION_ROWS, 'SAVE CODE', 'RESET SAVE']);
+    s.update(frame(['up']), STEP);
+    s.update(frame(['up']), STEP);
+    expect(s.update(frame(['confirm']), STEP)?.kind).toBe('saveCode');
+    const r = createOptionsScene(ctx, () => BEHIND, true);
+    r.update(frame(['up']), STEP);
+    expect(r.update(frame(['confirm']), STEP)?.kind).toBe('reset');
+  });
+
+  it('from the pause menu, it does not', () => {
+    const s = createOptionsScene(testContext(), () => BEHIND);
+    expect(s.rows).toEqual([...OPTION_ROWS]);
+    s.update(frame(['up']), STEP);
+    expect(s.update(frame(['confirm']), STEP)).toBeNull();
+  });
+
+  it('backing out of the save code screen returns to Options from the Hub, on the same row', () => {
+    const ctx = testContext();
+    const s = createOptionsScene(ctx, () => BEHIND, true);
+    s.update(frame(['up']), STEP);
+    s.update(frame(['up']), STEP);
+    const code = s.update(frame(['confirm']), STEP)!;
+    const back = code.update(frame(['back']), STEP) as ReturnType<typeof createOptionsScene>;
+    expect(back.kind).toBe('options');
+    expect(back.rows).toContain('SAVE CODE');
+    expect(back.row).toBe(4);
+  });
+});
+

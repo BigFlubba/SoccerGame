@@ -17,4 +17,6 @@ export interface GameContext {
   today(): string;
   audio: GameAudio;
   rumble: Rumble;
+  /** Puts text on the clipboard; false if the browser refuses or has no clipboard. Never rejects. */
+  copyText(s: string): Promise<boolean>;
 }

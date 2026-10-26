@@ -59,6 +59,15 @@ export function startGame(canvas: HTMLCanvasElement): void {
     today: () => localDate(new Date()),
     audio,
     rumble,
+    async copyText(s) {
+      try {
+        if (!navigator.clipboard) return false;
+        await navigator.clipboard.writeText(s);
+        return true;
+      } catch {
+        return false;
+      }
+    },
   };
   audio.setVolumes(ctx.settings.musicVolume, ctx.settings.sfxVolume);
   rumble.enabled = ctx.settings.rumble;

@@ -55,7 +55,7 @@ export function createHubScene(ctx: GameContext, index = 0): Scene {
       if (chosen === 'PLAY MATCH') return createMatchScene(ctx, newSeed());
       if (chosen === 'SHOP') return createShopScene(ctx, backHere);
       if (chosen === 'HELP') return createHelpScene(ctx, backHere);
-      if (chosen === 'OPTIONS') return createOptionsScene(ctx, backHere);
+      if (chosen === 'OPTIONS') return createOptionsScene(ctx, backHere, true);
       return null;
     },
     draw(g, nowS) {
