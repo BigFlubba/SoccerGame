@@ -62,6 +62,15 @@ describe('cue recipes', () => {
     }
   });
 
+  it('the star chime is two short rising notes, quieter than the level-up fanfare', () => {
+    const [low, high] = CUES.star.voices;
+    expect(CUES.star.voices).toHaveLength(2);
+    expect(high!.freq).toBeGreaterThan(low!.freq);
+    expect((high!.at ?? 0) + high!.dur).toBeLessThanOrEqual(0.5);
+    expect(loudest('star')).toBeLessThanOrEqual(loudest('levelUp'));
+    expect(CUES.star.minGapS).toBeLessThan(0.4);
+  });
+
   it('the power-up hum rises over about a second', () => {
     const hum = CUES.powerUp.voices[0]!;
     expect(hum.dur).toBeGreaterThanOrEqual(0.9);

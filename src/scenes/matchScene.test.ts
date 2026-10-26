@@ -181,14 +181,13 @@ describe('match scene', () => {
       run(s, 2);
       expect(s.moment).toBeNull();
       expect(s.bonusCallout).toBe(BONUS_CALLOUT);
-      expect(ctx.audio.played).toContain('perfect');
+      expect(ctx.audio.played.filter(c => c === 'star')).toHaveLength(1);
       run(s, BONUS_SHOW_S + 0.05);
       expect(s.bonusCallout).toBeNull();
-      const cues = ctx.audio.played.filter(c => c === 'perfect').length;
       headerGoal(s);
       run(s, 4.5);
       expect(s.bonusCallout).toBeNull();
-      expect(ctx.audio.played.filter(c => c === 'perfect')).toHaveLength(cues);
+      expect(ctx.audio.played.filter(c => c === 'star')).toHaveLength(1);
     });
 
     it('a goal that does not settle the bonus shows nothing', () => {

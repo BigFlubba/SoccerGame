@@ -294,8 +294,7 @@ export function createMatchScene(ctx: GameContext, seed: number, match: CareerMa
             bonusShown = true;
             hud.bonusCallout = BONUS_CALLOUT;
             bonusUntilS = t + BONUS_SHOW_S;
-            // 'perfect' stands in for the star chime until the cue exists.
-            ctx.audio.play('perfect');
+            ctx.audio.play('star');
           }
         }
       }

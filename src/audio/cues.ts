@@ -27,7 +27,8 @@ export type Cue =
   | 'waveBlast'
   | 'beam'
   | 'brace'
-  | 'whoosh';
+  | 'whoosh'
+  | 'star';
 
 export type Wave = 'square' | 'triangle' | 'noise';
 
@@ -208,4 +209,12 @@ export const CUES: Readonly<Record<Cue, CueRecipe>> = {
   },
   /** Max blown off his feet. */
   whoosh: { voices: [{ wave: 'noise', dur: 0.35, gain: 0.3, attack: 0.08, freq: 600, toFreq: 2200, filter: { type: 'bandpass', q: 1.5 } }], minGapS: 0.3 },
+  /** A star earned, or a bonus done: a short rising two-note chime, G then D above. By design, not by ear. */
+  star: {
+    voices: [
+      { wave: 'square', dur: 0.08, gain: 0.1, freq: 1568 },
+      { wave: 'square', at: 0.08, dur: 0.2, gain: 0.1, freq: 2349 },
+    ],
+    minGapS: 0.2,
+  },
 };
