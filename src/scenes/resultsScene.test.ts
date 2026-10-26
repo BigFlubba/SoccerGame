@@ -266,7 +266,7 @@ describe('careerLine', () => {
     expect((createResultsScene(lost.ctx, lost.reward, true).update(frame(['confirm']), STEP) as VsScene).match.id).toBe('backyard-boss');
     const done = after(WIN_3_0, { ...newProfile(), ladderWins: 10 }, boss);
     expect(resultsItems(done.reward)).toEqual(['CAREER', 'SHOP', 'HUB']);
-    expect(createResultsScene(done.ctx, done.reward, true).update(frame(['confirm']), STEP)?.kind).toBe('hub');
+    expect(createResultsScene(done.ctx, done.reward, true).update(frame(['confirm']), STEP)?.kind).toBe('roadMap');
   });
 });
 

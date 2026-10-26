@@ -10,6 +10,7 @@ import type { GameContext } from './context';
 import { createHubScene } from './hubScene';
 import { drawMenu, menuCue, stepMenu, type MenuState } from './menu';
 import { STAR_GAP, STAR_W, drawBar, drawButtonHint, drawPanel, drawStars } from './panel';
+import { createRoadMapScene } from './roadMapScene';
 import type { Scene } from './scene';
 import { createShopScene } from './shopScene';
 import { startMatch } from './startMatch';
@@ -173,7 +174,8 @@ export function createResultsScene(ctx: GameContext, reward: MatchReward, skipTa
 
   const choose = (item: string): Scene | null => {
     if (item === 'SHOP') return createShopScene(ctx, () => createResultsScene(ctx, reward, true, 1));
-    if (item === 'HUB' || item === 'CAREER') return createHubScene(ctx);
+    if (item === 'HUB') return createHubScene(ctx);
+    if (item === 'CAREER') return createRoadMapScene(ctx);
     if (item === 'TRY AGAIN') return startMatch(ctx, reward.career.match);
     return startMatch(ctx, nextCareerMatch(ctx.profile));
   };

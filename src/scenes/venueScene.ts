@@ -5,8 +5,8 @@ import { trainingLine } from '../meta/ladder';
 import { BONUSES } from '../meta/objectives';
 import { drawBackdrop } from './backdrop';
 import type { GameContext } from './context';
-import { createHubScene } from './hubScene';
 import { STAR_W, drawPanel, drawStar, drawStars } from './panel';
+import { createRoadMapScene } from './roadMapScene';
 import type { Scene } from './scene';
 import { startMatch } from './startMatch';
 
@@ -64,7 +64,7 @@ export function createVenueScene(ctx: GameContext, venue: VenueId, cursorId?: st
   const start = cursorId === undefined ? undefined : matchById(cursorId);
   let index = Math.max(0, matches.indexOf(start?.venue === venue ? start : nextCareerMatch(ctx.profile)));
   const cursor = () => matches[index]!;
-  const back = (): Scene => createHubScene(ctx);
+  const back = (): Scene => createRoadMapScene(ctx, VENUES.findIndex(v => v.id === venue));
 
   const scene: VenueScene = {
     kind: 'venue',

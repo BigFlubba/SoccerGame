@@ -75,10 +75,10 @@ describe('the venue screen', () => {
     expect(createVenueScene(ctx6(), 'backyard', 'park-1').cursor.id).toBe('backyard-7');
   });
 
-  it('B or Esc leaves the venue with the back blip', () => {
+  it('B or Esc leaves the venue for the road map with the back blip', () => {
     for (const press of [['back'], ['pause', 'back']] as const) {
       const ctx = ctx6();
-      expect(createVenueScene(ctx, 'backyard').update(frame(press), STEP)?.kind).toBe('hub');
+      expect(createVenueScene(ctx, 'backyard').update(frame(press), STEP)?.kind).toBe('roadMap');
       expect(ctx.audio.played).toContain('menuBack');
     }
   });
