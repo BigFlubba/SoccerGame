@@ -4,7 +4,8 @@ import { inGoalBox } from './field';
 import { NO_INTENT, PLAYER_R, type PlayerIntent } from './player';
 import { BASE_STATS } from './stats';
 import { BALL_REST_Y } from './ball';
-import { createWorld, placeForKickoff, stepWorld } from './world';
+import { POWER_UP_S } from './player';
+import { createWorld, placeForKickoff, stepWorld, type World } from './world';
 
 const STEP = 1 / 60;
 const ERR = { home: 4, away: 6 };
@@ -211,5 +212,117 @@ describe('world', () => {
       }
       if (w.match.score.home + w.match.score.away > 0) expect(mouth, `trial ${trial}: a goal that never crossed the goal mouth`).toBe(true);
     }
+  });
+});
+
+describe('world: the power-up', () => {
+  const hold: PlayerIntent = { ...NO_INTENT, powerHeld: true };
+  const ticks = (s: number) => Math.round(s / STEP);
+
+  /** Play on, a full meter, Harrison on his feet with the ball at his feet, facing Max's goal; Max far away. */
+  function ready(): World {
+    const w = createWorld(BASE_STATS, BASE_STATS, 1, ERR, { golden: false });
+    w.match.phase = 'playing';
+    w.power!.meter = 1;
+    Object.assign(w.home, { x: 300, z: 32, facing: 1 });
+    Object.assign(w.away, { x: 100, z: 10 });
+    Object.assign(w.ball, { x: 308, y: BALL_REST_Y, z: 32, vx: 0, vy: 0, vz: 0 });
+    return w;
+  }
+
+  it('without a kit, power is null and holding Y changes nothing', () => {
+    const plain = createWorld(BASE_STATS, BASE_STATS, 7, ERR);
+    const holding = createWorld(BASE_STATS, BASE_STATS, 7, ERR);
+    expect(plain.power).toBeNull();
+    const rng = seeded(3);
+    for (let i = 0; i < 600; i++) {
+      const i1: PlayerIntent = { ...NO_INTENT, moveX: rng() * 2 - 1, moveZ: rng() * 2 - 1, shootHeld: rng() < 0.3 };
+      const i2: PlayerIntent = { ...NO_INTENT, moveX: rng() * 2 - 1 };
+      stepWorld(plain, i1, i2, STEP);
+      stepWorld(holding, { ...i1, powerHeld: true }, i2, STEP);
+      expect(holding.events.power).toEqual({ started: false, cancelled: false, fired: false, braced: false, blown: false });
+    }
+    expect([holding.home.x, holding.home.z, holding.ball.x, holding.ball.z]).toEqual([plain.home.x, plain.home.z, plain.ball.x, plain.ball.z]);
+    expect(holding.match.score).toEqual(plain.match.score);
+  });
+
+  it('a power press reports started and plants him with the ball', () => {
+    const w = ready();
+    Object.assign(w.home, { vx: 90 });
+    Object.assign(w.ball, { vx: 60 });
+    stepWorld(w, hold, NO_INTENT, STEP);
+    expect(w.events.power.started).toBe(true);
+    expect(w.home.state).toBe('poweringUp');
+    expect([w.home.vx, w.ball.vx]).toEqual([0, 0]);
+    stepWorld(w, hold, NO_INTENT, STEP);
+    expect(w.events.power.started).toBe(false);
+  });
+
+  it('letting go early reports cancelled and keeps the meter', () => {
+    const w = ready();
+    for (let i = 0; i < ticks(0.5); i++) stepWorld(w, hold, NO_INTENT, STEP);
+    stepWorld(w, NO_INTENT, NO_INTENT, STEP);
+    expect(w.events.power.cancelled).toBe(true);
+    expect(w.home.state).toBe('ground');
+    expect(w.power?.meter).toBe(1);
+  });
+
+  it('a full charge at full time cancels and keeps the meter', () => {
+    const w = ready();
+    for (let i = 0; i < ticks(POWER_UP_S + 0.5); i++) stepWorld(w, hold, NO_INTENT, STEP);
+    expect([w.home.state, w.home.charge]).toEqual(['poweringUp', 1]);
+    w.match.phase = 'fullTime';
+    stepWorld(w, hold, NO_INTENT, STEP);
+    expect(w.events.power).toMatchObject({ cancelled: true, fired: false });
+    expect(w.home.state).toBe('ground');
+    expect(w.wave).toBeNull();
+    expect(w.power?.meter).toBe(1);
+  });
+
+  it('the ball leaving his feet cancels the power-up and keeps the meter', () => {
+    const w = ready();
+    for (let i = 0; i < ticks(0.5); i++) stepWorld(w, hold, NO_INTENT, STEP);
+    w.ball.vx = 200;
+    let cancelled = 0;
+    for (let i = 0; i < 10; i++) {
+      stepWorld(w, hold, NO_INTENT, STEP);
+      if (w.events.power.cancelled) cancelled++;
+    }
+    expect(cancelled).toBe(1);
+    expect(w.home.state).toBe('ground');
+    expect(w.power?.meter).toBe(1);
+  });
+
+  it('firing spends the meter and reports fired once', () => {
+    const w = ready();
+    for (let i = 0; i < ticks(POWER_UP_S + 0.1); i++) stepWorld(w, hold, NO_INTENT, STEP);
+    stepWorld(w, NO_INTENT, NO_INTENT, STEP);
+    expect(w.events.power).toMatchObject({ fired: true, cancelled: false });
+    expect(w.power?.meter).toBe(0);
+    expect(w.wave?.live).toBe(true);
+    let fires = 0;
+    for (let i = 0; i < 30; i++) {
+      stepWorld(w, NO_INTENT, NO_INTENT, STEP);
+      if (w.events.power.fired) fires++;
+    }
+    expect(fires).toBe(0);
+    expect(w.events.goal === 'home' || w.match.score.home === 1).toBe(true);
+  });
+
+  it('a wave goal is a style goal: it credits the meter and clears the kick', () => {
+    const w = ready();
+    for (let i = 0; i < ticks(POWER_UP_S + 0.1); i++) stepWorld(w, hold, NO_INTENT, STEP);
+    stepWorld(w, NO_INTENT, NO_INTENT, STEP);
+    for (let i = 0; i < 30 && w.match.score.home === 0; i++) stepWorld(w, NO_INTENT, NO_INTENT, STEP);
+    expect(w.match.score.home).toBe(1);
+    expect(w.power?.meter).toBeGreaterThan(0);
+    expect(w.power?.lastKind).toBeNull();
+  });
+
+  it('his dribble touches fill the meter', () => {
+    const w = ready();
+    w.power!.meter = 0;
+    for (let i = 0; i < ticks(3); i++) stepWorld(w, move(1), NO_INTENT, STEP);
+    expect(w.power?.meter).toBeGreaterThan(0);
   });
 });

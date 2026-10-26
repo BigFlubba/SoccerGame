@@ -346,8 +346,11 @@ export function stepPlayer(p: Player, intent: PlayerIntent, dt: number, field: F
 
   if (p.state === 'ground') {
     if (powerPressed && powerOk) {
+      // He plants in the power-up stance.
       enter(p, 'poweringUp');
       p.charge = 0;
+      p.vx = 0;
+      p.vz = 0;
     } else if (intent.jump) {
       enter(p, 'air');
       p.vy = jumpVelocity(p.stats);

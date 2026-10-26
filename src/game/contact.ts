@@ -56,7 +56,7 @@ function slide(p: Player, opponent: Player, ball: Ball, ev: ContactEvents): void
   const onGround = opponent.y === 0 && opponent.state !== 'air';
   const feetX = opponent.x + PLAYER_R >= reach.x0 && opponent.x - PLAYER_R <= reach.x1;
   const feetZ = opponent.z + PLAYER_R >= reach.z0 && opponent.z - PLAYER_R <= reach.z1;
-  if (onGround && opponent.state !== 'fallen' && feetX && feetZ) {
+  if (onGround && opponent.state !== 'fallen' && opponent.state !== 'blown' && feetX && feetZ) {
     knockDown(opponent);
     p.kick.active = false;
     ev.trippedOpponent = true;
@@ -66,7 +66,7 @@ function slide(p: Player, opponent: Player, ball: Ball, ev: ContactEvents): void
 /** Shots, chips and volleys: the swing connects once if the ball is in reach of his foot. */
 function strike(p: Player, ball: Ball, aimErrorDeg: number, rng: Rng, field: Field, ev: ContactEvents): void {
   const k = p.kick;
-  if (!k?.active || !ballIn(footZone(p), ball, BALL_R)) return;
+  if (!k?.active || k.kind === 'wave' || !ballIn(footZone(p), ball, BALL_R)) return;
   const line = aimLine(ball, p.facing, k.aim, field);
   if (k.kind === 'shot' && p.state === 'kicking') {
     const result = shot(p.stats, k.charge, k.overchargeS, line, aimErrorDeg, rng);
@@ -235,6 +235,8 @@ function squirt(p: Player, opponent: Player, ball: Ball, rng: Rng, field: Field)
 /** Everything player `p` does to the ball (and to the opponent's feet) this tick. */
 export function resolveContacts(p: Player, opponent: Player, ball: Ball, aimErrorDeg: number, rng: Rng, field: Field): ContactEvents {
   const ev: ContactEvents = { touched: false, kicked: null, perfect: false, tackledBall: false, trippedOpponent: false };
+  // Flying through the air after a wave, he can't block, dribble or head it.
+  if (p.state === 'blown') return ev;
   slide(p, opponent, ball, ev);
   strike(p, ball, aimErrorDeg, rng, field, ev);
   if (!ev.kicked) headBall(p, ball, field, ev);
