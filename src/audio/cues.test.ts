@@ -68,4 +68,3 @@ describe('cue recipes', () => {
     expect(hum.toFreq! / hum.freq).toBeGreaterThanOrEqual(3);
   });
 });
-

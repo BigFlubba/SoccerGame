@@ -230,4 +230,3 @@ describe('results: unlocks and the skip grace', () => {
     expect(s.update(frame(['confirm']), STEP)?.kind).toBe('match');
   });
 });
-

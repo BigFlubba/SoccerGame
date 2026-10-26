@@ -82,4 +82,3 @@ describe('the Energy Wave callout', () => {
     expect(noteKick(kick({ kind: 'wave' }), world({}, { touched: true }))).toBeNull();
   });
 });
-

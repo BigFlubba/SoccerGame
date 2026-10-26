@@ -178,4 +178,3 @@ describe('shop messages', () => {
     expect(messageInk('HOLD Y WITH A FULL POWER METER')).toBe('volt');
   });
 });
-

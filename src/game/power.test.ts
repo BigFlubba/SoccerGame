@@ -1,8 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import { BALL_REST_Y } from './ball';
+import { BALL_R } from '../art/ball';
+import { POST_R } from './constants';
 import { BACKYARD } from './field';
 import { POST_INSET } from './kick';
-import { METER_MIN_REFILL_S, TOUCH_CEILING, addMeter, canStartPower, createPower, onTarget, powerHint, tickPower, waveTarget, type PowerState } from './power';
+import { METER_MIN_REFILL_S, TOUCH_CEILING, WAVE_MIN_DX, addMeter, canStartPower, createPower, onTarget, powerHint, tickPower, waveTarget, type PowerState } from './power';
 import { BASE_STATS } from './stats';
 import { createWorld, type World } from './world';
 
@@ -77,10 +79,34 @@ describe('onTarget', () => {
 });
 
 describe('waveTarget', () => {
-  it('waveTarget aims at the inset posts and the middle', () => {
-    expect(waveTarget(MAX_GOAL, 'far')).toBe(MAX_GOAL.z1 - POST_INSET);
-    expect(waveTarget(MAX_GOAL, 'near')).toBe(MAX_GOAL.z0 + POST_INSET);
-    expect(waveTarget(MAX_GOAL, 'straight')).toBe((MAX_GOAL.z0 + MAX_GOAL.z1) / 2);
+  const clearance = BALL_R + POST_R;
+
+  it('waveTarget aims inside the posts and at the middle', () => {
+    const front = { x: 300, z: 32 };
+    expect(waveTarget(MAX_GOAL, 'far', front)).toBeGreaterThanOrEqual(MAX_GOAL.z1 - POST_INSET - 2);
+    expect(waveTarget(MAX_GOAL, 'far', front)).toBeLessThan(MAX_GOAL.z1 - clearance);
+    expect(waveTarget(MAX_GOAL, 'near', front)).toBeLessThanOrEqual(MAX_GOAL.z0 + POST_INSET + 2);
+    expect(waveTarget(MAX_GOAL, 'near', front)).toBeGreaterThan(MAX_GOAL.z0 + clearance);
+    expect(waveTarget(MAX_GOAL, 'straight', front)).toBe((MAX_GOAL.z0 + MAX_GOAL.z1) / 2);
+  });
+
+  it('every wave line clears both posts, from anywhere it can start', () => {
+    /** Distance from point p to the segment a-b. */
+    const toSegment = (p: { x: number; z: number }, a: { x: number; z: number }, b: { x: number; z: number }) => {
+      const [dx, dz] = [b.x - a.x, b.z - a.z];
+      const t = Math.min(Math.max(((p.x - a.x) * dx + (p.z - a.z) * dz) / (dx * dx + dz * dz), 0), 1);
+      return Math.hypot(a.x + t * dx - p.x, a.z + t * dz - p.z);
+    };
+    const posts = [MAX_GOAL.z0, MAX_GOAL.z1].map(z => ({ x: MAX_GOAL.lineX, z }));
+    for (let x = BACKYARD.fenceL + 5; x <= MAX_GOAL.lineX - WAVE_MIN_DX; x += 7) {
+      for (let z = BALL_R; z <= BACKYARD.depth - BALL_R; z += 2) {
+        const ball = { x, z };
+        for (const aim of ['far', 'near', 'straight'] as const) {
+          const end = { x: MAX_GOAL.lineX, z: waveTarget(MAX_GOAL, aim, ball) };
+          for (const post of posts) expect(toSegment(post, ball, end), `${aim} from (${x}, ${z})`).toBeGreaterThan(clearance);
+        }
+      }
+    }
   });
 });
 

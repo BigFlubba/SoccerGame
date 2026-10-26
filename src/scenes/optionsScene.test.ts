@@ -143,4 +143,3 @@ describe('options: save code and reset', () => {
     expect(back.row).toBe(4);
   });
 });
-

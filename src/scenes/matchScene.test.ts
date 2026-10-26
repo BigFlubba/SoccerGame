@@ -626,4 +626,3 @@ describe('match scene: the Energy Wave', () => {
     expect(s.goldenCelebration).toBe(false);
   });
 });
-

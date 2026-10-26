@@ -137,4 +137,3 @@ describe('codeLines', () => {
 });
 
 const normaliseLength = (code: string) => code.replaceAll('-', '').length;
-

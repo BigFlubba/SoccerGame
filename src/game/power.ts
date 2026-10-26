@@ -1,5 +1,5 @@
 import { BALL_R } from '../art/ball';
-import { GRAVITY } from './constants';
+import { GRAVITY, POST_R } from './constants';
 import type { Goal } from './field';
 import { POST_INSET, type Aim } from './kick';
 import type { World } from './world';
@@ -64,11 +64,29 @@ export function onTarget(ball: { x: number; y: number; z: number; vx: number; vy
   return z >= goal.z0 - BALL_R && z <= goal.z1 + BALL_R && y - BALL_R <= goal.barY + goal.barThick;
 }
 
-/** Where in depth the wave crosses the goal line: inside a post, like a charged shot, or the middle of the mouth. */
-export function waveTarget(goal: Goal, aim: Aim): number {
-  if (aim === 'far') return goal.z1 - POST_INSET;
-  if (aim === 'near') return goal.z0 + POST_INSET;
-  return (goal.z0 + goal.z1) / 2;
+/** The ball passes a post with at least this much room between their edges. */
+const POST_CLEARANCE = 1;
+/** Rounds of refining the inset for the line's angle: it settles within a couple. */
+const INSET_ROUNDS = 3;
+
+/**
+ * Where in depth a wave from `from` crosses the goal line: inside the far
+ * or near post, like a charged shot, or the middle of the mouth. An angled
+ * line passes the post at the inset times the cosine of its angle, so the
+ * inset grows with the angle to keep the whole line clear of the post. It
+ * never goes past the middle.
+ */
+export function waveTarget(goal: Goal, aim: Aim, from: { x: number; z: number }): number {
+  const middle = (goal.z0 + goal.z1) / 2;
+  if (aim === 'straight') return middle;
+  const clearance = BALL_R + POST_R + POST_CLEARANCE;
+  const at = (inset: number) => (aim === 'far' ? goal.z1 - inset : goal.z0 + inset);
+  let inset = Math.max(POST_INSET, clearance);
+  for (let i = 0; i < INSET_ROUNDS; i++) {
+    const [dx, dz] = [Math.abs(goal.lineX - from.x), at(inset) - from.z];
+    inset = Math.min(Math.max(POST_INSET, (clearance * Math.hypot(dx, dz)) / Math.max(dx, 1)), (goal.z1 - goal.z0) / 2);
+  }
+  return at(inset);
 }
 
 /** A straight line from the ball can enter the mouth clear of the posts: it's far enough in front of the goal line. */

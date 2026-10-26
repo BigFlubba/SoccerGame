@@ -22,12 +22,14 @@ export interface AiProfile {
   rushDelayS: number;
   /** Whether it sprints at him. */
   rushSprint: boolean;
+  /** How fast it closes, as a share of its run: Easy jogs in, so its window is wider. */
+  rushPace: number;
 }
 
 export const DIFFICULTY: Record<Difficulty, AiProfile> = {
-  easy: { reactionS: 0.32, aimErrorDeg: 10, aggression: 0.3, shootRange: 150, rushDelayS: 0.3, rushSprint: false },
-  normal: { reactionS: 0.18, aimErrorDeg: 6, aggression: 0.55, shootRange: 180, rushDelayS: 0.1, rushSprint: false },
-  hard: { reactionS: 0.1, aimErrorDeg: 3, aggression: 0.8, shootRange: 210, rushDelayS: 0, rushSprint: true },
+  easy: { reactionS: 0.32, aimErrorDeg: 10, aggression: 0.3, shootRange: 150, rushDelayS: 0.3, rushSprint: false, rushPace: 0.75 },
+  normal: { reactionS: 0.18, aimErrorDeg: 6, aggression: 0.55, shootRange: 180, rushDelayS: 0.1, rushSprint: false, rushPace: 1 },
+  hard: { reactionS: 0.1, aimErrorDeg: 3, aggression: 0.8, shootRange: 210, rushDelayS: 0, rushSprint: true, rushPace: 1 },
 };
 
 export interface AiBrain {
@@ -236,18 +238,23 @@ function rush(brain: AiBrain, w: World, me: Player, them: Player): void {
   const ball = w.ball;
   const goal = maxGoal(w);
   const dist = Math.hypot(ball.x - me.x, ball.z - me.z);
-  // Hard sprints all the way in; the others only from far, as they would to any distant ball.
-  const sprint = brain.profile.rushSprint ? !me.exhausted : dist > SPRINT_DISTANCE && me.stamina > SPRINT_MIN_STAMINA;
-  if (dist <= SLIDE_RANGE && Math.abs(ball.z - me.z) <= REACH_Z && brain.slideReadyS === 0 && Math.sign(ball.x - me.x) === me.facing) {
+  // Once the wave is coming, he stays square to it and keeps coming: whether he braces is the wave's to decide.
+  const wave = w.wave?.live && w.wave.outcome === null ? w.wave : null;
+  // Hard sprints all the way in while it has the legs; Normal runs; Easy jogs.
+  const sprint = brain.profile.rushSprint && !me.exhausted;
+  if (!wave && dist <= SLIDE_RANGE && Math.abs(ball.z - me.z) <= REACH_Z && brain.slideReadyS === 0 && Math.sign(ball.x - me.x) === me.facing) {
     brain.slideReadyS = SLIDE_COOLDOWN_S;
     brain.intent = { ...NO_INTENT, chipHeld: true };
     return;
   }
   const toward = Math.sign(ball.x - me.x) || -me.facing;
   const x = Math.abs(ball.x - me.x) > LANE_LOOKAHEAD ? me.x + toward * LANE_LOOKAHEAD : ball.x;
-  const laneZ = ball.z + ((waveTarget(goal, them.aim) - ball.z) * (x - ball.x)) / Math.max(1, Math.abs(goal.lineX - ball.x));
+  const laneZ = wave
+    ? wave.originZ + (wave.dirZ / Math.max(wave.dirX, 1e-3)) * (x - wave.originX)
+    : ball.z + ((waveTarget(goal, them.aim, ball) - ball.z) * (x - ball.x)) / Math.max(1, Math.abs(goal.lineX - ball.x));
   const [moveX, moveZ] = steer(me, x, dist <= LANE_LOOKAHEAD ? ball.z : laneZ);
-  brain.intent = { ...NO_INTENT, sprint, moveX: moveX || toward, moveZ };
+  const pace = brain.profile.rushPace;
+  brain.intent = { ...NO_INTENT, sprint, moveX: (moveX || toward) * pace, moveZ: moveZ * pace };
 }
 
 function decide(brain: AiBrain, w: World, me: Player, them: Player): void {
@@ -349,9 +356,11 @@ export function think(brain: AiBrain, w: World, me: Player, them: Player, dt: nu
       released = true;
     }
   }
-  brain.rushS = them.state === 'poweringUp' ? brain.rushS + dt : 0;
-  if (brain.rushS >= brain.profile.rushDelayS && them.state === 'poweringUp') {
-    // Committed: it re-aims every tick until he fires or is stopped.
+  // The wave Harrison just fired, still on its way: the standoff isn't over until it reaches Max.
+  const waveComing = them.team === 'home' && w.wave?.live === true && w.wave.outcome === null;
+  brain.rushS = them.state === 'poweringUp' ? brain.rushS + dt : waveComing ? brain.rushS : 0;
+  if (waveComing || (brain.rushS >= brain.profile.rushDelayS && them.state === 'poweringUp')) {
+    // Committed: it re-aims every tick until he fires and the wave arrives, or he's stopped.
     rush(brain, w, me, them);
     brain.nextDecisionS = brain.profile.reactionS;
   } else if (!released && brain.nextDecisionS <= 1e-9) {

@@ -9,7 +9,7 @@ export const WAVE_SPEED = 960;
 /** Half the beam's width in depth: Max is in its path when his body overlaps it. */
 export const WAVE_HALF_WIDTH = 8;
 /** Max braces only if the head has come at least this far before reaching him. */
-export const BRACE_DISTANCE = 90;
+export const BRACE_DISTANCE = 65;
 /** The beam lingers this long after it ends, fading. */
 export const WAVE_LINGER_S = 0.35;
 /** A braced ball drops this far in front of his body. */
@@ -36,7 +36,7 @@ export interface Wave {
 /** Fires from the ball at Max's goal along the stick's aim, with no aim error, and spends the meter. */
 export function fireWave(w: World): Wave {
   const goal = maxGoal(w);
-  const [dx, dz] = [goal.lineX - w.ball.x, waveTarget(goal, w.home.kick?.aim ?? 'straight') - w.ball.z];
+  const [dx, dz] = [goal.lineX - w.ball.x, waveTarget(goal, w.home.kick?.aim ?? 'straight', w.ball) - w.ball.z];
   const d = Math.hypot(dx, dz);
   const [dirX, dirZ] = [dx / d, dz / d];
   Object.assign(w.ball, { y: BALL_REST_Y, vy: 0, spin: 0, vx: dirX * WAVE_SPEED, vz: dirZ * WAVE_SPEED });

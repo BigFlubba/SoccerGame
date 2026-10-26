@@ -139,4 +139,3 @@ describe('matchFeedback: the power-up', () => {
     expect(matchFeedback(powered({ blown: true }), 'playing')).toEqual({ cues: ['whoosh'], rumble: [] });
   });
 });
-
