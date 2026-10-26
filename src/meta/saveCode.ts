@@ -1,0 +1,168 @@
+import { STAT_NAMES } from '../game/stats';
+import { FORM_IDS, MOVE_IDS } from './catalog';
+import { TOTAL_NAMES, profileFrom, type Owned, type Profile } from './profile';
+
+/**
+ * A save code: the profile as whole-number fields, written as unsigned
+ * LEB128 varints, then a 16-bit Fletcher checksum, in Crockford base 32.
+ * Later builds only ever append fields, so every older code still reads,
+ * and a newer code reads as best it can. The checksum catches typos; it
+ * doesn't stop tampering, which the loader's clamps take care of.
+ */
+
+const ALPHABET = '0123456789ABCDEFGHJKMNPQRSTVWXYZ';
+const GROUP = 5;
+const DAY_MS = 86_400_000;
+const EPOCH_MS = Date.UTC(2000, 0, 1);
+/** A varint longer than this is junk, not a number. */
+const MAX_VARINT_BYTES = 8;
+
+/** Uppercase, with the look-alikes Crockford allows (O for 0, I and L for 1), and nothing outside the alphabet. */
+export function normaliseCode(text: string): string {
+  let out = '';
+  for (const ch of text.toUpperCase()) {
+    const c = ch === 'O' ? '0' : ch === 'I' || ch === 'L' ? '1' : ch;
+    if (ALPHABET.includes(c)) out += c;
+  }
+  return out;
+}
+
+export function groupCode(chars: string): string {
+  return chars.match(new RegExp(`.{1,${GROUP}}`, 'g'))?.join('-') ?? '';
+}
+
+function fletcher16(bytes: readonly number[]): number {
+  let a = 0;
+  let b = 0;
+  for (const x of bytes) {
+    a = (a + x) % 255;
+    b = (b + a) % 255;
+  }
+  return (b << 8) | a;
+}
+
+function pushVarint(out: number[], n: number): void {
+  let v = Math.max(0, Math.floor(n));
+  do {
+    const low = v % 128;
+    v = Math.floor(v / 128);
+    out.push(v > 0 ? low | 128 : low);
+  } while (v > 0);
+}
+
+function readVarints(bytes: readonly number[]): number[] | null {
+  const fields: number[] = [];
+  let i = 0;
+  while (i < bytes.length) {
+    let v = 0;
+    let scale = 1;
+    for (let len = 0; ; len++) {
+      if (i >= bytes.length || len >= MAX_VARINT_BYTES) return null;
+      const b = bytes[i++];
+      v += (b & 127) * scale;
+      scale *= 128;
+      if (b < 128) break;
+    }
+    fields.push(v);
+  }
+  return fields;
+}
+
+/** Whole-number fields to a grouped code. */
+export function encodeFields(fields: readonly number[]): string {
+  const bytes: number[] = [];
+  for (const f of fields) pushVarint(bytes, f);
+  const sum = fletcher16(bytes);
+  bytes.push(sum >> 8, sum & 255);
+  let chars = '';
+  let acc = 0;
+  let bits = 0;
+  for (const b of bytes) {
+    acc = (acc << 8) | b;
+    bits += 8;
+    while (bits >= 5) {
+      bits -= 5;
+      chars += ALPHABET[(acc >> bits) & 31];
+    }
+    acc &= (1 << bits) - 1;
+  }
+  if (bits > 0) chars += ALPHABET[(acc << (5 - bits)) & 31];
+  return groupCode(chars);
+}
+
+/** A typed code back to its fields; null if it's empty, malformed or fails the checksum. */
+export function decodeFields(text: string): number[] | null {
+  const chars = normaliseCode(text);
+  const bytes: number[] = [];
+  let acc = 0;
+  let bits = 0;
+  for (const ch of chars) {
+    acc = (acc << 5) | ALPHABET.indexOf(ch);
+    bits += 5;
+    if (bits >= 8) {
+      bits -= 8;
+      bytes.push((acc >> bits) & 255);
+    }
+    acc &= (1 << bits) - 1;
+  }
+  // The padding bits are always zero, so a typo there is still a typo.
+  if (acc !== 0 || bytes.length < 3) return null;
+  const payload = bytes.slice(0, -2);
+  const sum = (bytes[bytes.length - 2] << 8) | bytes[bytes.length - 1];
+  if (fletcher16(payload) !== sum) return null;
+  return readVarints(payload);
+}
+
+function dayNumber(date: string | null): number {
+  const ms = date === null ? NaN : Date.parse(`${date}T00:00:00Z`);
+  return Number.isFinite(ms) && ms >= EPOCH_MS ? Math.round((ms - EPOCH_MS) / DAY_MS) + 1 : 0;
+}
+
+const dateOf = (day: number | undefined): string | null =>
+  day ? new Date(EPOCH_MS + (day - 1) * DAY_MS).toISOString().slice(0, 10) : null;
+
+function ownedFields<T extends string>(o: Owned<T>, ids: readonly T[]): [mask: number, equipped: number] {
+  const mask = ids.reduce((m, id, i) => (o.owned.includes(id) ? m + 2 ** i : m), 0);
+  return [mask, o.equipped === null ? 0 : ids.indexOf(o.equipped) + 1];
+}
+
+function ownedOf<T extends string>(mask: number | undefined, equipped: number | undefined, ids: readonly T[]): Owned<T> | undefined {
+  if (mask === undefined) return undefined;
+  return { owned: ids.filter((_, i) => Math.floor(mask / 2 ** i) % 2 === 1), equipped: ids[(equipped ?? 0) - 1] ?? null };
+}
+
+export function encodeSaveCode(p: Profile): string {
+  return encodeFields([
+    p.version,
+    p.coins,
+    p.level,
+    p.xp,
+    ...STAT_NAMES.map(k => p.stats[k]),
+    p.ladderWins,
+    dayNumber(p.dailyWinDate),
+    ...TOTAL_NAMES.map(k => p.totals[k]),
+    ...ownedFields(p.powerMoves, MOVE_IDS),
+    ...ownedFields(p.powerForms, FORM_IDS),
+  ]);
+}
+
+/** The profile in a typed or pasted code, through the same field-by-field loader as a save; null if it doesn't decode. */
+export function decodeSaveCode(text: string): Profile | null {
+  const f = decodeFields(text);
+  if (!f || !(f[0] >= 1)) return null;
+  let i = 0;
+  const next = (): number | undefined => f[i++];
+  const record = {
+    version: next(),
+    coins: next(),
+    level: next(),
+    xp: next(),
+    stats: Object.fromEntries(STAT_NAMES.map(k => [k, next()])),
+    ladderWins: next(),
+    dailyWinDate: dateOf(next()),
+    totals: Object.fromEntries(TOTAL_NAMES.map(k => [k, next()])),
+    powerMoves: ownedOf(next(), next(), MOVE_IDS),
+    powerForms: ownedOf(next(), next(), FORM_IDS),
+  };
+  return profileFrom(record);
+}
