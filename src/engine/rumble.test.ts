@@ -33,9 +33,8 @@ describe('rumble', () => {
     }
   });
 
-  it('the charge rumble rises in three steps', () => {
-    expect(RUMBLE.charge1.strong).toBeLessThan(RUMBLE.charge2.strong);
-    expect(RUMBLE.charge2.strong).toBeLessThan(RUMBLE.charge3.strong);
+  it('powering up kicks in with a firm pulse, and the wave goes off long and strong', () => {
+    expect(RUMBLE.powerOn.strong).toBeGreaterThanOrEqual(0.5);
     expect(RUMBLE.wave.strong).toBe(1);
   });
 

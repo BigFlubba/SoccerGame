@@ -4,9 +4,8 @@ import { inGoalBox } from './field';
 import { NO_INTENT, PLAYER_R, type PlayerIntent } from './player';
 import { BASE_STATS } from './stats';
 import { BALL_REST_Y } from './ball';
-import { POWER_UP_S } from './player';
+import { POWERED_S } from './power';
 import { createWorld, placeForKickoff, stepWorld, type World } from './world';
-import { ballAtFeet } from './zones';
 
 const STEP = 1 / 60;
 const ERR = { home: 4, away: 6 };
@@ -217,7 +216,8 @@ describe('world', () => {
 });
 
 describe('world: the power-up', () => {
-  const hold: PlayerIntent = { ...NO_INTENT, powerHeld: true };
+  const press: PlayerIntent = { ...NO_INTENT, powerHeld: true };
+  const shoot: PlayerIntent = { ...NO_INTENT, shootHeld: true };
   const ticks = (s: number) => Math.round(s / STEP);
 
   /** Play on, a full meter, Harrison on his feet with the ball at his feet, facing Max's goal; Max far away. */
@@ -228,6 +228,14 @@ describe('world: the power-up', () => {
     Object.assign(w.home, { x: 300, z: 32, facing: 1 });
     Object.assign(w.away, { x: 100, z: 10 });
     Object.assign(w.ball, { x: 308, y: BALL_REST_Y, z: 32, vx: 0, vy: 0, vz: 0 });
+    return w;
+  }
+
+  /** Powered up: Y pressed, then let go. */
+  function powered(): World {
+    const w = ready();
+    stepWorld(w, press, NO_INTENT, STEP);
+    stepWorld(w, NO_INTENT, NO_INTENT, STEP);
     return w;
   }
 
@@ -247,73 +255,104 @@ describe('world: the power-up', () => {
     expect(holding.match.score).toEqual(plain.match.score);
   });
 
-  it('a power press reports started and plants him with the ball', () => {
+  it('pressing Y with the ball powers him up at once, and he keeps running', () => {
     const w = ready();
-    Object.assign(w.home, { vx: 90 });
-    Object.assign(w.ball, { vx: 60 });
-    stepWorld(w, hold, NO_INTENT, STEP);
+    stepWorld(w, { ...press, moveX: 1 }, NO_INTENT, STEP);
     expect(w.events.power.started).toBe(true);
-    expect(w.home.state).toBe('poweringUp');
-    expect([w.home.vx, w.ball.vx]).toEqual([0, 0]);
-    stepWorld(w, hold, NO_INTENT, STEP);
-    expect(w.events.power.started).toBe(false);
-  });
-
-  it('letting go early reports cancelled and keeps the meter', () => {
-    const w = ready();
-    for (let i = 0; i < ticks(0.5); i++) stepWorld(w, hold, NO_INTENT, STEP);
-    stepWorld(w, NO_INTENT, NO_INTENT, STEP);
-    expect(w.events.power.cancelled).toBe(true);
-    expect(w.home.state).toBe('ground');
+    expect(w.power?.activeS).toBeCloseTo(POWERED_S);
+    const x = w.home.x;
+    for (let i = 0; i < 30; i++) stepWorld(w, { ...NO_INTENT, moveX: 1 }, NO_INTENT, STEP);
+    expect(w.home.x).toBeGreaterThan(x + 30);
+    expect(w.power?.activeS).toBeGreaterThan(0);
     expect(w.power?.meter).toBe(1);
   });
 
-  it('a full charge at full time cancels and keeps the meter', () => {
-    const w = ready();
-    for (let i = 0; i < ticks(POWER_UP_S + 0.5); i++) stepWorld(w, hold, NO_INTENT, STEP);
-    expect([w.home.state, w.home.charge]).toEqual(['poweringUp', 1]);
-    w.match.phase = 'fullTime';
-    stepWorld(w, hold, NO_INTENT, STEP);
-    expect(w.events.power).toMatchObject({ cancelled: true, fired: false });
-    expect(w.home.state).toBe('ground');
-    expect(w.wave).toBeNull();
-    expect(w.power?.meter).toBe(1);
+  it('X while powered up fires the Energy Wave at once, turned to Max’s goal, and spends the meter', () => {
+    const w = powered();
+    Object.assign(w.home, { facing: -1 });
+    w.ball.x = w.home.x - 8;
+    stepWorld(w, shoot, NO_INTENT, STEP);
+    expect(w.events.power).toMatchObject({ fired: true, cancelled: false });
+    expect(w.home.facing).toBe(1);
+    expect(w.power).toMatchObject({ meter: 0, activeS: 0 });
+    expect(w.wave?.live).toBe(true);
+    expect(w.ball.vx).toBeGreaterThan(500);
   });
 
-  it('the ball leaving his feet cancels the power-up and keeps the meter', () => {
-    const w = ready();
-    for (let i = 0; i < ticks(0.5); i++) stepWorld(w, hold, NO_INTENT, STEP);
-    w.ball.vx = 200;
+  it('the power-up runs out after POWERED_S, keeping the meter', () => {
+    const w = powered();
     let cancelled = 0;
-    for (let i = 0; i < 10; i++) {
-      stepWorld(w, hold, NO_INTENT, STEP);
+    for (let i = 0; i < ticks(POWERED_S) + 2; i++) {
+      stepWorld(w, NO_INTENT, NO_INTENT, STEP);
       if (w.events.power.cancelled) cancelled++;
     }
     expect(cancelled).toBe(1);
-    expect(w.home.state).toBe('ground');
-    expect(w.power?.meter).toBe(1);
+    expect(w.power).toMatchObject({ meter: 1, activeS: 0 });
   });
 
-  it('firing spends the meter and reports fired once', () => {
-    const w = ready();
-    for (let i = 0; i < ticks(POWER_UP_S + 0.1); i++) stepWorld(w, hold, NO_INTENT, STEP);
+  it('Max winning the ball ends it, keeping the meter', () => {
+    const w = powered();
+    Object.assign(w.away, { x: w.ball.x + 10, z: 32, facing: -1, state: 'sliding', stateT: 0, kick: { kind: 'slide', charge: 0, overchargeS: 0, aim: 'straight', active: true } });
     stepWorld(w, NO_INTENT, NO_INTENT, STEP);
-    expect(w.events.power).toMatchObject({ fired: true, cancelled: false });
-    expect(w.power?.meter).toBe(0);
-    expect(w.wave?.live).toBe(true);
-    let fires = 0;
-    for (let i = 0; i < 30; i++) {
-      stepWorld(w, NO_INTENT, NO_INTENT, STEP);
-      if (w.events.power.fired) fires++;
+    expect(w.events.kicks[1]!.tackledBall).toBe(true);
+    expect(w.events.power.cancelled).toBe(true);
+    expect(w.power).toMatchObject({ meter: 1, activeS: 0 });
+  });
+
+  it('any other move ends it: a chip', () => {
+    const w = powered();
+    stepWorld(w, { ...NO_INTENT, chipHeld: true }, NO_INTENT, STEP);
+    expect(w.events.power.cancelled).toBe(true);
+    expect(w.power?.activeS).toBe(0);
+  });
+
+  it('play stopping ends it, keeping the meter', () => {
+    const w = powered();
+    w.match.phase = 'fullTime';
+    stepWorld(w, shoot, NO_INTENT, STEP);
+    expect(w.events.power).toMatchObject({ cancelled: true, fired: false });
+    expect(w.wave).toBeNull();
+    expect(w.power).toMatchObject({ meter: 1, activeS: 0 });
+  });
+
+  it('a press held until the ball reaches him powers him up then', () => {
+    const w = ready();
+    w.ball.x = w.home.x + 60;
+    for (let i = 0; i < 10; i++) stepWorld(w, press, NO_INTENT, STEP);
+    expect(w.power?.activeS).toBe(0);
+    w.ball.x = w.home.x + 8;
+    stepWorld(w, press, NO_INTENT, STEP);
+    expect(w.events.power.started).toBe(true);
+  });
+
+  it('Y still held after it runs out needs a fresh press', () => {
+    const w = ready();
+    for (let i = 0; i < ticks(POWERED_S) + 30; i++) stepWorld(w, press, NO_INTENT, STEP);
+    expect(w.power?.activeS).toBe(0);
+    stepWorld(w, NO_INTENT, NO_INTENT, STEP);
+    stepWorld(w, press, NO_INTENT, STEP);
+    expect(w.events.power.started).toBe(true);
+  });
+
+  it.each([false, true])('while dribbling (sprint %s), a held power press starts within 0.1 s, whenever it comes', sprint => {
+    const run: PlayerIntent = { ...NO_INTENT, moveX: 1, sprint };
+    for (let k = 0; k < 60; k++) {
+      const w = ready();
+      Object.assign(w.home, { x: 120 });
+      Object.assign(w.ball, { x: 128 });
+      for (let i = 0; i < k; i++) stepWorld(w, run, NO_INTENT, STEP);
+      let waited = 0;
+      while ((w.power?.activeS ?? 0) === 0 && waited < 60) {
+        stepWorld(w, { ...run, powerHeld: true }, NO_INTENT, STEP);
+        waited++;
+      }
+      expect(waited, `pressed after ${k} ticks`).toBeLessThanOrEqual(6);
     }
-    expect(fires).toBe(0);
-    expect(w.events.goal === 'home' || w.match.score.home === 1).toBe(true);
   });
 
   it('a wave goal is a style goal: it credits the meter and clears the kick', () => {
-    const w = ready();
-    for (let i = 0; i < ticks(POWER_UP_S + 0.1); i++) stepWorld(w, hold, NO_INTENT, STEP);
-    stepWorld(w, NO_INTENT, NO_INTENT, STEP);
+    const w = powered();
+    stepWorld(w, shoot, NO_INTENT, STEP);
     for (let i = 0; i < 30 && w.match.score.home === 0; i++) stepWorld(w, NO_INTENT, NO_INTENT, STEP);
     expect(w.match.score.home).toBe(1);
     expect(w.power?.meter).toBeGreaterThan(0);
@@ -326,33 +365,4 @@ describe('world: the power-up', () => {
     for (let i = 0; i < ticks(3); i++) stepWorld(w, move(1), NO_INTENT, STEP);
     expect(w.power?.meter).toBeGreaterThan(0);
   });
-
-  it('starting a power-up traps a dribbled ball at his feet, and it stays there', () => {
-    const w = ready();
-    Object.assign(w.home, { vx: 95 });
-    Object.assign(w.ball, { x: w.home.x + 22, vx: 130 });
-    stepWorld(w, hold, NO_INTENT, STEP);
-    expect(w.home.state).toBe('poweringUp');
-    expect(ballAtFeet(w.home, w.ball)).toBe(true);
-    expect(Math.hypot(w.ball.vx, w.ball.vz)).toBe(0);
-    for (let i = 0; i < 30; i++) stepWorld(w, hold, NO_INTENT, STEP);
-    expect(w.home.state).toBe('poweringUp');
-  });
-
-  it.each([false, true])('while dribbling (sprint %s), a held power press starts within 0.1 s, whenever it comes', sprint => {
-    const run: PlayerIntent = { ...NO_INTENT, moveX: 1, sprint };
-    for (let k = 0; k < 60; k++) {
-      const w = ready();
-      Object.assign(w.home, { x: 120 });
-      Object.assign(w.ball, { x: 128 });
-      for (let i = 0; i < k; i++) stepWorld(w, run, NO_INTENT, STEP);
-      let waited = 0;
-      while (w.home.state !== 'poweringUp' && waited < 60) {
-        stepWorld(w, { ...run, powerHeld: true }, NO_INTENT, STEP);
-        waited++;
-      }
-      expect(waited, `pressed after ${k} ticks`).toBeLessThanOrEqual(6);
-    }
-  });
 });
-

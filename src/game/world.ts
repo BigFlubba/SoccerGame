@@ -4,8 +4,21 @@ import { resolveBodies } from './bodies';
 import { resolveContacts, type ContactEvents } from './contact';
 import { BACKYARD, goalScored, type Field } from './field';
 import { createMatch, stepMatch, type MatchState, type Team } from './match';
-import { NO_INTENT, cancelCharge, createPlayer, stepPlayer, type Player, type PlayerIntent } from './player';
-import { addMeter, canStartPower, createPower, maxGoal, onTarget, tickPower, trapAtFeet, type PowerKit, type PowerState } from './power';
+import { NO_INTENT, createPlayer, stepPlayer, type Player, type PlayerIntent } from './player';
+import {
+  POWERED_S,
+  addMeter,
+  canFireWave,
+  canStartPower,
+  createPower,
+  maxGoal,
+  maxGoalDir,
+  onTarget,
+  tickPower,
+  trapAtFeet,
+  type PowerKit,
+  type PowerState,
+} from './power';
 import type { Stats } from './stats';
 import { fireWave, stepWave, type Wave } from './wave';
 import { ballAtFeet } from './zones';
@@ -109,8 +122,8 @@ export function placeForKickoff(w: World): void {
  * otherwise. Buttons held outside play still count as held, so one held
  * through a goal pause or kickoff needs a fresh press.
  */
-function stepOne(p: Player, intent: PlayerIntent, live: boolean, w: World, dt: number, powerOk = false): void {
-  stepPlayer(p, live ? intent : NO_INTENT, dt, w.field, ballAtFeet(p, w.ball), powerOk);
+function stepOne(p: Player, intent: PlayerIntent, live: boolean, w: World, dt: number, waveDir: 1 | -1 | null = null): void {
+  stepPlayer(p, live ? intent : NO_INTENT, dt, w.field, ballAtFeet(p, w.ball), waveDir);
   if (!live) p.held = { shoot: intent.shootHeld, chip: intent.chipHeld, power: intent.powerHeld };
 }
 
@@ -129,34 +142,49 @@ function noteLastKind(power: PowerState, [home, away]: ContactEvents[]): void {
 }
 
 /**
+ * Whether a power-up that didn't fire this tick is over: play stopped, he
+ * was knocked down, Max played the ball, or he made any other move.
+ */
+function powerEnds(w: World, live: boolean, [, away]: ContactEvents[]): boolean {
+  const home = w.home;
+  const otherMove = (home.kick !== null && home.kick.kind !== 'wave') || home.state === 'charging' || home.state === 'chipping';
+  const maxPlayed = away !== undefined && (away.touched || away.kicked !== null || away.tackledBall);
+  return !live || home.state === 'fallen' || maxPlayed || otherMove;
+}
+
+/**
  * One fixed tick: players, then their bodies kept apart and out of the
  * goals, then the wave, the ball, contacts and the match rules. Intents
  * only count while the ball is in play.
  *
- * Harrison's power-up: a press starts it when the world allows; outside
- * play it's cancelled before he steps (NO_INTENT would read as letting go
- * and fire it); losing the ball cancels it too. A cancel keeps the meter;
- * only a fired wave spends it. While the wave is live nobody else touches
- * the ball: only Max standing in its path can stop it.
+ * Harrison's power-up: a Y press with the ball powers him up at once, for
+ * POWERED_S, while he keeps playing. While it lasts, X with the ball
+ * strikes the Energy Wave. It ends unfired when the time runs out, play
+ * stops, Max plays the ball or knocks him down, or he makes another move;
+ * that keeps the meter, and only a fired wave spends it. While the wave is
+ * live nobody else touches the ball: only Max standing in its path can
+ * stop it.
  */
 export function stepWorld(w: World, homeIntent: PlayerIntent, awayIntent: PlayerIntent, dt: number): void {
   const live = w.match.phase === 'playing';
   const power = quietPower();
   const home = w.home;
+  const wasActive = (w.power?.activeS ?? 0) > 0;
   if (w.power) tickPower(w.power, dt);
-  const powerOk = w.power !== null && canStartPower(w);
-  const wasPowering = home.state === 'poweringUp';
-  if (!live && wasPowering) cancelCharge(home);
-  stepOne(home, homeIntent, live, w, dt, powerOk);
+  const waveDir = live && canFireWave(w) ? maxGoalDir(w) : null;
+  stepOne(home, homeIntent, live, w, dt, waveDir);
   stepOne(w.away, awayIntent, live, w, dt);
-  if (!wasPowering && home.state === 'poweringUp') {
+  if (w.power && home.powerArmed && canStartPower(w)) {
+    home.powerArmed = false;
+    w.power.activeS = POWERED_S;
     power.started = true;
-    // He plants and traps the ball, so it can't roll off his feet as he stops.
-    trapAtFeet(home, w.ball);
   }
-  if (home.state === 'unleashing' && home.kick?.kind === 'wave' && home.kick.active) {
+  if (w.power && home.state === 'unleashing' && home.kick?.kind === 'wave' && home.kick.active) {
     home.kick.active = false;
+    // He strikes it from his boot, wherever it was running ahead of him.
+    trapAtFeet(home, w.ball);
     w.wave = fireWave(w);
+    w.power.activeS = 0;
     power.fired = true;
   }
   resolveBodies(home, w.away, w.field);
@@ -172,8 +200,10 @@ export function stepWorld(w: World, homeIntent: PlayerIntent, awayIntent: Player
   const second = homeFirst ? contact(w.away, home) : contact(home, w.away);
   const kicks = homeFirst ? [first, second] : [second, first];
   w.tick++;
-  if (home.state === 'poweringUp' && !ballAtFeet(home, w.ball)) cancelCharge(home);
-  if ((wasPowering || power.started) && home.state !== 'poweringUp' && home.state !== 'unleashing') power.cancelled = true;
+  if (w.power && !power.fired && (wasActive || power.started)) {
+    if (w.power.activeS > 0 && powerEnds(w, live, kicks)) w.power.activeS = 0;
+    if (w.power.activeS === 0) power.cancelled = true;
+  }
   if (w.power) {
     creditMeter(w.power, kicks[0]!, w);
     noteLastKind(w.power, kicks);

@@ -22,7 +22,6 @@ export type Cue =
   | 'levelUp'
   | 'nope'
   | 'powerUp'
-  | 'powerReady'
   | 'fizzle'
   | 'waveBlast'
   | 'beam'
@@ -158,7 +157,7 @@ export const CUES: Readonly<Record<Cue, CueRecipe>> = {
     minGapS: 1,
   },
   nope: { voices: [{ wave: 'square', dur: 0.16, gain: 0.1, freq: 140, toFreq: 110, filter: { type: 'lowpass' } }], minGapS: 0.15 },
-  /** The power-up's hum, rising with the charge over its second, with a shimmer on top. */
+  /** Powering up: a hum rising over a second, with a shimmer on top. */
   powerUp: {
     voices: [
       { wave: 'square', dur: 1, gain: 0.08, attack: 0.15, hold: 0.7, freq: 110, toFreq: 440, filter: { type: 'lowpass', q: 3 }, vibrato: { hz: 9, depth: 6 } },
@@ -166,15 +165,7 @@ export const CUES: Readonly<Record<Cue, CueRecipe>> = {
     ],
     minGapS: 0.5,
   },
-  /** Full charge: a bright two-note chime that says let go now. */
-  powerReady: {
-    voices: [
-      { wave: 'square', dur: 0.07, gain: 0.12, freq: 1319 },
-      { wave: 'square', at: 0.07, dur: 0.14, gain: 0.12, freq: 1976 },
-    ],
-    minGapS: 0.3,
-  },
-  /** A power-up let go too early, or knocked out of him: it fizzles out. */
+  /** A power-up that runs out, or is knocked out of him, before he fires: it fizzles out. */
   fizzle: {
     voices: [
       { wave: 'noise', dur: 0.25, gain: 0.18, freq: 3000, toFreq: 600, filter: { type: 'bandpass', q: 2 } },

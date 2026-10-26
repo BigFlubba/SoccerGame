@@ -3,16 +3,16 @@ import { M, MASTER, masterPalette, type MasterColor, type ResolvedPalette } from
 import { BALL_REST_Y } from '../game/ball';
 import { VIEW_W, project, type Camera } from '../game/camera';
 import { BRACE_S, BRACE_SKID_SPEED, type Player } from '../game/player';
-import type { PowerState } from '../game/power';
+import { POWERED_S, type PowerState } from '../game/power';
 import { WAVE_LINGER_S, type Wave } from '../game/wave';
 import type { World } from '../game/world';
 import type { GameArt } from './art';
 import type { MatchHud } from './matchView';
 
 /**
- * The Energy Wave's effects: the POWER meter, the aura and debris while he
- * powers up, the beam, the brace's splash and skid, the shake and the
- * impact-frame silhouettes. Pure drawing, off the sim's state and the HUD's.
+ * The Energy Wave's effects: the POWER meter, the aura while he's powered
+ * up, the beam, the brace's splash and skid, the shake and the impact-frame
+ * silhouettes. Pure drawing, off the sim's state and the HUD's.
  */
 
 /** Top right, mirroring the stamina bar: the label, the bar under it, the Y button beside it. */
@@ -22,7 +22,7 @@ export const POWER_METER_X0 = METER.glyphX - 1;
 const DIM_ALPHA = 0.35;
 /** The bright pulse running along a full bar: px/s, and how long it is. */
 const PULSE = { speed: 40, len: 3 };
-/** The gold charge bar sits where the shot-charge bar does. */
+/** The gold power-up bar, counting down his time, sits where the shot-charge bar does. */
 const POWER_BAR = { w: 12, h: 2, above: 46 };
 /** The aura's rings, innermost first, by form. */
 const AURA_RINGS: Record<'base' | 'golden', readonly MasterColor[]> = {
@@ -36,13 +36,10 @@ const AURA_FLICKER_HZ = 12;
 const TONGUES = { count: 5, maxPx: 8, hz: 14 };
 /** The glow pool at his feet, at full strength. */
 const POOL_W = 22;
-/** Grass, pebbles and clods floating up around him. */
-const DEBRIS = { count: 14, spreadPx: 15, risePx: 22 };
-const DEBRIS_KIND: readonly { colour: MasterColor; w: number; h: number }[] = [
-  { colour: 'grassLight', w: 1, h: 2 },
-  { colour: 'slate', w: 1, h: 1 },
-  { colour: 'wood', w: 2, h: 2 },
-];
+/** In its last moments the power-up's aura flickers, so he can see it's about to run out. */
+const ENDING_S = 0.6;
+const ENDING_FLICKER_HZ = 10;
+const ENDING_DIM = 0.4;
 /** The beam's band, in px either side of its centre line, which runs this high over the grass. */
 const BEAM = { centreY: 14, edge: 8, light: 4, core: 1, wobbleHz: 5 };
 const ORB_R = { origin: 5, head: 7 };
@@ -51,8 +48,7 @@ const SPEED_LINES = { count: 9, speedPx: 900, len: 28, alpha: 0.5 };
 const SPLASH = { rays: 7, spreadRad: 1.3, minLen: 6, maxLen: 13, hz: 20 };
 const DUST = { count: 6, risePx: 6 };
 
-/** Shake while powering up, at full charge; and the shakes the scene sets on a fired wave and a brace. */
-const POWER_UP_SHAKE_PX = 2;
+/** The shakes the scene sets on a fired wave and a brace. */
 export const WAVE_SHAKE = { px: 4, s: 0.3 };
 export const BRACE_SHAKE = { px: 2, s: 0.2 };
 /** Every shake comes from this pattern, a step per 1/30 s; the x step is always a full one. */
@@ -77,31 +73,33 @@ function screen(cam: Camera, x: number, y: number, z: number): { x: number; y: n
   return { x: Math.round(p.sx), y: Math.round(p.sy) };
 }
 
-/** Which of Harrison's sprite sets to draw: the power heads while powering up and firing, gold in Golden Form and its celebration. */
+const poweredUp = (w: World): boolean => (w.power?.activeS ?? 0) > 0;
+
+/** Which of Harrison's sprite sets to draw: the power heads while powered up and striking, gold in Golden Form and its celebration. */
 export function homeSprites(w: World, hud: MatchHud): 'home' | 'homePower' | 'homeGolden' {
   if (hud.goldenCelebration) return 'homeGolden';
-  if (w.home.state !== 'poweringUp' && w.home.state !== 'unleashing') return 'home';
+  if (!poweredUp(w) && w.home.state !== 'unleashing') return 'home';
   return w.power?.golden ? 'homeGolden' : 'homePower';
 }
 
-/** How strongly his aura burns, 0..1, or 0 for none. */
-export function auraStrength(w: World, hud: MatchHud): number {
-  if (hud.goldenCelebration) return 1;
-  if (w.home.state === 'poweringUp') return 0.3 + 0.7 * w.home.charge;
-  return w.home.state === 'unleashing' ? 1 : 0;
+/** How strongly his aura burns, 0..1, or 0 for none: full while powered up, flickering in its last moments. */
+export function auraStrength(w: World, hud: MatchHud, nowS: number): number {
+  if (hud.goldenCelebration || w.home.state === 'unleashing') return 1;
+  const left = w.power?.activeS ?? 0;
+  if (left <= 0) return 0;
+  if (left > ENDING_S) return 1;
+  return Math.floor(nowS * ENDING_FLICKER_HZ * 2) % 2 === 0 ? 1 : ENDING_DIM;
 }
 
-/** What to tell him over his head: once the charge is full, it's time to let go. */
-export function powerPrompt(p: Player): string | null {
-  return p.state === 'poweringUp' && p.charge >= 1 ? 'LET GO!' : null;
+/** What to tell him over his head: powered up, his next kick is the wave. */
+export function powerPrompt(w: World): string | null {
+  return poweredUp(w) ? 'SHOOT!' : null;
 }
 
-/** The pitch's power shake in whole pixels: growing with the charge, or the scene's fired-wave and brace shakes. */
-export function shakeFor(power: PowerState | null, home: Player, hud: MatchHud, nowS: number): { dx: number; dy: number } {
-  if (!power) return { dx: 0, dy: 0 };
-  let px = home.state === 'poweringUp' ? Math.round(POWER_UP_SHAKE_PX * home.charge) : 0;
-  if (hud.shake && nowS < hud.shake.untilS) px = Math.max(px, hud.shake.px);
-  if (px === 0) return { dx: 0, dy: 0 };
+/** The pitch's power shake in whole pixels: the scene's fired-wave and brace shakes. */
+export function shakeFor(power: PowerState | null, hud: MatchHud, nowS: number): { dx: number; dy: number } {
+  if (!power || !hud.shake || nowS >= hud.shake.untilS) return { dx: 0, dy: 0 };
+  const px = hud.shake.px;
   const [x, y] = SHAKE_PATTERN[Math.floor(nowS * SHAKE_HZ) % SHAKE_PATTERN.length]!;
   return { dx: x * px, dy: y * Math.round(px / 2) };
 }
@@ -210,35 +208,18 @@ export function drawAura(g: CanvasRenderingContext2D, cam: Camera, p: Player, fr
   g.globalAlpha = 1;
 }
 
-/** Grass, pebbles and clods rising around his feet as the power builds. */
-export function drawDebris(g: CanvasRenderingContext2D, cam: Camera, p: Player, strength: number, nowS: number): void {
-  const s = screen(cam, p.x, 0, p.z);
-  const count = Math.round(DEBRIS.count * strength);
-  for (let i = 0; i < count; i++) {
-    const period = 0.7 + scatter(i, 1) * 0.6;
-    const t = (nowS / period + scatter(i, 2)) % 1;
-    const kind = DEBRIS_KIND[i % DEBRIS_KIND.length]!;
-    const x = s.x + Math.round((scatter(i, 3) * 2 - 1) * DEBRIS.spreadPx + Math.sin(t * 6 + i));
-    const y = s.y - Math.round(t * DEBRIS.risePx * (0.6 + scatter(i, 4) * 0.6));
-    g.globalAlpha = (1 - t) * strength;
-    ink(g, kind.colour);
-    g.fillRect(x, y, kind.w, kind.h);
-  }
-  g.globalAlpha = 1;
-}
-
-/** The gold charge bar over him while he powers up, where the shot-charge bar sits. */
-export function drawPowerBar(g: CanvasRenderingContext2D, cam: Camera, p: Player, nowS: number): void {
-  if (p.state !== 'poweringUp') return;
+/** The gold bar over him while he's powered up, counting down the time he has left to fire. */
+export function drawPowerBar(g: CanvasRenderingContext2D, cam: Camera, p: Player, activeS: number): void {
+  if (activeS <= 0) return;
   const s = screen(cam, p.x, p.y, p.z);
   const [x, y] = [s.x - POWER_BAR.w / 2, s.y - POWER_BAR.above];
+  const left = Math.ceil((activeS / POWERED_S) * POWER_BAR.w);
   ink(g, 'outline');
   g.fillRect(x - 1, y - 1, POWER_BAR.w + 2, POWER_BAR.h + 2);
   ink(g, 'energyGold');
-  g.fillRect(x, y, Math.round(p.charge * POWER_BAR.w), POWER_BAR.h);
-  const full = p.charge >= 1 && Math.floor(nowS * PULSE.speed / 4) % 2 === 0;
-  ink(g, full ? 'auraWhite' : 'energyGoldLight');
-  g.fillRect(x, y, Math.round(p.charge * POWER_BAR.w), 1);
+  g.fillRect(x, y, left, POWER_BAR.h);
+  ink(g, 'energyGoldLight');
+  g.fillRect(x, y, left, 1);
 }
 
 /** A filled disc of whole pixels. */

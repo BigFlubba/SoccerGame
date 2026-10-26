@@ -4,7 +4,7 @@ import { GRAVITY } from './constants';
 import { inGoalBox, type Goal } from './field';
 import type { Aim } from './kick';
 import { NO_INTENT, PLAYER_R, type Player, type PlayerIntent } from './player';
-import { maxGoal, waveTarget } from './power';
+import type { Wave } from './wave';
 import type { World } from './world';
 import { REACH_Z } from './zones';
 
@@ -18,31 +18,23 @@ export interface AiProfile {
   aggression: number;
   /** Distance from the goal line it starts shooting from. */
   shootRange: number;
-  /** Seconds after Harrison starts powering up before it rushes him. */
-  rushDelayS: number;
-  /** Whether it sprints at him. */
-  rushSprint: boolean;
-  /** How fast it closes, as a share of its run: Easy jogs in, so its window is wider. */
-  rushPace: number;
 }
 
 export const DIFFICULTY: Record<Difficulty, AiProfile> = {
-  easy: { reactionS: 0.32, aimErrorDeg: 10, aggression: 0.3, shootRange: 150, rushDelayS: 0.3, rushSprint: false, rushPace: 0.75 },
-  normal: { reactionS: 0.18, aimErrorDeg: 6, aggression: 0.55, shootRange: 180, rushDelayS: 0.1, rushSprint: false, rushPace: 1 },
-  hard: { reactionS: 0.1, aimErrorDeg: 3, aggression: 0.8, shootRange: 210, rushDelayS: 0, rushSprint: true, rushPace: 1 },
+  easy: { reactionS: 0.32, aimErrorDeg: 10, aggression: 0.3, shootRange: 150 },
+  normal: { reactionS: 0.18, aimErrorDeg: 6, aggression: 0.55, shootRange: 180 },
+  hard: { reactionS: 0.1, aimErrorDeg: 3, aggression: 0.8, shootRange: 210 },
 };
 
 export interface AiBrain {
   profile: AiProfile;
   nextDecisionS: number;
   intent: PlayerIntent;
-  plan: 'chase' | 'dribble' | 'charge' | 'defend' | 'jump' | 'rush';
+  plan: 'chase' | 'dribble' | 'charge' | 'defend' | 'jump' | 'faceWave';
   /** Time left on the current charge before it releases the shot. */
   chargeLeftS: number;
   /** Time until it may slide again. */
   slideReadyS: number;
-  /** How long the opponent has been powering up. */
-  rushS: number;
 }
 
 /** The ball counts as at someone's feet within this distance, on the ground. */
@@ -54,7 +46,7 @@ const CHASE_OFFSET = 8;
 const DEFEND_OFFSET = 20;
 /** ...and this fraction of the way across from the ball toward its own goal's centre. */
 const DEFEND_COVER = 1 / 3;
-export const SLIDE_RANGE = 26;
+const SLIDE_RANGE = 26;
 const SLIDE_COOLDOWN_S = 1.2;
 const HIGH_BALL = 30;
 const HIGH_BALL_RANGE = 30;
@@ -84,7 +76,7 @@ const ARRIVE = 3;
 const CORNER_CLEARANCE = PLAYER_R + ARRIVE + 1;
 /** How far ahead it leads a rolling ball. */
 const LEAD_S = 0.25;
-/** Rushing a power-up, it runs at a spot on the beam's lane this far ahead of it, so it steps into the lane as it closes. */
+/** Facing a wave, it runs at a spot on the beam's line this far ahead of it, so it stays in the lane as it closes. */
 const LANE_LOOKAHEAD = 12;
 /** Where it aims its shots: mostly the far post, then the near post, sometimes straight. */
 const AIM_ODDS: readonly (readonly [Aim, number])[] = [
@@ -94,7 +86,7 @@ const AIM_ODDS: readonly (readonly [Aim, number])[] = [
 ];
 
 export function createBrain(profile: AiProfile): AiBrain {
-  return { profile, nextDecisionS: 0, intent: { ...NO_INTENT }, plan: 'chase', chargeLeftS: 0, slideReadyS: 0, rushS: 0 };
+  return { profile, nextDecisionS: 0, intent: { ...NO_INTENT }, plan: 'chase', chargeLeftS: 0, slideReadyS: 0 };
 }
 
 const attackDir = (me: Player): 1 | -1 => (me.team === 'home' ? 1 : -1);
@@ -228,33 +220,18 @@ function pickAim(w: World): Aim {
 }
 
 /**
- * The opponent is powering up: it comes for him. It runs at the ball along
- * the beam's lane, facing him all the way, and slides in once close and in
- * line. It never plants and waits, so every standoff ends: it braces from
- * far, is blown away in range, or tackles him if he waits too long.
+ * The Energy Wave Harrison just fired is on its way: Max stays square to
+ * it and keeps coming along its line, so whether he braces is the wave's
+ * to decide, not a turn to chase the loose ball.
  */
-function rush(brain: AiBrain, w: World, me: Player, them: Player): void {
-  brain.plan = 'rush';
+function faceWave(brain: AiBrain, w: World, me: Player, wave: Wave): void {
+  brain.plan = 'faceWave';
   const ball = w.ball;
-  const goal = maxGoal(w);
-  const dist = Math.hypot(ball.x - me.x, ball.z - me.z);
-  // Once the wave is coming, he stays square to it and keeps coming: whether he braces is the wave's to decide.
-  const wave = w.wave?.live && w.wave.outcome === null ? w.wave : null;
-  // Hard sprints all the way in while it has the legs; Normal runs; Easy jogs.
-  const sprint = brain.profile.rushSprint && !me.exhausted;
-  if (!wave && dist <= SLIDE_RANGE && Math.abs(ball.z - me.z) <= REACH_Z && brain.slideReadyS === 0 && Math.sign(ball.x - me.x) === me.facing) {
-    brain.slideReadyS = SLIDE_COOLDOWN_S;
-    brain.intent = { ...NO_INTENT, chipHeld: true };
-    return;
-  }
   const toward = Math.sign(ball.x - me.x) || -me.facing;
   const x = Math.abs(ball.x - me.x) > LANE_LOOKAHEAD ? me.x + toward * LANE_LOOKAHEAD : ball.x;
-  const laneZ = wave
-    ? wave.originZ + (wave.dirZ / Math.max(wave.dirX, 1e-3)) * (x - wave.originX)
-    : ball.z + ((waveTarget(goal, them.aim, ball) - ball.z) * (x - ball.x)) / Math.max(1, Math.abs(goal.lineX - ball.x));
-  const [moveX, moveZ] = steer(me, x, dist <= LANE_LOOKAHEAD ? ball.z : laneZ);
-  const pace = brain.profile.rushPace;
-  brain.intent = { ...NO_INTENT, sprint, moveX: (moveX || toward) * pace, moveZ: moveZ * pace };
+  const laneZ = wave.originZ + (wave.dirZ / Math.max(wave.dirX, 1e-3)) * (x - wave.originX);
+  const [moveX, moveZ] = steer(me, x, laneZ);
+  brain.intent = { ...NO_INTENT, moveX: moveX || toward, moveZ };
 }
 
 function decide(brain: AiBrain, w: World, me: Player, them: Player): void {
@@ -356,12 +333,10 @@ export function think(brain: AiBrain, w: World, me: Player, them: Player, dt: nu
       released = true;
     }
   }
-  // The wave Harrison just fired, still on its way: the standoff isn't over until it reaches Max.
-  const waveComing = them.team === 'home' && w.wave?.live === true && w.wave.outcome === null;
-  brain.rushS = them.state === 'poweringUp' ? brain.rushS + dt : waveComing ? brain.rushS : 0;
-  if (waveComing || (brain.rushS >= brain.profile.rushDelayS && them.state === 'poweringUp')) {
-    // Committed: it re-aims every tick until he fires and the wave arrives, or he's stopped.
-    rush(brain, w, me, them);
+  // The wave Harrison just fired, still on its way: it stays square to it every tick until it arrives.
+  const wave = them.team === 'home' && w.wave?.live && w.wave.outcome === null ? w.wave : null;
+  if (wave) {
+    faceWave(brain, w, me, wave);
     brain.nextDecisionS = brain.profile.reactionS;
   } else if (!released && brain.nextDecisionS <= 1e-9) {
     // A decision on the release tick could start a new charge and swallow the shot, so it waits a tick.

@@ -8,7 +8,6 @@ import {
   FALL_TIME,
   NO_INTENT,
   PLAYER_R,
-  POWER_UP_S,
   blowAway,
   brace,
   cancelCharge,
@@ -413,120 +412,53 @@ describe('stepPlayer: stamina and falls', () => {
   });
 });
 
-describe('stepPlayer: powering up', () => {
-  /** Ticks with the ball at his feet and the power-up allowed (or not). */
-  function power(p: Player, i: Partial<PlayerIntent>, n = 1, powerOk = true): void {
-    for (let k = 0; k < n; k++) stepPlayer(p, intent(i), STEP, BACKYARD, true, powerOk);
+describe('stepPlayer: the Energy Wave strike', () => {
+  /** Ticks with the ball at his feet, and a wave direction when X should fire the wave. */
+  function wave(p: Player, i: Partial<PlayerIntent>, n = 1, waveDir: 1 | -1 | null = 1): void {
+    for (let k = 0; k < n; k++) stepPlayer(p, intent(i), STEP, BACKYARD, true, waveDir);
   }
 
-  it('a power press with powerOk starts powering up and stands him still', () => {
-    const p = harrison();
-    tick(p, { moveX: 1 }, ticks(0.5), true);
-    power(p, { moveX: 1, powerHeld: true }, ticks(0.5));
-    expect(p.state).toBe('poweringUp');
-    expect(p.charge).toBeCloseTo(0.5 / POWER_UP_S, 1);
-    expect(p.vx).toBe(0);
-    expect(p.anim.name).toBe('powerUp');
-  });
-
-  it('without powerOk, a power press does nothing', () => {
-    const p = harrison();
-    power(p, { powerHeld: true }, ticks(0.5), false);
-    expect(p.state).toBe('ground');
-    expect(p.charge).toBe(0);
-  });
-
-  it('holding a full second then letting go unleashes a wave kick aimed by the stick', () => {
-    const p = harrison();
-    power(p, { powerHeld: true }, ticks(POWER_UP_S));
-    expect(p.charge).toBe(1);
-    power(p, { aim: 'far' });
+  it('X with a wave direction strikes the Energy Wave at once, turned to face it and aimed by the stick', () => {
+    const p = createPlayer('home', BASE_STATS, 320, -1);
+    wave(p, { shootHeld: true, aim: 'far' });
     expect(p.state).toBe('unleashing');
-    expect(p.kick).toEqual({ kind: 'wave', aim: 'far', active: true, charge: 1, overchargeS: 0 });
-    power(p, {}, ticks(1));
-    expect(p.state).toBe('ground');
-    expect(p.kick).toBeNull();
-  });
-
-  it('letting go early drops back to ground with no kick', () => {
-    const p = harrison();
-    power(p, { powerHeld: true }, ticks(0.6));
-    expect(p.state).toBe('poweringUp');
-    power(p, {});
-    expect(p.state).toBe('ground');
-    expect(p.kick).toBeNull();
-    expect(p.charge).toBe(0);
-  });
-
-  it('holding past full keeps it ready until let go', () => {
-    const p = harrison();
-    power(p, { powerHeld: true }, ticks(3));
-    expect(p.state).toBe('poweringUp');
-    expect(p.charge).toBe(1);
-    power(p, {});
-    expect(p.state).toBe('unleashing');
-  });
-
-  it('he keeps facing the way he started while powering up', () => {
-    const p = harrison();
-    power(p, { powerHeld: true }, ticks(0.2));
-    power(p, { powerHeld: true, moveX: -1 }, ticks(0.2));
     expect(p.facing).toBe(1);
+    expect(p.kick).toEqual({ kind: 'wave', aim: 'far', active: true, charge: 1, overchargeS: 0 });
+    wave(p, {}, ticks(1));
+    expect(p.state).toBe('ground');
+    expect(p.kick).toBeNull();
   });
 
-  it('a tackle cancels the power-up', () => {
+  it('without a wave direction, X is a normal shot', () => {
     const p = harrison();
-    power(p, { powerHeld: true }, ticks(0.5));
-    expect(p.state).toBe('poweringUp');
-    knockDown(p);
-    expect(p.state).toBe('fallen');
-    expect(p.charge).toBe(0);
+    wave(p, { shootHeld: true }, 1, null);
+    expect(p.state).toBe('charging');
   });
 
-  it('cancelCharge drops a power-up', () => {
+  it('a power press arms while Y is held, and letting go disarms it', () => {
     const p = harrison();
-    power(p, { powerHeld: true }, ticks(POWER_UP_S + 0.5));
-    expect(p.state).toBe('poweringUp');
+    wave(p, { powerHeld: true }, 3, null);
+    expect(p.powerArmed).toBe(true);
+    wave(p, {}, 1, null);
+    expect(p.powerArmed).toBe(false);
+    wave(p, { powerHeld: true }, 1, null);
+    expect(p.powerArmed).toBe(true);
+  });
+
+  it('Y still held gives no fresh press: once disarmed, it stays disarmed', () => {
+    const p = harrison();
+    wave(p, { powerHeld: true }, 1, null);
+    p.powerArmed = false;
+    wave(p, { powerHeld: true }, 10, null);
+    expect(p.powerArmed).toBe(false);
+  });
+
+  it('pausing (cancelCharge) drops a waiting press', () => {
+    const p = harrison();
+    wave(p, { powerHeld: true }, 3, null);
     cancelCharge(p);
-    expect(p.state).toBe('ground');
-    expect(p.charge).toBe(0);
-  });
-
-  it('a press held until a power-up is allowed starts it the moment it is', () => {
-    const p = harrison();
-    power(p, { powerHeld: true }, 10, false);
-    expect(p.state).toBe('ground');
-    power(p, { powerHeld: true }, 1, true);
-    expect(p.state).toBe('poweringUp');
-  });
-
-  it('pausing (cancelCharge) drops a waiting press, so a held Y needs a fresh press on resume', () => {
-    const p = harrison();
-    power(p, { powerHeld: true }, 5, false);
-    cancelCharge(p);
-    power(p, { powerHeld: true }, 5, true);
-    expect(p.state).toBe('ground');
-  });
-
-  it('a press let go before it was allowed does not start one later', () => {
-    const p = harrison();
-    power(p, { powerHeld: true }, 5, false);
-    power(p, {}, 1, false);
-    power(p, {}, 5, true);
-    expect(p.state).toBe('ground');
-  });
-
-  it('Y still held after a cancel needs a fresh press', () => {
-    const p = harrison();
-    power(p, { powerHeld: true }, ticks(0.5));
-    cancelCharge(p);
-    for (let k = 0; k < 10; k++) {
-      power(p, { powerHeld: true });
-      expect(p.state, `tick ${k}`).toBe('ground');
-    }
-    power(p, {});
-    power(p, { powerHeld: true });
-    expect(p.state).toBe('poweringUp');
+    wave(p, { powerHeld: true }, 3, null);
+    expect(p.powerArmed).toBe(false);
   });
 });
 

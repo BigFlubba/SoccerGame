@@ -31,7 +31,7 @@ describe('help', () => {
 
   it('the power moves page explains buying, filling, holding and Max', () => {
     const page = HELP_PAGES[3]!.lines.join(' ');
-    for (const phrase of ['BUY THE ENERGY WAVE IN THE SHOP', 'POWER METER', 'HOLD Y OR V', 'LET GO TO UNLEASH', 'BRACE', 'TACKLES']) expect(page).toContain(phrase);
+    for (const phrase of ['BUY THE ENERGY WAVE IN THE SHOP', 'POWER METER', 'PRESS Y OR V', 'SHOOT WITH X', 'BRACE', 'TAKES THE BALL']) expect(page).toContain(phrase);
   });
 
   it('every help line fits the screen and uses only font characters', () => {

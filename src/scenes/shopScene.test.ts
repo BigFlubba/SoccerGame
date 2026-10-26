@@ -150,7 +150,7 @@ describe('shop: power moves', () => {
     expect(ctx.profile.coins).toBe(50);
     expect(ctx.profile.powerMoves).toEqual({ owned: ['energyWave'], equipped: 'energyWave' });
     expect(ctx.audio.played).toContain('buy');
-    expect(s.message).toBe('HOLD Y WITH A FULL POWER METER');
+    expect(s.message).toBe('PRESS Y, THEN SHOOT WITH X');
   });
 
   it('A on an owned Energy Wave buys nothing and reminds him how to use it', () => {
@@ -160,7 +160,7 @@ describe('shop: power moves', () => {
     s.update(frame(['confirm']), STEP);
     expect(ctx.savedProfiles).toHaveLength(1);
     expect(ctx.audio.played.at(-1)).toBe('nope');
-    expect(s.message).toBe('HOLD Y WITH A FULL POWER METER');
+    expect(s.message).toBe('PRESS Y, THEN SHOOT WITH X');
   });
 
   it('the Shop turns the crowd off', () => {
@@ -175,6 +175,6 @@ describe('shop messages', () => {
   it('what went wrong is red; how to use the move is not', () => {
     expect(messageInk('NEED 150 MORE')).toBe('redLight');
     expect(messageInk('REACH LEVEL 3')).toBe('redLight');
-    expect(messageInk('HOLD Y WITH A FULL POWER METER')).toBe('volt');
+    expect(messageInk('PRESS Y, THEN SHOOT WITH X')).toBe('volt');
   });
 });

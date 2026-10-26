@@ -16,7 +16,6 @@ import {
   auraStrength,
   drawAura,
   drawBeam,
-  drawDebris,
   drawPowerBar,
   drawPowerMeter,
   drawSkid,
@@ -80,7 +79,7 @@ const CELEBRATE_HOP_PX = 2;
 /** Blinks per second for the overcharge flash. */
 const BLINK_HZ = 8;
 const ARROW_Y = 16;
-/** LET GO! sits over his charge bar, flashing between gold and white. */
+/** SHOOT! sits over his power-up bar, flashing between gold and white. */
 const PROMPT_Y = -56;
 const PROMPT_BLINK_HZ = 8;
 /** The arrow is drawn 3 px either side of its x; this keeps a pixel's gap beside the meter. */
@@ -182,8 +181,8 @@ const BEHIND = 1e-3;
 /**
  * Everything standing on the pitch, ready for the depth sort: both players,
  * the ball, and each goal's nets and posts. The nets come first, so at the
- * same depth a post is drawn over its net. While he powers up, his aura and
- * the floating debris go just behind him.
+ * same depth a post is drawn over its net. While he's powered up, his aura
+ * goes just behind him.
  */
 export function pitchDrawables(
   w: World,
@@ -211,7 +210,6 @@ export function pitchDrawables(
             draw: g => {
               const golden = look.set === 'homeGolden';
               drawAura(g, cam, w.home, spriteFrame(w.home, art[look.set], home), golden, look.aura, look.nowS);
-              if (w.home.state === 'poweringUp') drawDebris(g, cam, w.home, look.aura, look.nowS);
             },
           },
         ]
@@ -308,7 +306,7 @@ function drawArrow(g: CanvasRenderingContext2D, w: World, cam: Camera): void {
 /** The bigger of the goal moment's shake and the power shake: they never add up past the goal moment's own. */
 function pitchShake(w: World, hud: MatchHud, nowS: number): { dx: number; dy: number } {
   const goal = hud.moment ? shakeOffset(hud.moment) : { dx: 0, dy: 0 };
-  const power = shakeFor(w.power, w.home, hud, nowS);
+  const power = shakeFor(w.power, hud, nowS);
   const size = (s: { dx: number; dy: number }) => Math.max(Math.abs(s.dx), Math.abs(s.dy));
   return size(power) > size(goal) ? power : goal;
 }
@@ -335,7 +333,7 @@ export function drawMatch(g: CanvasRenderingContext2D, w: World, cam: Camera, ar
   // Decided before this frame uses up an impact frame, so the flash comes on the frame after the last one.
   const flash = takeFlash(hud);
   const home = homeClip(w, moment);
-  const look: HomeLook = { set: homeSprites(w, hud), aura: auraStrength(w, hud), nowS };
+  const look: HomeLook = { set: homeSprites(w, hud), aura: auraStrength(w, hud, nowS), nowS };
   g.save();
   g.translate(shake.dx, shake.dy);
   drawLayers(g, cam, art);
@@ -355,7 +353,7 @@ export function drawMatch(g: CanvasRenderingContext2D, w: World, cam: Camera, ar
   }
   drawChargeBar(g, cam, w.away, nowS);
   drawChargeBar(g, cam, w.home, nowS);
-  drawPowerBar(g, cam, w.home, nowS);
+  drawPowerBar(g, cam, w.home, w.power?.activeS ?? 0);
   g.restore();
   if (flash) {
     g.save();
@@ -370,7 +368,7 @@ export function drawMatch(g: CanvasRenderingContext2D, w: World, cam: Camera, ar
     const at = screen(cam, kicker.x, kicker.y, kicker.z);
     drawText(g, art, 'PERFECT', at.x, at.y - 56, 1, 'energyGold');
   }
-  const prompt = powerPrompt(w.home);
+  const prompt = powerPrompt(w);
   if (prompt) {
     const at = screen(cam, w.home.x, w.home.y, w.home.z);
     drawText(g, art, prompt, at.x, at.y + PROMPT_Y, 1, Math.floor(nowS * PROMPT_BLINK_HZ) % 2 === 0 ? 'energyGold' : 'white');

@@ -19,6 +19,8 @@ export interface PowerState {
   meter: number;
   /** Seconds since the meter last became full. */
   sinceFullS: number;
+  /** Seconds left powered up, when his next kick is the Energy Wave; 0 when he isn't. */
+  activeS: number;
   /** His last kick still in play, so a goal knows whether it was a style goal. */
   lastKind: 'shot' | 'chip' | 'volley' | 'header' | 'wave' | null;
 }
@@ -33,9 +35,11 @@ export const METER_MIN_REFILL_S = 20;
 const REFILL_CAP = 0.99;
 /** The ball must be this far in front of the goal line for a clean line into the mouth. */
 export const WAVE_MIN_DX = 24;
+/** How long a power-up lasts if he doesn't fire it: the parent asked for 2 to 3 s. */
+export const POWERED_S = 2.5;
 
 export function createPower(kit: PowerKit): PowerState {
-  return { golden: kit.golden, meter: 0, sinceFullS: Infinity, lastKind: null };
+  return { golden: kit.golden, meter: 0, sinceFullS: Infinity, lastKind: null, activeS: 0 };
 }
 
 export function addMeter(s: PowerState, e: keyof typeof METER_GAIN): void {
@@ -49,8 +53,15 @@ export function addMeter(s: PowerState, e: keyof typeof METER_GAIN): void {
   }
 }
 
+/** Ends a power-up without firing (the game paused, say). The meter is kept. */
+export function endPower(s: PowerState): void {
+  s.activeS = 0;
+}
+
+/** Time passes: since the meter filled, and off a power-up. */
 export function tickPower(s: PowerState, dt: number): void {
   s.sinceFullS += dt;
+  s.activeS = Math.max(0, s.activeS - dt);
 }
 
 /**
@@ -117,24 +128,35 @@ export function trapAtFeet(p: Player, ball: Ball): void {
 /** The goal Harrison attacks. */
 export const maxGoal = (w: World): Goal => w.field.goals.find(g => g.side === 'right')!;
 
-const facesMaxGoal = (w: World): boolean => w.home.facing === (maxGoal(w).side === 'right' ? 1 : -1);
+/** The way to Max's goal along the pitch: the wave always goes there, so he turns to face it as he strikes. */
+export const maxGoalDir = (w: World): 1 | -1 => (maxGoal(w).side === 'right' ? 1 : -1);
 
-/** Whether a power press now starts a power-up. Facing Max's goal already means the beam can never fly at his own. */
+/** Whether a power press now powers him up: a full meter, in play, on his feet with the ball, not already powered. */
 export function canStartPower(w: World): boolean {
   return (
     w.power !== null &&
     w.power.meter === 1 &&
+    w.power.activeS === 0 &&
     w.match.phase === 'playing' &&
     w.home.state === 'ground' &&
-    facesMaxGoal(w) &&
+    ballInControl(w.home, w.ball)
+  );
+}
+
+/** Whether an X press now fires the Energy Wave: powered up, on his feet with the ball, and a clean line into Max's goal. */
+export function canFireWave(w: World): boolean {
+  return (
+    w.power !== null &&
+    w.power.activeS > 0 &&
+    w.match.phase === 'playing' &&
+    w.home.state === 'ground' &&
     ballInControl(w.home, w.ball) &&
     waveClear(w.ball, maxGoal(w))
   );
 }
 
-/** The HUD's Y button: hidden until the meter is full, dimmed while the ball is at his feet but there's no clean line. */
+/** The HUD's Y button: hidden until the meter is full (and while he's powered up), dimmed while Y can't power him up for want of the ball. */
 export function powerHint(w: World): 'none' | 'lit' | 'dim' {
-  if (!w.power || w.power.meter < 1) return 'none';
-  if (ballInControl(w.home, w.ball) && (!facesMaxGoal(w) || !waveClear(w.ball, maxGoal(w)))) return 'dim';
-  return 'lit';
+  if (!w.power || w.power.meter < 1 || w.power.activeS > 0) return 'none';
+  return w.home.state === 'ground' && ballInControl(w.home, w.ball) ? 'lit' : 'dim';
 }

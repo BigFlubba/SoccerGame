@@ -556,34 +556,32 @@ describe('match scene: the Energy Wave', () => {
     return { s, ctx };
   }
 
-  /** Holds power through a full charge, then lets go. */
+  /** Powers up with Y, then fires with X. */
   function fire(s: MatchScene): void {
     s.update(frame(['power']), STEP);
-    run(s, 1.1, ['power']);
     s.update(frame(), STEP);
+    s.update(frame(['shoot']), STEP);
   }
 
   it('without the move, the world has no power', () => {
     expect(createMatchScene(testContext(), 1).world.power).toBeNull();
   });
 
-  it('with the move owned, holding power with a full meter powers up', () => {
+  it('with the move owned, Y with a full meter powers him up at once', () => {
     const { s } = ready();
     s.update(frame(['power']), STEP);
-    run(s, 0.3, ['power']);
-    expect(s.world.home.state).toBe('poweringUp');
+    expect(s.world.power?.activeS).toBeGreaterThan(0);
   });
 
-  it('pausing mid power-up cancels it and keeps the meter; on resume, a held Y needs a fresh press', () => {
+  it('pausing while powered up ends it and keeps the meter; on resume, a held Y needs a fresh press', () => {
     const { s } = ready();
     s.update(frame(['power']), STEP);
-    run(s, 1.2, ['power']);
+    run(s, 0.3, ['power']);
     s.update(frame(['pause'], ['power']), STEP);
-    expect(s.world.home.state).toBe('ground');
-    expect(s.world.power?.meter).toBe(1);
+    expect(s.world.power).toMatchObject({ activeS: 0, meter: 1 });
     s.update(frame(['confirm'], ['power']), STEP);
     run(s, 0.3, ['power']);
-    expect(s.world.home.state).toBe('ground');
+    expect(s.world.power?.activeS).toBe(0);
     expect(s.world.wave).toBeNull();
   });
 
@@ -592,7 +590,7 @@ describe('match scene: the Energy Wave', () => {
     fire(s);
     expect(s.world.wave).not.toBeNull();
     expect(ctx.audio.played).toEqual(expect.arrayContaining(['powerUp', 'waveBlast', 'beam']));
-    expect(ctx.rumble.pulses).toEqual(expect.arrayContaining(['charge1', 'charge2', 'charge3', 'wave']));
+    expect(ctx.rumble.pulses).toEqual(expect.arrayContaining(['powerOn', 'wave']));
     expect(s.flash).toBe(true);
   });
 

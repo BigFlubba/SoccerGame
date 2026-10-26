@@ -4,7 +4,7 @@ import { BALL_R } from '../art/ball';
 import { POST_R } from './constants';
 import { BACKYARD } from './field';
 import { POST_INSET } from './kick';
-import { METER_MIN_REFILL_S, TOUCH_CEILING, WAVE_MIN_DX, addMeter, canStartPower, createPower, onTarget, powerHint, tickPower, waveTarget, type PowerState } from './power';
+import { METER_MIN_REFILL_S, POWERED_S, TOUCH_CEILING, WAVE_MIN_DX, addMeter, canFireWave, canStartPower, createPower, onTarget, powerHint, tickPower, waveTarget, type PowerState } from './power';
 import { BASE_STATS } from './stats';
 import { createWorld, type World } from './world';
 
@@ -129,23 +129,52 @@ const faceOwnGoal = (w: World) => {
 };
 
 describe('starting a power-up', () => {
-  it('can start when every condition holds', () => {
+  it('can start when every condition holds, facing either way', () => {
     expect(canStartPower(ready().w)).toBe(true);
+    const away = ready().w;
+    faceOwnGoal(away);
+    expect(canStartPower(away)).toBe(true);
   });
 
   it.each<[string, (w: World, power: PowerState) => void]>([
     ['without the move', w => (w.power = null)],
     ['with the meter short of full', (_, power) => (power.meter = 0.99)],
+    ['already powered up', (_, power) => (power.activeS = 1)],
     ['outside play', w => (w.match.phase = 'goal')],
     ['in the air', w => (w.home.state = 'air')],
     ['charging a shot', w => (w.home.state = 'charging')],
-    ['facing his own goal', faceOwnGoal],
     ['without the ball', w => (w.ball.x = w.home.x + 60)],
-    ['beside the goal line', w => ((w.home.x = MAX_GOAL.lineX - 12), (w.ball.x = MAX_GOAL.lineX - 4))],
   ])('canStartPower needs every condition: not %s', (_, spoil) => {
     const { w, power } = ready();
     spoil(w, power);
     expect(canStartPower(w)).toBe(false);
+  });
+});
+
+describe('firing the wave', () => {
+  const powered = (x = 400) => {
+    const r = ready(x);
+    r.power.activeS = 1;
+    return r;
+  };
+
+  it('X fires it while powered up with the ball, facing either way', () => {
+    expect(canFireWave(powered().w)).toBe(true);
+    const away = powered().w;
+    faceOwnGoal(away);
+    expect(canFireWave(away)).toBe(true);
+  });
+
+  it.each<[string, (w: World, power: PowerState) => void]>([
+    ['not powered up', (_, power) => (power.activeS = 0)],
+    ['without the ball', w => (w.ball.x = w.home.x + 60)],
+    ['in the air', w => (w.home.state = 'air')],
+    ['outside play', w => (w.match.phase = 'goal')],
+    ['beside the goal line', w => ((w.home.x = MAX_GOAL.lineX - 12), (w.ball.x = MAX_GOAL.lineX - 4))],
+  ])('canFireWave needs every condition: not %s', (_, spoil) => {
+    const { w, power } = powered();
+    spoil(w, power);
+    expect(canFireWave(w)).toBe(false);
   });
 });
 
@@ -164,20 +193,32 @@ describe('a dribbled ball', () => {
 });
 
 describe('powerHint', () => {
-  it('powerHint is dim with the ball at his feet beside the goal line, lit in open play, none when not full', () => {
+  it('lit when Y would power him up, dim without the ball, none when not full or already powered', () => {
     expect(powerHint(ready().w)).toBe('lit');
-    expect(powerHint(ready(MAX_GOAL.lineX - 12).w)).toBe('dim');
-    const away = ready().w;
-    faceOwnGoal(away);
-    expect(powerHint(away)).toBe('dim');
     const loose = ready().w;
     loose.ball.x += 60;
-    expect(powerHint(loose)).toBe('lit');
+    expect(powerHint(loose)).toBe('dim');
     const short = ready();
     short.power.meter = 0.5;
     expect(powerHint(short.w)).toBe('none');
+    const on = ready();
+    on.power.activeS = 1;
+    expect(powerHint(on.w)).toBe('none');
     const without = ready().w;
     without.power = null;
     expect(powerHint(without)).toBe('none');
+  });
+});
+
+describe('the power-up timer', () => {
+  it('runs down with the ticks and stops at 0', () => {
+    const s = plain();
+    s.activeS = POWERED_S;
+    tickPower(s, POWERED_S - 0.5);
+    expect(s.activeS).toBeCloseTo(0.5);
+    tickPower(s, 1);
+    expect(s.activeS).toBe(0);
+    expect(POWERED_S).toBeGreaterThanOrEqual(2);
+    expect(POWERED_S).toBeLessThanOrEqual(3);
   });
 });

@@ -1,13 +1,13 @@
 import { describe, expect, it } from 'vitest';
 import { seeded } from '../engine/random';
-import { DIFFICULTY, SLIDE_RANGE, createBrain, think, type AiBrain, type AiProfile } from './ai';
+import { DIFFICULTY, createBrain, think, type AiBrain, type AiProfile } from './ai';
 import { BALL_REST_Y } from './ball';
 import { inGoalBox } from './field';
 import { NO_INTENT, PLAYER_R, type Player, type PlayerIntent } from './player';
 import type { Aim } from './kick';
-import { METER_MIN_REFILL_S, canStartPower, maxGoal, waveTarget } from './power';
+import { METER_MIN_REFILL_S, canStartPower } from './power';
 import { BASE_STATS, STAT_NAMES, type StatName, type Stats } from './stats';
-import { BRACE_DISTANCE, WAVE_HALF_WIDTH } from './wave';
+import { BRACE_DISTANCE } from './wave';
 import { createWorld, stepWorld, type World } from './world';
 
 const STEP = 1 / 60;
@@ -109,9 +109,8 @@ describe('think', () => {
   });
 
   it('difficulty profiles match the plan', () => {
-    expect(DIFFICULTY.easy).toEqual({ reactionS: 0.32, aimErrorDeg: 10, aggression: 0.3, shootRange: 150, rushDelayS: 0.3, rushSprint: false, rushPace: 0.75 });
-    expect(DIFFICULTY.normal).toMatchObject({ rushDelayS: 0.1, rushSprint: false, rushPace: 1 });
-    expect(DIFFICULTY.hard).toEqual({ reactionS: 0.1, aimErrorDeg: 3, aggression: 0.8, shootRange: 210, rushDelayS: 0, rushSprint: true, rushPace: 1 });
+    expect(DIFFICULTY.easy).toEqual({ reactionS: 0.32, aimErrorDeg: 10, aggression: 0.3, shootRange: 150 });
+    expect(DIFFICULTY.hard).toEqual({ reactionS: 0.1, aimErrorDeg: 3, aggression: 0.8, shootRange: 210 });
   });
 
   it('a whole simulated match between two AIs finishes with a result and no exceptions', () => {
@@ -297,37 +296,38 @@ describe('think', () => {
   }
 
   /**
-   * Test-only Harrison who uses his power move a lot. He plays as the AI,
-   * and whenever a power-up can start he holds it (his own seeded generator
-   * picks how long). Half the time it plays out as it would: held 0.2 to
-   * 2 s, so it's let go early, tackled, or fired. The other half are staged
-   * at random ranges, since Max rarely stands far off while Harrison has the
-   * ball: Max is put 20 to 260 px down the lane facing him, the charge
-   * completes at once, and it's held 0 to 0.6 s more. The meter is refilled
-   * whenever no wave is live, to force many waves.
+   * Test-only Harrison who uses his power move a lot. He plays as the AI;
+   * whenever a power-up can start he presses Y, then shoots with X after
+   * 0 to 3 s (his own seeded generator picks), so some run out, some are
+   * ended by Max, and the rest fire at whatever range they find. Half are
+   * staged at random ranges, since Max rarely stands far off while
+   * Harrison has the ball: Max is put 20 to 260 px down the lane facing
+   * him, and X comes at once. The meter is refilled whenever no wave is
+   * live, to force many waves.
    */
   function powerBot(brain: AiBrain, seed: number): (w: World) => PlayerIntent {
     const rng = seeded(seed * 7 + 1);
-    let holdS = 0;
-    let staged = false;
+    let shootInS = -1;
+    let lastShoot = false;
     return w => {
       const intent = think(brain, w, w.home, w.away, STEP);
       if (w.power && !w.wave?.live) w.power.meter = 1;
-      if (holdS > 0) {
-        if (staged && w.home.state === 'poweringUp') w.home.charge = 1;
-        holdS -= STEP;
-        return { ...NO_INTENT, aim: intent.aim, powerHeld: holdS > 0 };
+      if (w.power && w.power.activeS > 0 && shootInS >= 0) {
+        shootInS -= STEP;
+        const shoot = shootInS <= 0 && !lastShoot;
+        lastShoot = shoot;
+        return { ...intent, shootHeld: shoot };
       }
+      lastShoot = false;
       if (!canStartPower(w) || w.home.held.power) return intent;
-      staged = rng() < 0.5;
-      if (staged) {
+      if (rng() < 0.5) {
         const x = Math.min(w.ball.x + 20 + rng() * 240, w.field.fenceR - PLAYER_R);
         Object.assign(w.away, { x, z: w.ball.z + (rng() - 0.5) * 20, facing: -1, vx: 0, vz: 0 });
-        holdS = STEP + rng() * 0.6;
+        shootInS = 2 * STEP;
       } else {
-        holdS = 0.2 + rng() * 1.8;
+        shootInS = rng() * 3;
       }
-      return { ...NO_INTENT, aim: intent.aim, powerHeld: true };
+      return { ...intent, shootHeld: false, powerHeld: true };
     };
   }
 
@@ -442,140 +442,48 @@ describe('think', () => {
   });
 });
 
-describe('Max and the power-up', () => {
-  const hold: PlayerIntent = { ...NO_INTENT, powerHeld: true };
-
-  /** Harrison on the ball at x 200 with a full meter, about to power up; Max placed by hand. */
-  function standoff(max: { x: number; z?: number }, profile: AiProfile = DIFFICULTY.normal): { w: World; brain: AiBrain } {
-    const w = createWorld(BASE_STATS, BASE_STATS, 5, { home: 0, away: profile.aimErrorDeg }, { golden: false });
-    w.match.phase = 'playing';
-    w.power!.meter = 1;
-    Object.assign(w.home, { x: 200, z: 32, facing: 1 });
-    Object.assign(w.ball, { x: 208, y: BALL_REST_Y, z: 32, vx: 0, vy: 0, vz: 0 });
-    Object.assign(w.away, { x: max.x, z: max.z ?? 32, facing: -1 });
-    return { w, brain: createBrain(profile) };
-  }
-
-  const step = (w: World, brain: AiBrain, home: PlayerIntent = hold) => stepWorld(w, home, think(brain, w, w.away, w.home, STEP), STEP);
-  const laneZ = (w: World, x: number, aim: Aim) => {
-    const goal = maxGoal(w);
-    return w.ball.z + ((waveTarget(goal, aim, w.ball) - w.ball.z) * (x - w.ball.x)) / (goal.lineX - w.ball.x);
-  };
-
-  it('when Harrison powers up far away, Max steps into the lane and runs at him', () => {
-    const { w, brain } = standoff({ x: 450, z: 12 });
-    const far = { ...hold, aim: 'far' as Aim };
-    for (let i = 0; i < 30; i++) step(w, brain, far);
-    expect(w.home.state).toBe('poweringUp');
-    expect(w.away.x).toBeLessThan(420);
-    expect(Math.abs(w.away.z - laneZ(w, w.away.x, 'far'))).toBeLessThanOrEqual(WAVE_HALF_WIDTH);
-    expect(w.away.facing).toBe(-1);
-  });
-
-  it('when Harrison powers up close, Max slides in', () => {
-    const { w, brain } = standoff({ x: 230 });
-    let slid = false;
-    for (let i = 0; i < 40; i++) {
-      step(w, brain);
-      slid ||= w.away.state === 'sliding';
-    }
-    expect(slid).toBe(true);
-    expect(w.home.state).not.toBe('poweringUp');
-  });
-
-  /** Seconds from the press until Max rushes, and until he's inside the bracing distance of the ball. */
-  function closeIn(profile: AiProfile): { rushS: number; inRangeS: number } {
-    const { w, brain } = standoff({ x: 400 }, profile);
-    let rushS = Infinity;
-    for (let i = 1; i < 300; i++) {
-      step(w, brain);
-      if (brain.plan === 'rush') rushS = Math.min(rushS, i * STEP);
-      if (w.away.x - w.ball.x < BRACE_DISTANCE + PLAYER_R) return { rushS, inRangeS: i * STEP };
-    }
-    return { rushS, inRangeS: Infinity };
-  }
-
-  it('Easy Max starts later than Hard Max', () => {
-    const [easy, normal, hard] = [closeIn(DIFFICULTY.easy), closeIn(DIFFICULTY.normal), closeIn(DIFFICULTY.hard)];
-    expect(easy.rushS).toBeGreaterThan(normal.rushS);
-    expect(normal.rushS).toBeGreaterThan(hard.rushS);
-    // Easy jogs in; Normal runs; Hard sprints.
-    expect(easy.inRangeS).toBeGreaterThan(normal.inRangeS);
-  });
-
+describe('Max and the Energy Wave', () => {
   /**
-   * Seconds between Max coming inside the bracing distance and his tackle
-   * ending a held, full power-up: the window to let go and blow him away.
+   * Max's AI in the loop: Harrison with the ball and a full meter, Max
+   * `gap` px down the lane facing him. Harrison presses Y, then X a few
+   * ticks later. What stopped the wave, or didn't.
    */
-  function releaseWindow(profile: AiProfile, startX: number): number {
-    const { w, brain } = standoff({ x: startX }, profile);
-    let inRange: number | null = null;
-    for (let i = 1; i < 600; i++) {
-      step(w, brain);
-      if (inRange === null && w.away.x - w.ball.x < BRACE_DISTANCE + PLAYER_R) inRange = i * STEP;
-      if (w.home.state !== 'poweringUp') return inRange === null ? 0 : i * STEP - inRange;
-    }
-    return Infinity;
-  }
-
-  it('the release window on Normal is about half a second', () => {
-    for (const startX of [400, 500]) {
-      const window = releaseWindow(DIFFICULTY.normal, startX);
-      expect(window, `from ${startX}`).toBeGreaterThanOrEqual(0.35);
-      expect(window, `from ${startX}`).toBeLessThanOrEqual(0.65);
-    }
-  });
-
-  it("Easy's window is wider than Normal's, and Hard's tighter", () => {
-    const [easy, normal, hard] = [DIFFICULTY.easy, DIFFICULTY.normal, DIFFICULTY.hard].map(p => releaseWindow(p, 450));
-    expect(easy).toBeGreaterThan(normal + 0.1);
-    expect(hard).toBeLessThan(normal - 0.05);
-  });
-
-  it('Max never plants and waits while Harrison holds a full charge', () => {
-    const { w, brain } = standoff({ x: 500 });
-    let minSpeed = Infinity;
-    for (let i = 0; i < 120; i++) {
-      step(w, brain);
-      if (i > 30 && w.home.state === 'poweringUp') minSpeed = Math.min(minSpeed, Math.abs(w.away.vx));
-    }
-    expect(minSpeed).toBeGreaterThan(50);
-  });
-
-  /**
-   * Max's AI in the loop: Harrison powers up with Max coming from the far
-   * end, and lets go once the charge is full and Max is nearer than `gap`
-   * (never, for null). What stopped it, or didn't.
-   */
-  function standoffOutcome(profile: AiProfile, gap: number | null): 'braced' | 'blown' | 'tackled' | 'none' {
+  function outcome(profile: AiProfile, gap: number): 'braced' | 'blown' | 'none' {
     const w = createWorld(BASE_STATS, BASE_STATS, 9, { home: 0, away: profile.aimErrorDeg }, { golden: false });
     w.match.phase = 'playing';
     w.power!.meter = 1;
     Object.assign(w.home, { x: 60, z: 32, facing: 1 });
     Object.assign(w.ball, { x: 68, y: BALL_REST_Y, z: 32, vx: 0, vy: 0, vz: 0 });
-    Object.assign(w.away, { x: 600, z: 32, facing: -1 });
+    Object.assign(w.away, { x: 68 + gap, z: 32, facing: -1 });
     const brain = createBrain(profile);
-    let holding = true;
-    for (let i = 0; i < 60 * 8; i++) {
-      if (holding && gap !== null && w.home.charge >= 1 && w.away.x - w.ball.x < gap) holding = false;
-      stepWorld(w, { ...NO_INTENT, powerHeld: holding }, think(brain, w, w.away, w.home, STEP), STEP);
+    const script: PlayerIntent[] = [{ ...NO_INTENT, powerHeld: true }, NO_INTENT, { ...NO_INTENT, shootHeld: true }];
+    for (let i = 0; i < 60 * 3; i++) {
+      stepWorld(w, script[i] ?? NO_INTENT, think(brain, w, w.away, w.home, STEP), STEP);
       if (w.events.power.braced) return 'braced';
       if (w.events.power.blown) return 'blown';
-      if (w.events.power.cancelled) return 'tackled';
     }
     return 'none';
   }
 
-  it.each(['easy', 'normal', 'hard'] as const)('on %s, firing at once into a far, square Max is braced', difficulty => {
-    for (const gap of [150, 250, 350]) expect(standoffOutcome(DIFFICULTY[difficulty], gap), `gap ${gap}`).toBe('braced');
+  it.each(['easy', 'normal', 'hard'] as const)('on %s, a wave fired into a far, square Max is braced', difficulty => {
+    for (const gap of [150, 250, 350]) expect(outcome(DIFFICULTY[difficulty], gap), `gap ${gap}`).toBe('braced');
   });
 
-  it.each(['easy', 'normal', 'hard'] as const)('on %s, firing as Max closes inside the bracing distance blows him away', difficulty => {
-    expect(standoffOutcome(DIFFICULTY[difficulty], BRACE_DISTANCE - 10)).toBe('blown');
+  it.each(['easy', 'normal', 'hard'] as const)('on %s, a wave fired at a Max inside the bracing distance blows him away', difficulty => {
+    for (const gap of [30, BRACE_DISTANCE - 10]) expect(outcome(DIFFICULTY[difficulty], gap), `gap ${gap}`).toBe('blown');
   });
 
-  it.each(['easy', 'normal', 'hard'] as const)('on %s, holding on too long gets him tackled', difficulty => {
-    expect(standoffOutcome(DIFFICULTY[difficulty], null)).toBe('tackled');
+  it('Max plays as usual while Harrison is powered up: he comes to defend', () => {
+    const w = createWorld(BASE_STATS, BASE_STATS, 9, { home: 0, away: 6 }, { golden: false });
+    w.match.phase = 'playing';
+    w.power!.meter = 1;
+    Object.assign(w.home, { x: 200, z: 32, facing: 1 });
+    Object.assign(w.ball, { x: 208, y: BALL_REST_Y, z: 32, vx: 0, vy: 0, vz: 0 });
+    Object.assign(w.away, { x: 400, z: 32, facing: -1 });
+    const brain = createBrain(DIFFICULTY.normal);
+    stepWorld(w, { ...NO_INTENT, powerHeld: true }, think(brain, w, w.away, w.home, STEP), STEP);
+    for (let i = 0; i < 60; i++) stepWorld(w, NO_INTENT, think(brain, w, w.away, w.home, STEP), STEP);
+    expect(w.away.x).toBeLessThan(330);
+    expect(brain.plan).toBe('defend');
   });
 });
-

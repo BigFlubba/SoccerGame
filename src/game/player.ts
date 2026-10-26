@@ -39,7 +39,6 @@ export type PlayerState =
   | 'chipping'
   | 'sliding'
   | 'fallen'
-  | 'poweringUp'
   | 'unleashing'
   | 'bracing'
   | 'blown';
@@ -79,9 +78,9 @@ export interface Player {
   /** Last tick's held buttons, so a press is only seen on its first tick. */
   held: { shoot: boolean; chip: boolean; power: boolean };
   /**
-   * A power press waiting, while Y stays held, for a power-up to be allowed
-   * (the ball reaching his feet, say). Starting one, or letting go, uses it
-   * up, so Y still held after a cancel needs a fresh press.
+   * A power press waiting, while Y stays held, for the world to power him
+   * up (the ball reaching him, say). Powering up, or letting go, uses it
+   * up, so Y still held afterwards needs a fresh press.
    */
   powerArmed: boolean;
   slideCooldown: number;
@@ -122,8 +121,6 @@ const IDLE_SPEED = 5;
 const JUMP_RISE_FRAME = 1;
 const JUMP_FALL_FRAME = 2;
 
-/** Seconds of powering up before the Energy Wave is ready. */
-export const POWER_UP_S = 1;
 /** A braced player is shoved back at this speed, easing to a stop over BRACE_S. */
 export const BRACE_SKID_SPEED = 100;
 export const BRACE_S = 0.5;
@@ -185,7 +182,7 @@ function approach2(p: Player, tx: number, tz: number, dt: number, accel: number,
 
 /** Striking the ball: charging a shot or chip, or in the air. Up/down aims instead of moving him. */
 export function isStriking(p: Player): boolean {
-  return p.state === 'charging' || (p.state === 'chipping' && !p.kick) || p.state === 'air' || p.state === 'poweringUp';
+  return p.state === 'charging' || (p.state === 'chipping' && !p.kick) || p.state === 'air';
 }
 
 /** How long a kick's strike clip runs after release, and how long it can connect. */
@@ -262,10 +259,10 @@ export function blowAway(p: Player, dirX: number, dirZ: number): void {
   p.vy = BLOWN_VY;
 }
 
-/** Drops a shot, chip or power-up that is still charging, without kicking (used when the game pauses). */
+/** Drops a shot or chip that is still charging, and a waiting power press, without kicking (used when the game pauses). */
 export function cancelCharge(p: Player): void {
   p.powerArmed = false;
-  const charging = p.state === 'charging' || (p.state === 'chipping' && !p.kick) || p.state === 'poweringUp';
+  const charging = p.state === 'charging' || (p.state === 'chipping' && !p.kick);
   if (!charging) return;
   enter(p, 'ground');
   p.charge = 0;
@@ -300,10 +297,6 @@ function chooseAnim(p: Player, sprinting: boolean): { name: AnimName; frame: num
     }
     case 'fallen':
       return { name: 'fall', frame: Math.min(CLIPS.fall.frameCount - 1, Math.floor((t / FALL_TIME) * CLIPS.fall.frameCount)) };
-    case 'poweringUp': {
-      const time = p.anim.name === 'powerUp' ? p.animT : 0;
-      return { name: 'powerUp', frame: Math.floor(time * CLIPS.powerUp.fps) % CLIPS.powerUp.frameCount };
-    }
     case 'unleashing':
       return { name: 'shoot', frame: clipFrame('shoot', SHOOT_STRIKE_FRAME, t) };
     case 'bracing':
@@ -341,8 +334,12 @@ function dropWallSpeed(p: Player, intent: PlayerIntent, field: Field): void {
   if (p.z >= field.depth - PLAYER_R && p.vz > 0 && intent.moveZ <= 0) p.vz = 0;
 }
 
-/** `powerOk`: the world's say-so that a power press may start a power-up now (a full meter, the ball, a clear line). */
-export function stepPlayer(p: Player, intent: PlayerIntent, dt: number, field: Field, ballAtFeet: boolean, powerOk = false): void {
+/**
+ * `waveDir`: while he's powered up with the ball and a clear line, the way
+ * to Max's goal; an X press then strikes the Energy Wave, turning him to
+ * face it. Null otherwise, when X is a normal shot.
+ */
+export function stepPlayer(p: Player, intent: PlayerIntent, dt: number, field: Field, ballAtFeet: boolean, waveDir: 1 | -1 | null = null): void {
   const shootPressed = intent.shootHeld && !p.held.shoot;
   const chipPressed = intent.chipHeld && !p.held.chip;
   if (intent.powerHeld && !p.held.power) p.powerArmed = true;
@@ -354,13 +351,10 @@ export function stepPlayer(p: Player, intent: PlayerIntent, dt: number, field: F
   p.touchCooldown = Math.max(0, p.touchCooldown - dt);
 
   if (p.state === 'ground') {
-    if (p.powerArmed && powerOk) {
-      // He plants in the power-up stance.
-      p.powerArmed = false;
-      enter(p, 'poweringUp');
-      p.charge = 0;
-      p.vx = 0;
-      p.vz = 0;
+    if (shootPressed && waveDir !== null) {
+      p.facing = waveDir;
+      p.kick = { kind: 'wave', aim: intent.aim, active: true, charge: 1, overchargeS: 0 };
+      enter(p, 'unleashing');
     } else if (intent.jump) {
       enter(p, 'air');
       p.vy = jumpVelocity(p.stats);
@@ -445,20 +439,6 @@ export function stepPlayer(p: Player, intent: PlayerIntent, dt: number, field: F
       if (p.y > 0 || p.vy > 0) fall(p, dt);
       if (p.y <= 0) [p.y, p.vy] = [0, 0];
       if (p.stateT >= FALL_TIME) enter(p, 'ground');
-      break;
-    case 'poweringUp':
-      if (!intent.powerHeld) {
-        if (p.charge >= 1) {
-          p.kick = { kind: 'wave', aim: intent.aim, active: true, charge: 1, overchargeS: 0 };
-          enter(p, 'unleashing');
-        } else {
-          enter(p, 'ground');
-        }
-        p.charge = 0;
-      } else {
-        p.charge = Math.min(1, p.charge + dt / POWER_UP_S);
-        approach2(p, 0, 0, dt, ACCEL, DECEL);
-      }
       break;
     case 'unleashing':
       // The world fires the wave as he enters this state (and clears kick.active); he just follows through.

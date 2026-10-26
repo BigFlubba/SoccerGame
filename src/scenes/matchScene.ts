@@ -5,6 +5,7 @@ import { DIFFICULTY, createBrain, think, type Difficulty } from '../game/ai';
 import { updateCamera, type Camera } from '../game/camera';
 import { HUMAN_AIM_ERROR_DEG, type Aim } from '../game/kick';
 import { cancelCharge, type PlayerIntent } from '../game/player';
+import { endPower } from '../game/power';
 import { endGoalPause } from '../game/match';
 import { createWorld, stepWorld, type World } from '../game/world';
 import { powerKit } from '../meta/catalog';
@@ -118,8 +119,9 @@ export function createMatchScene(ctx: GameContext, seed: number): MatchScene {
   };
   const openPause = () => {
     pause = { items: PAUSE_ITEMS, index: 0 };
-    // A held charge is dropped, not fired, so pausing can't shoot.
+    // A held charge is dropped, not fired, so pausing can't shoot; a power-up ends, keeping the meter.
     cancelCharge(world.home);
+    if (world.power) endPower(world.power);
     ctx.audio.setCrowd('low');
   };
   const restart = () => createMatchScene(ctx, seed + 1);
@@ -198,9 +200,8 @@ export function createMatchScene(ctx: GameContext, seed: number): MatchScene {
       const simDt = dt * (moment ? simScale(moment) : 1);
       if (simDt > 0) {
         const prevPhase = world.match.phase;
-        const prevCharge = world.home.charge;
         stepWorld(world, harrisonIntent(input), think(brain, world, world.away, world.home, simDt), simDt);
-        const feedback = matchFeedback(world, prevPhase, prevCharge);
+        const feedback = matchFeedback(world, prevPhase);
         for (const cue of feedback.cues) ctx.audio.play(cue);
         for (const kind of feedback.rumble) ctx.rumble.pulse(kind);
         world.events.kicks.forEach((k, i) => {

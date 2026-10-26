@@ -114,17 +114,7 @@ describe('matchFeedback: the power-up', () => {
   };
 
   it('starting a power-up hums, gasps and rumbles', () => {
-    expect(matchFeedback(powered({ started: true }), 'playing')).toEqual({ cues: ['powerUp', 'ooh'], rumble: ['charge1'] });
-  });
-
-  it('the charge rumble steps up at a third and two thirds', () => {
-    const w = powered({});
-    Object.assign(w.home, { state: 'poweringUp', charge: 0.34 });
-    expect(matchFeedback(w, 'playing', 0.32).rumble).toEqual(['charge2']);
-    Object.assign(w.home, { charge: 0.67 });
-    expect(matchFeedback(w, 'playing', 0.66).rumble).toEqual(['charge3']);
-    Object.assign(w.home, { charge: 0.5 });
-    expect(matchFeedback(w, 'playing', 0.48).rumble).toEqual([]);
+    expect(matchFeedback(powered({ started: true }), 'playing')).toEqual({ cues: ['powerUp', 'ooh'], rumble: ['powerOn'] });
   });
 
   it('firing blasts, roars and rumbles hard', () => {
@@ -137,13 +127,6 @@ describe('matchFeedback: the power-up', () => {
 
   it('Max blown away whooshes', () => {
     expect(matchFeedback(powered({ blown: true }), 'playing')).toEqual({ cues: ['whoosh'], rumble: [] });
-  });
-
-  it('a full charge chimes and pulses: ready to let go', () => {
-    const w = powered({});
-    Object.assign(w.home, { state: 'poweringUp', charge: 1 });
-    expect(matchFeedback(w, 'playing', 0.99)).toEqual({ cues: ['powerReady'], rumble: ['ready'] });
-    expect(matchFeedback(w, 'playing', 1)).toEqual({ cues: [], rumble: [] });
   });
 
   it('a cancelled power-up fizzles', () => {

@@ -47,7 +47,7 @@ export function moveRow(p: Profile): string {
 }
 
 /** What the Shop teaches once he owns the Energy Wave. */
-const WAVE_HOW_TO = 'HOLD Y WITH A FULL POWER METER';
+const WAVE_HOW_TO = 'PRESS Y, THEN SHOOT WITH X';
 
 /** Why a buy didn't happen is red; how to use the move he's just bought isn't an error. */
 export const messageInk = (message: string): 'redLight' | 'volt' => (message === WAVE_HOW_TO ? 'volt' : 'redLight');
