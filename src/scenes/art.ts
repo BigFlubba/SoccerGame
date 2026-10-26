@@ -4,13 +4,15 @@ import { bakeAll, type BakedClip } from '../art/body/bake';
 import type { HeadSprite } from '../art/body/head';
 import type { HeadFacing } from '../art/body/pose';
 import { HARRISON_BODY } from '../art/body/proportions';
-import { masterPalette, resolvePalette, type LookColors, type MasterColor, type ResolvedPalette } from '../art/colors';
+import { C, masterPalette, resolvePalette, type LookColors, type MasterColor, type ResolvedPalette } from '../art/colors';
 import { renderText, textPalette } from '../art/font';
 import { buttonGlyph, type ButtonName } from '../art/glyphs';
 import { HARRISON_HEADS, HARRISON_POWER_HEADS } from '../art/harrison/head';
 import { harrisonLook } from '../art/harrison/look';
 import { harrisonPortrait, type Expression } from '../art/harrison/portrait';
+import { IndexedImage, blit } from '../art/indexedImage';
 import { MAX_HEADS, maxLook } from '../art/opponents/max';
+import { addOutline } from '../art/raster';
 import { backyardLayers, goalSprites, type GoalArt, type VenueLayers } from '../art/venues/backyard';
 import { toCanvas } from '../engine/bitmaps';
 import { SpriteCache } from '../engine/sprites';
@@ -43,6 +45,8 @@ export interface GameArt {
   away: SpriteSet;
   /** Harrison's portrait in each expression, in the home kit. */
   portraits: Record<Expression, HTMLCanvasElement>;
+  /** Max's face, front on and outlined, for the venue screen's match panel. */
+  maxFace: HTMLCanvasElement;
   /** Outlined text, cached per string, scale and colours. */
   text(s: string, scale: number, ink: MasterColor, outline: MasterColor): HTMLCanvasElement;
 }
@@ -57,6 +61,14 @@ function spriteSet(cache: SpriteCache, who: string, heads: Record<HeadFacing, He
     set.left[name] = f.left;
   }
   return set;
+}
+
+/** A head on its own, with a one-pixel outline ring, in `look`'s colours. */
+function faceCanvas(head: HeadSprite, look: LookColors): HTMLCanvasElement {
+  const img = new IndexedImage(head.image.width + 2, head.image.height + 2);
+  blit(img, head.image, 1, 1);
+  addOutline(img, C.Outline);
+  return toCanvas(img, resolvePalette(look));
 }
 
 function goalCanvases(g: GoalArt, palette: ResolvedPalette): GoalCanvases {
@@ -82,6 +94,7 @@ export function loadGameArt(): GameArt {
     homeGolden: spriteSet(cache, 'harrison-golden', HARRISON_POWER_HEADS, harrisonLook('home', 'golden')),
     away: spriteSet(cache, 'max', MAX_HEADS, maxLook()),
     portraits: Object.fromEntries(EXPRESSIONS.map(e => [e, toCanvas(harrisonPortrait(e), resolvePalette(harrisonLook('home')))])) as Record<Expression, HTMLCanvasElement>,
+    maxFace: faceCanvas(MAX_HEADS.front, maxLook()),
     text(s, scale, ink, outline) {
       const key = `${s}|${scale}|${ink}|${outline}`;
       let c = texts.get(key);

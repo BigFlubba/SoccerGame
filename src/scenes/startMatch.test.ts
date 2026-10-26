@@ -4,6 +4,7 @@ import type { MatchScene } from './matchScene';
 import { startMatch } from './startMatch';
 import { testContext } from './testContext';
 import { frame } from './testInput';
+import type { VenueScene } from './venueScene';
 import type { VsScene } from './vsScene';
 
 const STEP = 1 / 60;
@@ -18,8 +19,10 @@ describe('startMatch', () => {
     expect(match.match.id).toBe('backyard-2');
   });
 
-  it('B on the card goes back out', () => {
+  it('B on the card goes back to the venue screen, on that match', () => {
     const s = startMatch(testContext(), matchById('backyard-2')!);
-    expect(s.update(frame(['back']), STEP)?.kind).toBe('hub');
+    const venue = s.update(frame(['back']), STEP) as VenueScene;
+    expect(venue.kind).toBe('venue');
+    expect(venue.cursor.id).toBe('backyard-2');
   });
 });

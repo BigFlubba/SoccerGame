@@ -1,0 +1,170 @@
+import { MASTER, type MasterColor } from '../art/colors';
+import { BASE_W } from '../engine/viewport';
+import { VENUES, VENUE_STARS, matchById, matchState, nextCareerMatch, starsAt, venueStars, type CareerMatch, type MatchState, type VenueId } from '../meta/career';
+import { trainingLine } from '../meta/ladder';
+import { BONUSES } from '../meta/objectives';
+import { drawBackdrop } from './backdrop';
+import type { GameContext } from './context';
+import { createHubScene } from './hubScene';
+import { STAR_W, drawPanel, drawStar, drawStars } from './panel';
+import type { Scene } from './scene';
+import { startMatch } from './startMatch';
+
+export interface VenueScene extends Scene {
+  readonly venue: VenueId;
+  /** The match under the cursor. */
+  readonly cursor: CareerMatch;
+  /** The match panel's lines for the cursor's match. */
+  readonly panelLines: readonly string[];
+}
+
+/** Biscuit's blurb states the facts only; the first attempt is pure discovery. */
+const BOSS_BLURB = "HE CAN'T SHOOT. HE JUST RUNS IT IN.";
+
+const HEADER = { h: 30, dim: 0.45 };
+const TITLE_Y = 4;
+const STARS_LINE_Y = 19;
+const NODES = { x: 8, y: 32, w: 304, h: 56 };
+const NODE = { w: 20, h: 16, x0: 16, step: 24, y: 44 };
+const NEXT_Y = 35;
+const NODE_STARS_Y = 63;
+const BOSS_NODE = { x: 268, y: 38, size: 28 };
+const BOSS_LABEL_Y = 69;
+const PANEL = { x: 8, y: 96, w: 304, h: 74 };
+const FACE_AT = { x: 14, y: 100 };
+const PANEL_TEXT_X = 32;
+const PANEL_LINE_YS = [100, 118, 132] as const;
+const PANEL_FOOT_Y = 146;
+const HINT_RIGHT = 306;
+const STAR_GAP_PX = 4;
+
+/** The node's fill, border and number colours by state. */
+const NODE_LOOK: Record<MatchState, { fill: MasterColor; border: MasterColor; number: MasterColor }> = {
+  beaten: { fill: 'ink', border: 'silver', number: 'white' },
+  next: { fill: 'ink', border: 'energyGold', number: 'energyGold' },
+  locked: { fill: 'charcoal', border: 'outline', number: 'gray' },
+};
+
+/** The match panel's lines: the match, its blurb (none for rung 1), and its bonus. */
+export function panelLines(match: CareerMatch): string[] {
+  const title = match.kind === 'boss' ? match.name : `MATCH ${match.rung} - ${match.name}`;
+  const blurb = match.kind === 'boss' ? BOSS_BLURB : trainingLine(match.rung);
+  return [title, ...(blurb ? [blurb] : []), `BONUS: ${BONUSES[match.bonus].label}`];
+}
+
+/**
+ * A venue's matches in a row, with their stars, and a panel for the one
+ * under the cursor. Left/right move along the matches, wrapping; A or
+ * Start plays a beaten or next match through the VS card, and only blips
+ * on a locked one. B or Esc goes back to the road map.
+ */
+export function createVenueScene(ctx: GameContext, venue: VenueId, cursorId?: string): VenueScene {
+  const { art } = ctx;
+  const matches = VENUES.find(v => v.id === venue)!.matches;
+  const start = cursorId === undefined ? undefined : matchById(cursorId);
+  let index = Math.max(0, matches.indexOf(start?.venue === venue ? start : nextCareerMatch(ctx.profile)));
+  const cursor = () => matches[index]!;
+  const back = (): Scene => createHubScene(ctx);
+
+  const scene: VenueScene = {
+    kind: 'venue',
+    venue,
+    get cursor() {
+      return cursor();
+    },
+    get panelLines() {
+      return panelLines(cursor());
+    },
+    update(input) {
+      if (input.pressed.has('back')) {
+        ctx.audio.play('menuBack');
+        return back();
+      }
+      const n = matches.length;
+      const before = index;
+      if (input.pressed.has('left')) index = (index - 1 + n) % n;
+      if (input.pressed.has('right')) index = (index + 1) % n;
+      if (index !== before) ctx.audio.play('menuMove');
+      if (input.pressed.has('confirm') || input.pressed.has('pause')) {
+        const match = cursor();
+        if (matchState(ctx.profile, match) === 'locked') {
+          ctx.audio.play('nope');
+          return null;
+        }
+        ctx.audio.play('menuConfirm');
+        return startMatch(ctx, match);
+      }
+      return null;
+    },
+    draw(g, nowS) {
+      const p = ctx.profile;
+      drawBackdrop(g, art, nowS);
+      g.save();
+      g.globalAlpha = HEADER.dim;
+      g.fillStyle = MASTER.ink;
+      g.fillRect(0, 0, BASE_W, HEADER.h);
+      g.restore();
+      const centre = (img: HTMLCanvasElement, y: number) => g.drawImage(img, Math.round(BASE_W / 2 - img.width / 2), y);
+      centre(art.text(VENUES.find(v => v.id === venue)!.name, 2, 'energyGold', 'outline'), TITLE_Y);
+      const total = art.text(`STARS ${venueStars(p, venue)}/${VENUE_STARS}`, 1, 'white', 'outline');
+      const totalX = Math.round(BASE_W / 2 - (STAR_W + STAR_GAP_PX + total.width) / 2);
+      drawStar(g, totalX, STARS_LINE_Y + 1, true);
+      g.drawImage(total, totalX + STAR_W + STAR_GAP_PX, STARS_LINE_Y);
+
+      drawPanel(g, NODES.x, NODES.y, NODES.w, NODES.h);
+      matches.forEach((m, i) => {
+        const state = matchState(p, m);
+        const look = NODE_LOOK[state];
+        const selected = i === index;
+        if (m.kind === 'boss') {
+          drawNode(g, BOSS_NODE.x, BOSS_NODE.y, BOSS_NODE.size, BOSS_NODE.size, 'charcoal', look.border, selected);
+          // Part 2 draws Biscuit's face here; until then a question mark, dark until he's unlocked.
+          const mark = art.text('?', 2, state === 'locked' ? 'slate' : 'white', 'outline');
+          g.drawImage(mark, Math.round(BOSS_NODE.x + BOSS_NODE.size / 2 - mark.width / 2), Math.round(BOSS_NODE.y + BOSS_NODE.size / 2 - mark.height / 2));
+          const label = art.text('BOSS', 1, look.number, 'outline');
+          g.drawImage(label, Math.round(BOSS_NODE.x + BOSS_NODE.size / 2 - label.width / 2), BOSS_LABEL_Y);
+          return;
+        }
+        const x = NODE.x0 + NODE.step * (m.rung - 1);
+        drawNode(g, x, NODE.y, NODE.w, NODE.h, look.fill, look.border, selected);
+        const num = art.text(`${m.rung}`, 1, look.number, 'outline');
+        g.drawImage(num, Math.round(x + NODE.w / 2 - num.width / 2), Math.round(NODE.y + NODE.h / 2 - num.height / 2));
+        if (state === 'next') {
+          const next = art.text('NEXT', 1, 'energyGold', 'outline');
+          g.drawImage(next, Math.round(x + NODE.w / 2 - next.width / 2), NEXT_Y);
+        }
+        drawStars(g, x + 1, NODE_STARS_Y, starsAt(p, m.id));
+      });
+
+      drawPanel(g, PANEL.x, PANEL.y, PANEL.w, PANEL.h);
+      g.drawImage(art.maxFace, FACE_AT.x, FACE_AT.y);
+      panelLines(cursor()).forEach((line, i) => {
+        const last = i === panelLines(cursor()).length - 1;
+        const colour: MasterColor = i === 0 ? 'energyGold' : last ? 'white' : 'silver';
+        // Rung 1 has no blurb: its bonus line keeps the third slot.
+        const y = i === 0 ? PANEL_LINE_YS[0] : last ? PANEL_LINE_YS[2] : PANEL_LINE_YS[1];
+        g.drawImage(art.text(line, i === 0 ? 2 : 1, colour, 'outline'), PANEL_TEXT_X, y);
+      });
+      const starsLabel = art.text('STARS', 1, 'silver', 'outline');
+      g.drawImage(starsLabel, PANEL_TEXT_X, PANEL_FOOT_Y);
+      drawStars(g, PANEL_TEXT_X + starsLabel.width + STAR_GAP_PX, PANEL_FOOT_Y + 1, starsAt(p, cursor().id));
+      const hint = art.text('A PLAY   B BACK', 1, 'silver', 'outline');
+      g.drawImage(hint, HINT_RIGHT - hint.width, PANEL_FOOT_Y);
+    },
+  };
+  return scene;
+}
+
+/** A node box with a one-pixel border, and a second gold ring outside it when it holds the cursor. */
+function drawNode(g: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, fill: MasterColor, border: MasterColor, selected: boolean): void {
+  if (selected) {
+    g.fillStyle = MASTER.energyGold;
+    g.fillRect(x - 3, y - 3, w + 6, h + 6);
+    g.fillStyle = MASTER.ink;
+    g.fillRect(x - 2, y - 2, w + 4, h + 4);
+  }
+  g.fillStyle = MASTER[border];
+  g.fillRect(x - 1, y - 1, w + 2, h + 2);
+  g.fillStyle = MASTER[fill];
+  g.fillRect(x, y, w, h);
+}
