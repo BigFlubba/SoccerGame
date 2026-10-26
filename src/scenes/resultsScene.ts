@@ -59,9 +59,9 @@ export function tallyAt(reward: MatchReward, t: number): Tally {
 
 /** The ladder's news: a beaten match, the championship, a rematch won, or a try-again. */
 export function ladderLine(reward: MatchReward): string {
-  const { beaten, champion, match } = reward.ladder;
-  if (beaten && champion) return 'BACKYARD CHAMPION!';
-  if (beaten) return `MATCH ${match} BEATEN!`;
+  const { firstWin, champion, match } = reward.career;
+  if (firstWin && champion) return 'BACKYARD CHAMPION!';
+  if (firstWin) return `MATCH ${match.rung} BEATEN!`;
   if (reward.summary.result === 'win') return 'REMATCH WON!';
   return reward.summary.result === 'draw' ? 'ALL SQUARE. GO AGAIN!' : 'MAX TAKES THIS ONE. GO AGAIN!';
 }
@@ -217,7 +217,7 @@ export function createResultsScene(ctx: GameContext, reward: MatchReward, skipTa
       // The ladder's line comes first once the tally is done; unlocks shown before then keep their place below it.
       const firstSlot = tally.done ? 0 : 1;
       footLines(reward, tally, scene.upgradeReady).forEach((line, i) => {
-        const colour = line === UPGRADE_READY ? 'volt' : line === ladderLine(reward) && !reward.ladder.beaten ? 'white' : 'energyGold';
+        const colour = line === UPGRADE_READY ? 'volt' : line === ladderLine(reward) && !reward.career.firstWin ? 'white' : 'energyGold';
         centre(art.text(line, 1, colour, 'outline'), LADDER_Y + (firstSlot + i) * FOOT_LINE_H);
       });
       if (menu) drawMenu(g, art, menu, BASE_W / 2, MENU_TOP);

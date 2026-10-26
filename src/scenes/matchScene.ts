@@ -8,6 +8,7 @@ import { cancelCharge, type PlayerIntent } from '../game/player';
 import { endPower } from '../game/power';
 import { endGoalPause } from '../game/match';
 import { createWorld, stepWorld, type World } from '../game/world';
+import { nextCareerMatch } from '../meta/career';
 import { powerKit } from '../meta/catalog';
 import type { StyleKind } from '../meta/economy';
 import { maxStats, nextMatch } from '../meta/ladder';
@@ -128,7 +129,7 @@ export function createMatchScene(ctx: GameContext, seed: number): MatchScene {
   /** Saved at once, so closing the tab during the FULL TIME banner loses nothing. Called once, on the full-time tick. */
   const award = (result: NonNullable<World['match']['result']>) => {
     const { home, away } = world.match.score;
-    const done = applyMatch(ctx.profile, { result, goalsFor: home, goalsAgainst: away, styleGoals: [...styleGoals], goals: [] }, ladderMatch, ctx.today());
+    const done = applyMatch(ctx.profile, { result, goalsFor: home, goalsAgainst: away, styleGoals: [...styleGoals], goals: [] }, nextCareerMatch(ctx.profile), ctx.today());
     ctx.saveProfile(done.profile);
     reward = done.reward;
   };

@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { matchById, nextCareerMatch, type CareerMatch } from '../meta/career';
 import type { MatchSummary } from '../meta/economy';
 import { nextMatch } from '../meta/ladder';
 import { newProfile, type Profile } from '../meta/profile';
@@ -14,7 +15,7 @@ const WIN_3_0: MatchSummary = { result: 'win', goalsFor: 3, goalsAgainst: 0, sty
 const LOSS_0_2: MatchSummary = { result: 'lose', goalsFor: 0, goalsAgainst: 2, styleGoals: [], goals: [] };
 
 /** A context whose profile has had `s` applied, as the match scene leaves it, and the reward for it. */
-function after(s: MatchSummary, from: Profile = newProfile(), match = nextMatch(from.ladderWins)) {
+function after(s: MatchSummary, from: Profile = newProfile(), match: CareerMatch = nextCareerMatch(from)) {
   const { profile, reward } = applyMatch(from, s, match, TEST_TODAY);
   return { ctx: testContext({ profile }), reward };
 }
@@ -190,7 +191,7 @@ describe('ladderLine', () => {
   it('names a beaten match, the championship, a rematch win and a try-again', () => {
     expect(ladderLine(after(WIN_3_0, { ...newProfile(), ladderWins: 2 }).reward)).toBe('MATCH 3 BEATEN!');
     expect(ladderLine(after(WIN_3_0, { ...newProfile(), ladderWins: 9 }).reward)).toBe('BACKYARD CHAMPION!');
-    expect(ladderLine(after(WIN_3_0, { ...newProfile(), ladderWins: 10 }).reward)).toBe('REMATCH WON!');
+    expect(ladderLine(after(WIN_3_0, { ...newProfile(), ladderWins: 10 }, matchById('backyard-10')!).reward)).toBe('REMATCH WON!');
     expect(ladderLine(after(LOSS_0_2).reward)).toMatch(/GO AGAIN!$/);
     expect(ladderLine(after({ result: 'draw', goalsFor: 1, goalsAgainst: 1, styleGoals: [], goals: [] }).reward)).toMatch(/GO AGAIN!$/);
   });
