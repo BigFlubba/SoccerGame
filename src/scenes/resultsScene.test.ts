@@ -113,8 +113,8 @@ describe('results screen', () => {
     expect(s.menu!.items).toEqual(['NEXT MATCH', 'SHOP', 'HUB']);
     const next = s.update(frame(['confirm']), STEP) as MatchScene;
     expect(next.kind).toBe('match');
-    expect(next.ladderMatch).toBe(nextMatch(ctx.profile.ladderWins));
-    expect(next.ladderMatch).toBe(2);
+    expect(next.match.rung).toBe(nextMatch(ctx.profile.ladderWins));
+    expect(next.match.id).toBe('backyard-2');
     expect(ctx.savedProfiles).toHaveLength(0);
   });
 
@@ -122,7 +122,7 @@ describe('results screen', () => {
     const { ctx, reward } = after(LOSS_0_2, { ...newProfile(), ladderWins: 4 });
     expect(resultsItems(reward)).toEqual(['TRY AGAIN', 'SHOP', 'HUB']);
     const s = createResultsScene(ctx, reward, true);
-    expect((s.update(frame(['confirm']), STEP) as MatchScene).ladderMatch).toBe(5);
+    expect((s.update(frame(['confirm']), STEP) as MatchScene).match.id).toBe('backyard-5');
   });
 
   it('SHOP and back returns to Results, done, with no second save', () => {

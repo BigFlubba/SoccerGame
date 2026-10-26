@@ -6,12 +6,13 @@ import { updateCamera, type Camera } from '../game/camera';
 import { HUMAN_AIM_ERROR_DEG, type Aim } from '../game/kick';
 import { cancelCharge, type PlayerIntent } from '../game/player';
 import { endPower } from '../game/power';
-import { endGoalPause } from '../game/match';
 import { createWorld, stepWorld, type World } from '../game/world';
-import { nextCareerMatch } from '../meta/career';
+import { clockMinute, endGoalPause } from '../game/match';
+import { nextCareerMatch, type CareerMatch } from '../meta/career';
 import { powerKit } from '../meta/catalog';
-import type { StyleKind } from '../meta/economy';
-import { maxStats, nextMatch } from '../meta/ladder';
+import type { GoalRecord, StyleKind } from '../meta/economy';
+import { LADDER_MATCHES, maxStats } from '../meta/ladder';
+import { BONUSES } from '../meta/objectives';
 import { applyMatch, type MatchReward } from '../meta/progress';
 import type { GameContext } from './context';
 import { drawMenu, menuCue, stepMenu, type MenuState } from './menu';
@@ -37,8 +38,12 @@ export interface MatchScene extends Scene {
   readonly callout: string | null;
   /** Where a hard-hit ball has just been, newest first. */
   readonly trail: readonly TrailPoint[];
-  /** The Backyard Ladder match being played, fixed when the match is made. */
-  readonly ladderMatch: number;
+  /** The career match being played, fixed when the match is made. */
+  readonly match: CareerMatch;
+  /** Harrison's goals so far, in order. */
+  readonly goals: readonly GoalRecord[];
+  /** BONUS DONE!, while it shows. */
+  readonly bonusCallout: string | null;
   /** What the match paid, from the tick it reached full time. */
   readonly reward: MatchReward | null;
   /** The goal flash is owed to the next drawn frame. */
@@ -48,6 +53,9 @@ export interface MatchScene extends Scene {
 }
 
 export const PAUSE_ITEMS = ['RESUME', 'RESTART', 'HELP', 'OPTIONS', 'QUIT TO HUB'] as const;
+export const BONUS_CALLOUT = 'BONUS DONE!';
+/** The bonus callout shows this long, once the goal moment that earned it has ended. */
+export const BONUS_SHOW_S = 1.5;
 /** The FULL TIME banner shows this long before Results. */
 const RESULT_DELAY_S = 1.5;
 const PERFECT_SHOW_S = 0.6;
@@ -80,29 +88,53 @@ function harrisonIntent(input: InputFrame): PlayerIntent {
   };
 }
 
+/** The away stats for a career match: Max at the rung's stats. */
+function awayStats(match: CareerMatch) {
+  // Stand-in until Biscuit lands (plan part 2): the boss plays as Max at rung 10.
+  if (match.kind === 'boss') return maxStats(LADDER_MATCHES);
+  return maxStats(match.rung);
+}
+
 /**
- * A 90-second ladder match against Max: Harrison with his bought stats, Max
- * with the match's. It pays out on the tick it reaches full time, then hands
- * over to Results after the FULL TIME banner.
+ * A 90-second career match, by default the next one: Harrison with his
+ * bought stats, Max with the match's. It pays out on the tick it reaches
+ * full time, then hands over to Results after the FULL TIME banner.
  */
-export function createMatchScene(ctx: GameContext, seed: number): MatchScene {
+export function createMatchScene(ctx: GameContext, seed: number, match: CareerMatch = nextCareerMatch(ctx.profile)): MatchScene {
   const { art } = ctx;
   let difficulty = ctx.settings.difficulty;
   const thinking = DIFFICULTY[difficulty];
-  const ladderMatch = nextMatch(ctx.profile.ladderWins);
   const world = createWorld(
     { ...ctx.profile.stats },
-    maxStats(ladderMatch),
+    awayStats(match),
     seed,
     { home: HUMAN_AIM_ERROR_DEG, away: thinking.aimErrorDeg },
     powerKit(ctx.profile),
   );
   const brain = createBrain(thinking);
   const cam: Camera = { x: world.ball.x - BASE_W / 2 };
-  const hud: MatchHud = { perfect: null, moment: null, callout: null, trail: [], flash: false, shake: null, impactFrames: 0, goldenCelebration: false };
+  const hud: MatchHud = {
+    perfect: null,
+    moment: null,
+    callout: null,
+    trail: [],
+    flash: false,
+    shake: null,
+    impactFrames: 0,
+    goldenCelebration: false,
+    bonusCallout: null,
+    awayName: match.hudName,
+  };
   let lastKick: LastKick | null = null;
   /** Harrison's header, volley, chip and Energy Wave goals, for the style bonus. */
   const styleGoals: StyleKind[] = [];
+  /** Every goal of his, for the bonus objective and the stars. */
+  const goals: GoalRecord[] = [];
+  const bonus = BONUSES[match.bonus];
+  /** The in-play bonus has been done: the callout is owed once the goal moment ends. */
+  let bonusOwed = false;
+  let bonusShown = false;
+  let bonusUntilS = 0;
   let pause: MenuState | null = null;
   let reward: MatchReward | null = null;
   let results: Scene | null = null;
@@ -125,13 +157,20 @@ export function createMatchScene(ctx: GameContext, seed: number): MatchScene {
     if (world.power) endPower(world.power);
     ctx.audio.setCrowd('low');
   };
-  const restart = () => createMatchScene(ctx, seed + 1);
+  const restart = () => createMatchScene(ctx, seed + 1, match);
   /** Saved at once, so closing the tab during the FULL TIME banner loses nothing. Called once, on the full-time tick. */
   const award = (result: NonNullable<World['match']['result']>) => {
     const { home, away } = world.match.score;
-    const done = applyMatch(ctx.profile, { result, goalsFor: home, goalsAgainst: away, styleGoals: [...styleGoals], goals: [] }, nextCareerMatch(ctx.profile), ctx.today());
+    const done = applyMatch(ctx.profile, { result, goalsFor: home, goalsAgainst: away, styleGoals: [...styleGoals], goals: [...goals] }, match, ctx.today());
     ctx.saveProfile(done.profile);
     reward = done.reward;
+  };
+  /** Notes one of his goals, and whether it has just settled an in-play bonus. */
+  const recordGoal = () => {
+    goals.push({ minute: clockMinute(world.match), kind: lastKick?.kind ?? null, perfect: lastKick?.perfect ?? false });
+    if (bonusShown || bonusOwed || !bonus.inPlay) return;
+    const { home, away } = world.match.score;
+    bonusOwed = bonus.done({ goalsFor: home, goalsAgainst: away, goals, result: null });
   };
   /** Help and Options come back to this match, still paused, with any new difficulty applied to Max. */
   const backHere = (): Scene => {
@@ -159,7 +198,13 @@ export function createMatchScene(ctx: GameContext, seed: number): MatchScene {
     get trail() {
       return hud.trail;
     },
-    ladderMatch,
+    match,
+    get goals() {
+      return goals;
+    },
+    get bonusCallout() {
+      return hud.bonusCallout;
+    },
     get reward() {
       return reward;
     },
@@ -222,6 +267,7 @@ export function createMatchScene(ctx: GameContext, seed: number): MatchScene {
           hud.flash = true;
           hud.callout = goalCallout(lastKick, world.match.score.home);
           if (lastKick && isStyle(lastKick.kind)) styleGoals.push(lastKick.kind);
+          recordGoal();
           // Forms show while powered up and celebrating: an Energy Wave goal in Golden Form keeps the gold.
           hud.goldenCelebration = lastKick?.kind === 'wave' && world.power?.golden === true;
           // The roar cue swells; the crowd holds it through the celebration.
@@ -242,8 +288,18 @@ export function createMatchScene(ctx: GameContext, seed: number): MatchScene {
           hud.callout = null;
           hud.goldenCelebration = false;
           ctx.audio.setCrowd('match');
+          // The bonus callout waits behind the goal moment, so it never covers one.
+          if (bonusOwed) {
+            bonusOwed = false;
+            bonusShown = true;
+            hud.bonusCallout = BONUS_CALLOUT;
+            bonusUntilS = t + BONUS_SHOW_S;
+            // 'perfect' stands in for the star chime until the cue exists.
+            ctx.audio.play('perfect');
+          }
         }
       }
+      if (hud.bonusCallout && t >= bonusUntilS) hud.bonusCallout = null;
       if (world.match.phase !== 'fullTime' || !world.match.result) return null;
       if (!reward) award(world.match.result);
       // Results brings in the jingle, after the full-time whistle.

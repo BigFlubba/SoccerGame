@@ -6,10 +6,11 @@ import { DIFFICULTY } from '../game/ai';
 import { GOAL_PAUSE_S } from '../game/match';
 import { BASE_STATS } from '../game/stats';
 import { WAVE_READY_S } from '../game/power';
+import { matchById } from '../meta/career';
 import { maxStats } from '../meta/ladder';
 import { newProfile } from '../meta/profile';
 import { DEFAULT_SETTINGS } from '../meta/settings';
-import { PAUSE_ITEMS, createMatchScene, type MatchScene } from './matchScene';
+import { BONUS_CALLOUT, BONUS_SHOW_S, PAUSE_ITEMS, createMatchScene, type MatchScene } from './matchScene';
 import type { Scene } from './scene';
 import { testContext } from './testContext';
 import { frame } from './testInput';
@@ -103,21 +104,115 @@ describe('match scene', () => {
     expect(s.world.home.stats).toEqual({ speed: 4, power: 2, jump: 3, control: 1 });
   });
 
-  it('Max plays with the next ladder match’s stats', () => {
+  it('plays the next career match by default, Max at that rung', () => {
     const s = createMatchScene(testContext({ profile: { ...newProfile(), ladderWins: 2 } }), 1);
-    expect(s.ladderMatch).toBe(3);
+    expect(s.match.id).toBe('backyard-3');
     expect(s.world.away.stats).toEqual(maxStats(3));
   });
 
   it('a new profile plays match 1, Harrison and Max both as they were', () => {
     const s = live();
-    expect(s.ladderMatch).toBe(1);
+    expect(s.match.id).toBe('backyard-1');
     expect(s.world.home.stats).toEqual(BASE_STATS);
     expect(s.world.away.stats).toEqual(BASE_STATS);
   });
 
-  it('a champion gets match 10', () => {
-    expect(createMatchScene(testContext({ profile: { ...newProfile(), ladderWins: 10 } }), 1).ladderMatch).toBe(10);
+  it('a chosen rung plays that rung, and Restart keeps it', () => {
+    const s = createMatchScene(testContext({ profile: { ...newProfile(), ladderWins: 6 } }), 1, matchById('backyard-2')!);
+    expect(s.match.id).toBe('backyard-2');
+    expect(s.world.away.stats).toEqual(maxStats(2));
+    s.update(frame(['pause']), STEP);
+    s.update(frame(['down']), STEP);
+    const again = s.update(frame(['confirm']), STEP) as MatchScene;
+    expect(again.match.id).toBe('backyard-2');
+    expect(again.world.away.stats).toEqual(maxStats(2));
+  });
+
+  it('the boss is a stand-in for now: Max at rung 10 under his name', () => {
+    const s = createMatchScene(testContext({ profile: { ...newProfile(), ladderWins: 10 } }), 1);
+    expect(s.match.id).toBe('backyard-boss');
+    expect(s.match.hudName).toBe('BISCUIT');
+    expect(s.world.away.stats).toEqual(maxStats(10));
+  });
+
+  describe('the goal record', () => {
+    /** Stages Harrison heading the ball into Max's goal, and steps until his goal moment starts. */
+    function headerGoal(s: MatchScene): void {
+      Object.assign(s.world.away, { x: 300 });
+      Object.assign(s.world.home, { x: 540, z: 32, y: 10, state: 'air', vy: 0, facing: 1, kick: null });
+      Object.assign(s.world.ball, { x: 543, y: 40, z: 32, vx: -50, vy: -100, vz: 0 });
+      let n = 0;
+      while (!s.moment && n++ < 60) s.update(frame(), STEP);
+      expect(s.moment).not.toBeNull();
+    }
+
+    it('records each of his goals with the minute, kind and perfect', () => {
+      const s = live();
+      s.world.match.clockS = 40;
+      headerGoal(s);
+      expect(s.goals).toEqual([{ minute: 40, kind: 'header', perfect: false }]);
+      run(s, 4);
+      s.world.match.phase = 'playing';
+      Object.assign(s.world.ball, { x: 616, y: 3, z: 32, vx: 100, vy: 0, vz: 0 });
+      s.update(frame(), STEP);
+      expect(s.world.events.goal).toBe('home');
+      expect(s.goals).toHaveLength(2);
+      expect(s.goals[1]).toMatchObject({ kind: null, perfect: false });
+    });
+
+    it('a golden-goal winner is minute 90', () => {
+      const s = live();
+      Object.assign(s.world.match, { goldenGoal: true, clockS: 90, goldenS: 10, score: { home: 1, away: 1 } });
+      Object.assign(s.world.ball, { x: 616, y: 3, z: 32, vx: 100 });
+      s.update(frame(), STEP);
+      expect(s.world.events.goal).toBe('home');
+      expect(s.goals[0]?.minute).toBe(90);
+    });
+
+    it('BONUS DONE! shows after the goal moment, once, with its cue', () => {
+      const ctx = testContext({ profile: { ...newProfile(), ladderWins: 2 } });
+      const s = createMatchScene(ctx, 1);
+      s.world.match.phase = 'playing';
+      expect(s.match.bonus).toBe('header');
+      headerGoal(s);
+      expect(s.bonusCallout).toBeNull();
+      run(s, 2);
+      expect(s.bonusCallout).toBeNull();
+      run(s, 2);
+      expect(s.moment).toBeNull();
+      expect(s.bonusCallout).toBe(BONUS_CALLOUT);
+      expect(ctx.audio.played).toContain('perfect');
+      run(s, BONUS_SHOW_S + 0.05);
+      expect(s.bonusCallout).toBeNull();
+      const cues = ctx.audio.played.filter(c => c === 'perfect').length;
+      headerGoal(s);
+      run(s, 4.5);
+      expect(s.bonusCallout).toBeNull();
+      expect(ctx.audio.played.filter(c => c === 'perfect')).toHaveLength(cues);
+    });
+
+    it('a goal that does not settle the bonus shows nothing', () => {
+      const s = live();
+      expect(s.match.bonus).toBe('score3');
+      headerGoal(s);
+      run(s, 4.5);
+      expect(s.bonusCallout).toBeNull();
+    });
+
+    it('the summary it saves carries the goals and the match', () => {
+      const ctx = testContext();
+      const s = createMatchScene(ctx, 1);
+      s.world.match.phase = 'playing';
+      s.world.match.clockS = 20;
+      headerGoal(s);
+      run(s, 4);
+      s.world.match.clockS = 89.99;
+      run(s, 3);
+      expect(s.world.match.phase).toBe('fullTime');
+      expect(s.reward!.summary.goals).toEqual([{ minute: 20, kind: 'header', perfect: false }]);
+      expect(s.reward!.career.match.id).toBe('backyard-1');
+      expect(ctx.savedProfiles.at(-1)?.career.stars['backyard-1']).toBeGreaterThan(0);
+    });
   });
 
   it('up on the stick runs away from the camera, down toward it', () => {

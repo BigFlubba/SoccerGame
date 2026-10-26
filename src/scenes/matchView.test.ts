@@ -41,33 +41,34 @@ describe('banner', () => {
   it('GOAL!!! slams in big once the moment shows its banner', () => {
     const w = world();
     Object.assign(w.match, { phase: 'goal', lastScorer: 'home' });
-    expect(banner(w, moment(0.1))).toBeNull();
-    expect(banner(w, moment(0.5))).toEqual({ text: 'GOAL!!!', scale: 3 });
+    expect(banner(w, moment(0.1), 'MAX')).toBeNull();
+    expect(banner(w, moment(0.5), 'MAX')).toEqual({ text: 'GOAL!!!', scale: 3 });
   });
 
-  it("Max's goal gets a smaller MAX SCORES", () => {
+  it("the away side's goal gets a smaller banner with its name", () => {
     const w = world();
     Object.assign(w.match, { phase: 'goal', lastScorer: 'away' });
-    expect(banner(w, null)).toEqual({ text: 'MAX SCORES', scale: 2 });
+    expect(banner(w, null, 'MAX')).toEqual({ text: 'MAX SCORES', scale: 2 });
+    expect(banner(w, null, 'BISCUIT')).toEqual({ text: 'BISCUIT SCORES', scale: 2 });
   });
 
   it('no banner in the goal pause otherwise', () => {
     const w = world();
     Object.assign(w.match, { phase: 'goal', lastScorer: 'home' });
-    expect(banner(w, null)).toBeNull();
+    expect(banner(w, null, 'MAX')).toBeNull();
   });
 
   it('FULL TIME, KICK OFF and GOLDEN GOAL as before', () => {
     const w = world();
-    expect(banner(w, null)).toEqual({ text: 'KICK OFF', scale: 2 });
+    expect(banner(w, null, 'MAX')).toEqual({ text: 'KICK OFF', scale: 2 });
     w.match.goldenGoal = true;
-    expect(banner(w, null)).toEqual({ text: 'GOLDEN GOAL', scale: 2 });
+    expect(banner(w, null, 'MAX')).toEqual({ text: 'GOLDEN GOAL', scale: 2 });
     w.match.phase = 'playing';
-    expect(banner(w, null)).toEqual({ text: 'GOLDEN GOAL', scale: 2 });
+    expect(banner(w, null, 'MAX')).toEqual({ text: 'GOLDEN GOAL', scale: 2 });
     w.match.goldenS = 5;
-    expect(banner(w, null)).toBeNull();
+    expect(banner(w, null, 'MAX')).toBeNull();
     w.match.phase = 'fullTime';
-    expect(banner(w, null)).toEqual({ text: 'FULL TIME', scale: 2 });
+    expect(banner(w, null, 'MAX')).toEqual({ text: 'FULL TIME', scale: 2 });
   });
 });
 
@@ -99,6 +100,8 @@ describe('calloutLine', () => {
       shake: null,
       impactFrames: 0,
       goldenCelebration: false,
+      bonusCallout: null,
+      awayName: 'MAX',
     });
     expect(calloutLine(hud(0.3))).toBeNull();
     expect(calloutLine(hud(0.7))).toBe('HEADER!');
@@ -109,7 +112,7 @@ describe('calloutLine', () => {
 
 describe('takeFlash', () => {
   it('a flash owed while impact frames run waits for them to finish', () => {
-    const hud: MatchHud = { perfect: null, moment: null, callout: null, trail: [], flash: true, shake: null, impactFrames: 1, goldenCelebration: false };
+    const hud: MatchHud = { perfect: null, moment: null, callout: null, trail: [], flash: true, shake: null, impactFrames: 1, goldenCelebration: false, bonusCallout: null, awayName: 'MAX' };
     expect(takeFlash(hud)).toBe(false);
     expect(hud.flash).toBe(true);
     hud.impactFrames = 0;
@@ -117,7 +120,7 @@ describe('takeFlash', () => {
   });
 
   it('takeFlash is true once, then false', () => {
-    const hud: MatchHud = { perfect: null, moment: null, callout: null, trail: [], flash: true, shake: null, impactFrames: 0, goldenCelebration: false };
+    const hud: MatchHud = { perfect: null, moment: null, callout: null, trail: [], flash: true, shake: null, impactFrames: 0, goldenCelebration: false, bonusCallout: null, awayName: 'MAX' };
     expect(takeFlash(hud)).toBe(true);
     expect(takeFlash(hud)).toBe(false);
   });

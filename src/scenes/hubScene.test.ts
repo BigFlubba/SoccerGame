@@ -44,7 +44,7 @@ describe('hub', () => {
   it('PLAY MATCH plays the next ladder match', () => {
     const ctx = testContext({ profile: { ...newProfile(), ladderWins: 4 } });
     const next = createHubScene(ctx).update(frame(['confirm']), STEP) as MatchScene;
-    expect(next.ladderMatch).toBe(5);
+    expect(next.match.id).toBe('backyard-5');
     expect(next.world.away.stats).toEqual(maxStats(5));
   });
 

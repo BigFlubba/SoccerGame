@@ -45,6 +45,10 @@ export interface MatchHud {
   impactFrames: number;
   /** He celebrates an Energy Wave goal in Golden Form's gold. */
   goldenCelebration: boolean;
+  /** BONUS DONE!, while it shows after a goal moment. */
+  bonusCallout: string | null;
+  /** The away side's name on the HUD and its goal banner. */
+  awayName: string;
 }
 
 /**
@@ -60,7 +64,6 @@ export function takeFlash(hud: MatchHud): boolean {
 }
 
 export const HOME_NAME = 'HARRISON';
-export const AWAY_NAME = 'MAX';
 
 const BALL_SPRITE_R = 3;
 const CHARGE_BAR = { w: 12, h: 2, above: 46 };
@@ -245,9 +248,9 @@ function drawText(g: CanvasRenderingContext2D, art: GameArt, s: string, cx: numb
   g.drawImage(t, Math.round(cx - t.width / 2), y);
 }
 
-function drawHud(g: CanvasRenderingContext2D, w: World, art: GameArt, nowS: number): void {
+function drawHud(g: CanvasRenderingContext2D, w: World, art: GameArt, nowS: number, awayName: string): void {
   const { match, home } = w;
-  drawText(g, art, `${HOME_NAME} ${match.score.home}-${match.score.away} ${AWAY_NAME}`, VIEW_W / 2, 0);
+  drawText(g, art, `${HOME_NAME} ${match.score.home}-${match.score.away} ${awayName}`, VIEW_W / 2, 0);
   const clock = match.goldenGoal ? `90+${Math.floor(match.goldenS)}` : `${clockMinute(match)}'`;
   drawText(g, art, clock, VIEW_W / 2, 7);
 
@@ -258,12 +261,12 @@ function drawHud(g: CanvasRenderingContext2D, w: World, art: GameArt, nowS: numb
   if (w.power) drawPowerMeter(g, art, w.power.meter, powerHint(w), nowS);
 }
 
-/** The banner over the pitch, if any: GOAL!!! for Harrison's goal moment, a smaller MAX SCORES for Max's. */
-export function banner(w: World, moment: GoalMoment | null): { text: string; scale: number } | null {
+/** The banner over the pitch, if any: GOAL!!! for Harrison's goal moment, a smaller MAX SCORES (or BISCUIT SCORES) for the other side's. */
+export function banner(w: World, moment: GoalMoment | null, awayName: string): { text: string; scale: number } | null {
   const m = w.match;
   const text = (t: string) => ({ text: t, scale: 2 });
   if (moment) return bannerShown(moment) ? { text: 'GOAL!!!', scale: 3 } : null;
-  if (m.phase === 'goal') return m.lastScorer === 'away' ? text('MAX SCORES') : null;
+  if (m.phase === 'goal') return m.lastScorer === 'away' ? text(`${awayName} SCORES`) : null;
   if (m.phase === 'fullTime') return text('FULL TIME');
   if (m.phase === 'kickoff') return text(m.goldenGoal ? 'GOLDEN GOAL' : 'KICK OFF');
   if (m.goldenGoal && m.goldenS < GOLDEN_GOAL_BANNER_S) return text('GOLDEN GOAL');
@@ -362,7 +365,7 @@ export function drawMatch(g: CanvasRenderingContext2D, w: World, cam: Camera, ar
     g.fillRect(0, 0, VIEW_W, BASE_H);
     g.restore();
   }
-  drawHud(g, w, art, nowS);
+  drawHud(g, w, art, nowS, hud.awayName);
   if (hud.perfect && nowS < hud.perfect.untilS) {
     const kicker = hud.perfect.team === 'home' ? w.home : w.away;
     const at = screen(cam, kicker.x, kicker.y, kicker.z);
@@ -373,10 +376,12 @@ export function drawMatch(g: CanvasRenderingContext2D, w: World, cam: Camera, ar
     const at = screen(cam, w.home.x, w.home.y, w.home.z);
     drawText(g, art, prompt, at.x, at.y + PROMPT_Y, 1, Math.floor(nowS * PROMPT_BLINK_HZ) % 2 === 0 ? 'energyGold' : 'white');
   }
-  const b = banner(w, moment);
+  const b = banner(w, moment, hud.awayName);
   if (b && moment) drawGoalBanner(g, art, moment, b.scale);
   else if (b) drawText(g, art, b.text, VIEW_W / 2, BANNER_Y, b.scale);
   const callout = calloutLine(hud);
   if (callout) drawText(g, art, callout, VIEW_W / 2, BANNER_Y + CALLOUT.gapPx, 2);
+  // Under the banner line, so it sits clear of FULL TIME or KICK OFF.
+  else if (hud.bonusCallout) drawText(g, art, hud.bonusCallout, VIEW_W / 2, BANNER_Y + CALLOUT.gapPx, 2, 'energyGold');
   drawArrow(g, w, cam);
 }

@@ -14,6 +14,8 @@ const hudWith = (h: Partial<MatchHud> = {}): MatchHud => ({
   shake: null,
   impactFrames: 0,
   goldenCelebration: false,
+  bonusCallout: null,
+  awayName: 'MAX',
   ...h,
 });
 
