@@ -160,11 +160,12 @@ export function parkBall(w: World): void {
   Object.assign(w.ball, { x, y: -MUZZLE.y, z, vx: 0, vy: 0, vz: 0, spin: 0 });
 }
 
-/** Lets go: the ball at the muzzle, live, popped forward ahead of Harrison's tackle (`pop`) or set down (a pant). */
+/** Lets go: the ball at the muzzle, live, popped forward ahead of Harrison's tackle (`pop`) or set down (a pant). Any jink ends with it. */
 export function dropBall(w: World, pop: boolean): void {
   const d = w.dog!;
   d.carrying = false;
   d.carryS = 0;
+  d.jinkS = 0;
   d.dwellS = 0;
   d.regrabS = Math.max(d.regrabS, REGRAB_S);
   parkBall(w);

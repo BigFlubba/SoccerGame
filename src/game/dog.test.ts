@@ -147,6 +147,7 @@ describe('the dog', () => {
       expect(w.dog!.carrying).toBe(!jinking);
       if (!jinking) continue;
       expect(w.events.kicks[0]!.tackledBall).toBe(true);
+      expect(w.dog!.jinkS, 'losing the ball ends the jink').toBe(0);
       expect(w.ball.vy).toBeGreaterThan(0);
       expect(w.ball.vx).toBeGreaterThan(0); // ahead of Harrison's slide, which runs to the right
     }
