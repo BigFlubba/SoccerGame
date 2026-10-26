@@ -131,6 +131,38 @@ By the parent, in the Plan 6 brainstorm (2026-10-25):
   and X glyphs, as a yellow disc with a dark Y, since Y is yellow on an Xbox
   pad.
 
+### Amended after the parent's playtest (2026-10-25)
+
+The parent played the build on a controller and found the hold-and-release
+power-up too hard to use. Max defends close, so the one-second stand-still
+charge was nearly always tackled. The parent rejected an aura that blasts
+Max back, because it could be spammed. They chose this instead, and it
+replaces *Powering up* and *Max and the power-up* below wherever they
+disagree:
+
+- **Y powers up at once.** With a full meter, the ball his, and play on,
+  pressing Y powers him up straight away. A press made while Y is held
+  waits for the ball.
+- **He keeps playing.** He runs and dribbles at full speed with the aura
+  and the power hair. A gold bar over his head counts down the power-up's
+  time: about 2.5 s *(designer's pick within the parent's 2–3 s)*. SHOOT!
+  flashes over him.
+- **His next kick, X, is the Energy Wave.** It fires at once at Max's
+  goal, with no shot charge. He turns to face that goal as he strikes,
+  and up/down aim it as before. The bracing and blow-away rules of *The
+  Energy Wave* are unchanged.
+- **It ends without firing** when the time runs out, when Max plays the
+  ball or knocks him down, when he makes any other move (a chip, a slide,
+  a volley, a header, or a shot from where the wave can't go in), when
+  play stops, and when the game pauses. The meter is kept: only a fired
+  wave spends it *(designer's call, in line with the anti-goal)*.
+- **Max plays as usual** while Harrison is powered up. Once the wave is on
+  its way, he stays square to it until it reaches him. The rush and the
+  release window are gone.
+- *Left to tune after Harrison plays:* Max usually defends close, so an
+  instant Y-then-X will usually blow him away. If that's too easy, the
+  first knob is Max backing off to brace when Harrison powers up.
+
 ### Powering up
 
 - **Input:** Y on the pad (standard-mapping button 3). On the keyboard it's
