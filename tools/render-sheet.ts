@@ -17,6 +17,7 @@ import { PARALLAX, backyardLayers, goalSprites } from '../src/art/venues/backyar
 import { harrisonPortrait } from '../src/art/harrison/portrait';
 import { IndexedImage, blit, flipX } from '../src/art/indexedImage';
 import { MAX_HEADS, maxLook } from '../src/art/opponents/max';
+import { BISCUIT_ANCHOR, BISCUIT_FACE, BISCUIT_FRAMES, type DogAnim } from '../src/art/opponents/biscuit';
 import type { AnimName } from '../src/art/body/animations';
 import { DEPTH_SHEAR, project } from '../src/game/camera';
 import { BACKYARD } from '../src/game/field';
@@ -34,6 +35,11 @@ const OUT_FILE = `${OUT_DIR}/character-sheet.png`;
 /** The Backyard composites on their own, for reviewing the venue layout. */
 const VENUE_FILE = `${OUT_DIR}/backyard.png`;
 const VENUE_SCALE = 3;
+/** Biscuit galloping the ball at the left goal, one Backyard view per frame in a strip, for slicing into a GIF. */
+const CARRY_FILE = `${OUT_DIR}/biscuit-carry.png`;
+const CARRY_FRAMES = 8;
+/** How far he gallops between strip frames, px. */
+const CARRY_STEP = 14;
 const FACINGS = ['side', 'threeQuarter', 'front'] as const;
 
 function swatch(hex: string): SheetItem {
@@ -139,6 +145,10 @@ const maxAt = (x: number, z: number, clip: AnimName, frame: number, facing: 1 | 
   const img = max[clip].frames[frame]!;
   return { x, y: 0, z, img: facing === 1 ? img : flipX(img), palette: resolvePalette(maxLook()), anchor: facing === 1 ? ANCHOR : { x: img.width - 1 - ANCHOR.x, y: ANCHOR.y } };
 };
+const biscuitAt = (x: number, z: number, clip: DogAnim, frame: number, facing: 1 | -1 = -1): Actor => {
+  const img = BISCUIT_FRAMES[clip][frame]!;
+  return { x, y: 0, z, img: facing === 1 ? img : flipX(img), palette: masterPalette(), anchor: facing === 1 ? BISCUIT_ANCHOR : { x: img.width - 1 - BISCUIT_ANCHOR.x, y: BISCUIT_ANCHOR.y }, shadow: true };
+};
 const ballAt = (x: number, y: number, z: number, frame = 0): Actor => ({
   x,
   y,
@@ -164,6 +174,9 @@ const rightEndView = () => {
   const cam = BACKYARD.width + BACKYARD.depth * DEPTH_SHEAR - VIEW_W;
   return backyardView(cam, [withShadow(maxAt(560, 24, 'run', 1)), withShadow(harrisonAt(540, 46, 'run', 3)), ballAt(620, BALL_R, 32, 2)]);
 };
+
+/** Camera at the left end: Biscuit galloping the ball at the left goal, Harrison squared up in his way. */
+const bossView = (x = 150, frame = 0) => backyardView(0, [biscuitAt(x, 30, 'carry', frame % 4), withShadow(harrisonAt(96, 32, 'idle', 0, 1))]);
 
 const standing = standingPose(HARRISON_BODY);
 const baked = bakeAll(HARRISON_BODY, HARRISON_HEADS);
@@ -194,6 +207,9 @@ const rows: SheetItem[][] = [
   [...max.idle.frames, ...max.run.frames].map(f => resolved(f, maxLook())),
   [...FACINGS.map(f => resolved(MAX_HEADS[f].image, maxLook(), true)), item(baked.idle.frames[0]!), resolved(max.idle.frames[0]!, maxLook())],
   [leftEndView(), rightEndView()],
+  Object.values(BISCUIT_FRAMES).flat().slice(0, 10).map(f => ({ width: f.width, height: f.height, rgba: toRGBA(f, masterPalette()) })),
+  [...Object.values(BISCUIT_FRAMES).flat().slice(10), BISCUIT_FACE].map(f => ({ width: f.width, height: f.height, rgba: toRGBA(f, masterPalette()) })),
+  [bossView()],
   ballRow,
   [text("HARRISON 0-0 MAX 45'", 1), text('ABCDEFGHIJKLMNOPQRSTUVWXYZ', 1), text("0123456789 -':!?.,/+", 1)],
   [text("HARRISON 0-0 MAX 45'", 2), text('GOAL! PERFECT', 2)],
@@ -207,3 +223,7 @@ console.log(`wrote ${OUT_FILE} (${sheet.width}×${sheet.height})`);
 const venue = composeSheet([[leftEndView()], [rightEndView()]], { scale: VENUE_SCALE, gap: GAP, background: BACKGROUND });
 writeFileSync(VENUE_FILE, encodePNG(venue.width, venue.height, venue.rgba));
 console.log(`wrote ${VENUE_FILE} (${venue.width}×${venue.height})`);
+
+const carry = composeSheet([Array.from({ length: CARRY_FRAMES }, (_, i) => bossView(236 - i * CARRY_STEP, i))], { scale: 1, gap: 0, background: BACKGROUND });
+writeFileSync(CARRY_FILE, encodePNG(carry.width, carry.height, carry.rgba));
+console.log(`wrote ${CARRY_FILE} (${carry.width}×${carry.height})`);
