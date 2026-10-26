@@ -78,6 +78,12 @@ export interface Player {
   aim: Aim;
   /** Last tick's held buttons, so a press is only seen on its first tick. */
   held: { shoot: boolean; chip: boolean; power: boolean };
+  /**
+   * A power press waiting, while Y stays held, for a power-up to be allowed
+   * (the ball reaching his feet, say). Starting one, or letting go, uses it
+   * up, so Y still held after a cancel needs a fresh press.
+   */
+  powerArmed: boolean;
   slideCooldown: number;
   /** Time until he can take another dribble touch. */
   touchCooldown: number;
@@ -152,6 +158,7 @@ export function createPlayer(team: 'home' | 'away', stats: Stats, x: number, fac
     anim: { name: 'idle', frame: 0 },
     aim: 'straight',
     held: { shoot: false, chip: false, power: false },
+    powerArmed: false,
     slideCooldown: 0,
     touchCooldown: 0,
     animT: 0,
@@ -257,6 +264,7 @@ export function blowAway(p: Player, dirX: number, dirZ: number): void {
 
 /** Drops a shot, chip or power-up that is still charging, without kicking (used when the game pauses). */
 export function cancelCharge(p: Player): void {
+  p.powerArmed = false;
   const charging = p.state === 'charging' || (p.state === 'chipping' && !p.kick) || p.state === 'poweringUp';
   if (!charging) return;
   enter(p, 'ground');
@@ -337,7 +345,8 @@ function dropWallSpeed(p: Player, intent: PlayerIntent, field: Field): void {
 export function stepPlayer(p: Player, intent: PlayerIntent, dt: number, field: Field, ballAtFeet: boolean, powerOk = false): void {
   const shootPressed = intent.shootHeld && !p.held.shoot;
   const chipPressed = intent.chipHeld && !p.held.chip;
-  const powerPressed = intent.powerHeld && !p.held.power;
+  if (intent.powerHeld && !p.held.power) p.powerArmed = true;
+  if (!intent.powerHeld) p.powerArmed = false;
   p.held = { shoot: intent.shootHeld, chip: intent.chipHeld, power: intent.powerHeld };
   p.aim = intent.aim;
   p.stateT += dt;
@@ -345,8 +354,9 @@ export function stepPlayer(p: Player, intent: PlayerIntent, dt: number, field: F
   p.touchCooldown = Math.max(0, p.touchCooldown - dt);
 
   if (p.state === 'ground') {
-    if (powerPressed && powerOk) {
+    if (p.powerArmed && powerOk) {
       // He plants in the power-up stance.
+      p.powerArmed = false;
       enter(p, 'poweringUp');
       p.charge = 0;
       p.vx = 0;

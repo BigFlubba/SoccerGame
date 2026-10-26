@@ -34,7 +34,12 @@ export function matchFeedback(w: World, prevPhase: Phase, prevCharge = 0): Match
   }
   if (w.home.state === 'poweringUp') {
     for (const [at, kind] of CHARGE_STEPS) if (prevCharge < at && w.home.charge >= at) rumble.add(kind);
+    if (prevCharge < 1 && w.home.charge >= 1) {
+      cues.add('powerReady');
+      rumble.add('ready');
+    }
   }
+  if (power.cancelled) cues.add('fizzle');
   if (power.fired) {
     cues.add('waveBlast').add('beam');
     rumble.add('wave');

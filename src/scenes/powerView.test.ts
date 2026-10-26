@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { BASE_STATS } from '../game/stats';
 import { createWorld, type World } from '../game/world';
 import type { MatchHud } from './matchView';
-import { homeSprites, shakeFor } from './powerView';
+import { homeSprites, powerPrompt, shakeFor } from './powerView';
 
 const hudWith = (h: Partial<MatchHud> = {}): MatchHud => ({
   perfect: null,
@@ -63,3 +63,15 @@ describe('homeSprites', () => {
     expect(homeSprites(w, hudWith({ goldenCelebration: true }))).toBe('homeGolden');
   });
 });
+
+describe('powerPrompt', () => {
+  it('LET GO! shows over him once the charge is full, and not before', () => {
+    const w = world(false);
+    expect(powerPrompt(w.home)).toBeNull();
+    Object.assign(w.home, { state: 'poweringUp', charge: 0.9 });
+    expect(powerPrompt(w.home)).toBeNull();
+    Object.assign(w.home, { charge: 1 });
+    expect(powerPrompt(w.home)).toBe('LET GO!');
+  });
+});
+

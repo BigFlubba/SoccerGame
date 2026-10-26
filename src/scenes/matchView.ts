@@ -21,6 +21,7 @@ import {
   drawPowerMeter,
   drawSkid,
   homeSprites,
+  powerPrompt,
   shakeFor,
   silhouette,
 } from './powerView';
@@ -79,6 +80,9 @@ const CELEBRATE_HOP_PX = 2;
 /** Blinks per second for the overcharge flash. */
 const BLINK_HZ = 8;
 const ARROW_Y = 16;
+/** LET GO! sits over his charge bar, flashing between gold and white. */
+const PROMPT_Y = -56;
+const PROMPT_BLINK_HZ = 8;
 /** The arrow is drawn 3 px either side of its x; this keeps a pixel's gap beside the meter. */
 const ARROW_CLEARANCE = 5;
 const SHADOW_W = 5;
@@ -365,6 +369,11 @@ export function drawMatch(g: CanvasRenderingContext2D, w: World, cam: Camera, ar
     const kicker = hud.perfect.team === 'home' ? w.home : w.away;
     const at = screen(cam, kicker.x, kicker.y, kicker.z);
     drawText(g, art, 'PERFECT', at.x, at.y - 56, 1, 'energyGold');
+  }
+  const prompt = powerPrompt(w.home);
+  if (prompt) {
+    const at = screen(cam, w.home.x, w.home.y, w.home.z);
+    drawText(g, art, prompt, at.x, at.y + PROMPT_Y, 1, Math.floor(nowS * PROMPT_BLINK_HZ) % 2 === 0 ? 'energyGold' : 'white');
   }
   const b = banner(w, moment);
   if (b && moment) drawGoalBanner(g, art, moment, b.scale);

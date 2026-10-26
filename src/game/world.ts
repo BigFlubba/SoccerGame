@@ -5,7 +5,7 @@ import { resolveContacts, type ContactEvents } from './contact';
 import { BACKYARD, goalScored, type Field } from './field';
 import { createMatch, stepMatch, type MatchState, type Team } from './match';
 import { NO_INTENT, cancelCharge, createPlayer, stepPlayer, type Player, type PlayerIntent } from './player';
-import { addMeter, canStartPower, createPower, maxGoal, onTarget, tickPower, type PowerKit, type PowerState } from './power';
+import { addMeter, canStartPower, createPower, maxGoal, onTarget, tickPower, trapAtFeet, type PowerKit, type PowerState } from './power';
 import type { Stats } from './stats';
 import { fireWave, stepWave, type Wave } from './wave';
 import { ballAtFeet } from './zones';
@@ -151,8 +151,8 @@ export function stepWorld(w: World, homeIntent: PlayerIntent, awayIntent: Player
   stepOne(w.away, awayIntent, live, w, dt);
   if (!wasPowering && home.state === 'poweringUp') {
     power.started = true;
-    // He plants with the ball, so it can't roll off his feet as he stops.
-    [w.ball.vx, w.ball.vz] = [0, 0];
+    // He plants and traps the ball, so it can't roll off his feet as he stops.
+    trapAtFeet(home, w.ball);
   }
   if (home.state === 'unleashing' && home.kick?.kind === 'wave' && home.kick.active) {
     home.kick.active = false;

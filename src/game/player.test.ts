@@ -492,6 +492,30 @@ describe('stepPlayer: powering up', () => {
     expect(p.charge).toBe(0);
   });
 
+  it('a press held until a power-up is allowed starts it the moment it is', () => {
+    const p = harrison();
+    power(p, { powerHeld: true }, 10, false);
+    expect(p.state).toBe('ground');
+    power(p, { powerHeld: true }, 1, true);
+    expect(p.state).toBe('poweringUp');
+  });
+
+  it('pausing (cancelCharge) drops a waiting press, so a held Y needs a fresh press on resume', () => {
+    const p = harrison();
+    power(p, { powerHeld: true }, 5, false);
+    cancelCharge(p);
+    power(p, { powerHeld: true }, 5, true);
+    expect(p.state).toBe('ground');
+  });
+
+  it('a press let go before it was allowed does not start one later', () => {
+    const p = harrison();
+    power(p, { powerHeld: true }, 5, false);
+    power(p, {}, 1, false);
+    power(p, {}, 5, true);
+    expect(p.state).toBe('ground');
+  });
+
   it('Y still held after a cancel needs a fresh press', () => {
     const p = harrison();
     power(p, { powerHeld: true }, ticks(0.5));

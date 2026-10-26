@@ -149,6 +149,20 @@ describe('starting a power-up', () => {
   });
 });
 
+describe('a dribbled ball', () => {
+  it('just ahead of him counts as his, further does not', () => {
+    const near = ready().w;
+    near.ball.x = near.home.x + 22;
+    expect(canStartPower(near)).toBe(true);
+    const far = ready().w;
+    far.ball.x = far.home.x + 34;
+    expect(canStartPower(far)).toBe(false);
+    const behind = ready().w;
+    behind.ball.x = behind.home.x - 10;
+    expect(canStartPower(behind)).toBe(false);
+  });
+});
+
 describe('powerHint', () => {
   it('powerHint is dim with the ball at his feet beside the goal line, lit in open play, none when not full', () => {
     expect(powerHint(ready().w)).toBe('lit');

@@ -6,6 +6,7 @@ import { BASE_STATS } from './stats';
 import { BALL_REST_Y } from './ball';
 import { POWER_UP_S } from './player';
 import { createWorld, placeForKickoff, stepWorld, type World } from './world';
+import { ballAtFeet } from './zones';
 
 const STEP = 1 / 60;
 const ERR = { home: 4, away: 6 };
@@ -325,4 +326,33 @@ describe('world: the power-up', () => {
     for (let i = 0; i < ticks(3); i++) stepWorld(w, move(1), NO_INTENT, STEP);
     expect(w.power?.meter).toBeGreaterThan(0);
   });
+
+  it('starting a power-up traps a dribbled ball at his feet, and it stays there', () => {
+    const w = ready();
+    Object.assign(w.home, { vx: 95 });
+    Object.assign(w.ball, { x: w.home.x + 22, vx: 130 });
+    stepWorld(w, hold, NO_INTENT, STEP);
+    expect(w.home.state).toBe('poweringUp');
+    expect(ballAtFeet(w.home, w.ball)).toBe(true);
+    expect(Math.hypot(w.ball.vx, w.ball.vz)).toBe(0);
+    for (let i = 0; i < 30; i++) stepWorld(w, hold, NO_INTENT, STEP);
+    expect(w.home.state).toBe('poweringUp');
+  });
+
+  it.each([false, true])('while dribbling (sprint %s), a held power press starts within 0.1 s, whenever it comes', sprint => {
+    const run: PlayerIntent = { ...NO_INTENT, moveX: 1, sprint };
+    for (let k = 0; k < 60; k++) {
+      const w = ready();
+      Object.assign(w.home, { x: 120 });
+      Object.assign(w.ball, { x: 128 });
+      for (let i = 0; i < k; i++) stepWorld(w, run, NO_INTENT, STEP);
+      let waited = 0;
+      while (w.home.state !== 'poweringUp' && waited < 60) {
+        stepWorld(w, { ...run, powerHeld: true }, NO_INTENT, STEP);
+        waited++;
+      }
+      expect(waited, `pressed after ${k} ticks`).toBeLessThanOrEqual(6);
+    }
+  });
 });
+

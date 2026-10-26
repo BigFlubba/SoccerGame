@@ -1,9 +1,11 @@
 import { BALL_R } from '../art/ball';
+import { BALL_REST_Y, type Ball } from './ball';
 import { GRAVITY, POST_R } from './constants';
 import type { Goal } from './field';
 import { POST_INSET, type Aim } from './kick';
 import type { World } from './world';
-import { ballAtFeet } from './zones';
+import type { Player } from './player';
+import { REACH_Z, ballAtFeet } from './zones';
 
 /** What Harrison brings to a match from the profile: present only once he owns a power move. */
 export interface PowerKit {
@@ -95,6 +97,23 @@ export function waveClear(ball: { x: number }, goal: Goal): boolean {
   return inFront >= WAVE_MIN_DX;
 }
 
+/** A dribbled ball runs ahead of him between touches: this far ahead (ball centre from his), it's still his to power up with. */
+export const POWER_REACH = 26;
+/** Where a power-up traps the ball: just ahead of his boot. */
+const TRAP_AHEAD = 8;
+
+/** The ball is his: at his feet, or on the ground just ahead of him as he dribbles. */
+export function ballInControl(p: Player, ball: Ball): boolean {
+  if (ballAtFeet(p, ball)) return true;
+  const ahead = (ball.x - p.x) * p.facing;
+  return p.y === 0 && ball.y <= BALL_REST_Y && ahead >= 0 && ahead <= POWER_REACH && Math.abs(ball.z - p.z) <= REACH_Z;
+}
+
+/** He traps the ball as he plants: dead, just ahead of his boot. */
+export function trapAtFeet(p: Player, ball: Ball): void {
+  Object.assign(ball, { x: p.x + p.facing * TRAP_AHEAD, z: p.z, y: BALL_REST_Y, vx: 0, vy: 0, vz: 0, spin: 0 });
+}
+
 /** The goal Harrison attacks. */
 export const maxGoal = (w: World): Goal => w.field.goals.find(g => g.side === 'right')!;
 
@@ -108,7 +127,7 @@ export function canStartPower(w: World): boolean {
     w.match.phase === 'playing' &&
     w.home.state === 'ground' &&
     facesMaxGoal(w) &&
-    ballAtFeet(w.home, w.ball) &&
+    ballInControl(w.home, w.ball) &&
     waveClear(w.ball, maxGoal(w))
   );
 }
@@ -116,6 +135,6 @@ export function canStartPower(w: World): boolean {
 /** The HUD's Y button: hidden until the meter is full, dimmed while the ball is at his feet but there's no clean line. */
 export function powerHint(w: World): 'none' | 'lit' | 'dim' {
   if (!w.power || w.power.meter < 1) return 'none';
-  if (ballAtFeet(w.home, w.ball) && (!facesMaxGoal(w) || !waveClear(w.ball, maxGoal(w)))) return 'dim';
+  if (ballInControl(w.home, w.ball) && (!facesMaxGoal(w) || !waveClear(w.ball, maxGoal(w)))) return 'dim';
   return 'lit';
 }

@@ -91,6 +91,11 @@ export function auraStrength(w: World, hud: MatchHud): number {
   return w.home.state === 'unleashing' ? 1 : 0;
 }
 
+/** What to tell him over his head: once the charge is full, it's time to let go. */
+export function powerPrompt(p: Player): string | null {
+  return p.state === 'poweringUp' && p.charge >= 1 ? 'LET GO!' : null;
+}
+
 /** The pitch's power shake in whole pixels: growing with the charge, or the scene's fired-wave and brace shakes. */
 export function shakeFor(power: PowerState | null, home: Player, hud: MatchHud, nowS: number): { dx: number; dy: number } {
   if (!power) return { dx: 0, dy: 0 };
