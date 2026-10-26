@@ -22,8 +22,8 @@ export const VS_AUTO_S = 2;
 
 /** The venue behind the card, still, as the road map shows it. */
 const CAM: Camera = { x: 40 };
-/** The top band is dimmed under the lines, as on the venue screen. */
-const HEADER = { h: 30, dim: 0.45 };
+/** The band behind the three lines is dimmed, as the venue screen's header is: the sky's cloud streak and the washing line are behind them. */
+const HEADER = { h: 86, dim: 0.45 };
 const LINE_YS = [30, 52, 74] as const;
 const LINE_SCALES = [2, 2, 1] as const;
 /** The two of them stand facing each other on the pitch line. */
