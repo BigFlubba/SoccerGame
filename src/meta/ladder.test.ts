@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { BASE_STATS, MAX_STAT_LEVEL, MIN_STAT_LEVEL, STAT_NAMES } from '../game/stats';
-import { LADDER_STATS, isChampion, maxStats, nextMatch, nextMatchLine, trainingLine } from './ladder';
+import { LADDER_STATS, isChampion, maxStats, nextMatch, trainingLine } from './ladder';
 import { LADDER_MATCHES } from './profile';
 
 describe('the Backyard Ladder', () => {
@@ -41,11 +41,5 @@ describe('the Backyard Ladder', () => {
     expect(trainingLine(2)).toBe('MAX HAS BEEN TRAINING: SPEED UP');
     expect(trainingLine(3)).toBe('MAX HAS BEEN TRAINING: POWER UP');
     expect(trainingLine(7)).toBe('MAX HAS BEEN TRAINING: JUMP UP');
-  });
-
-  it('next-match line', () => {
-    expect(nextMatchLine(0)).toBe('NEXT: MAX - MATCH 1/10');
-    expect(nextMatchLine(2)).toBe('NEXT: MAX - MATCH 3/10');
-    expect(nextMatchLine(10)).toBe('CHAMPION! REMATCH: MAX');
   });
 });

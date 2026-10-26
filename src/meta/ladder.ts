@@ -43,7 +43,3 @@ export function trainingLine(match: number): string | null {
   const rose = STAT_NAMES.filter(k => now[k] > before[k]).map(k => STAT_INFO[k].label);
   return rose.length ? `MAX HAS BEEN TRAINING: ${rose.join(' AND ')} UP` : null;
 }
-
-export function nextMatchLine(ladderWins: number): string {
-  return isChampion(ladderWins) ? 'CHAMPION! REMATCH: MAX' : `NEXT: MAX - MATCH ${nextMatch(ladderWins)}/${LADDER_MATCHES}`;
-}

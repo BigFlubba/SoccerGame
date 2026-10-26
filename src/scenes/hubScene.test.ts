@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { DIFFICULTY } from '../game/ai';
+import { careerCardLines } from '../meta/career';
 import { maxStats } from '../meta/ladder';
 import { newProfile } from '../meta/profile';
 import { DEFAULT_SETTINGS, type Settings } from '../meta/settings';
@@ -8,6 +9,7 @@ import type { MatchScene } from './matchScene';
 import { testContext } from './testContext';
 import { frame } from './testInput';
 import { createPressStartScene } from './titleScene';
+import type { VsScene } from './vsScene';
 
 const STEP = 1 / 60;
 function context(difficulty: Settings['difficulty'] = 'normal') {
@@ -29,23 +31,35 @@ describe('press start screen', () => {
 });
 
 describe('hub', () => {
-  it('the Hub has PLAY MATCH, SHOP, OPTIONS, HELP and no quit', () => {
-    expect(HUB_ITEMS).toEqual(['PLAY MATCH', 'SHOP', 'OPTIONS', 'HELP']);
+  it('the Hub has CAREER, SHOP, OPTIONS, HELP and no quit', () => {
+    expect(HUB_ITEMS).toEqual(['CAREER', 'SHOP', 'OPTIONS', 'HELP']);
   });
 
-  it('PLAY MATCH starts a match at the saved difficulty', () => {
+  it('CAREER opens the road map, and A there then A plays the next match through the VS card', () => {
+    const ctx = testContext({ profile: { ...newProfile(), ladderWins: 4 } });
+    const map = createHubScene(ctx).update(frame(['confirm']), STEP)!;
+    expect(map.kind).toBe('roadMap');
+    const venue = map.update(frame(['confirm']), STEP)!;
+    expect(venue.kind).toBe('venue');
+    const vs = venue.update(frame(['confirm']), STEP) as VsScene;
+    expect(vs.kind).toBe('vs');
+    expect(vs.match.id).toBe('backyard-5');
+    const match = vs.update(frame(['confirm']), STEP) as MatchScene;
+    expect(match.world.away.stats).toEqual(maxStats(5));
+  });
+
+  it('a match reached from the Hub plays at the saved difficulty', () => {
     for (const difficulty of ['easy', 'hard'] as const) {
-      const next = createHubScene(context(difficulty)).update(frame(['confirm']), STEP) as MatchScene;
-      expect(next.kind).toBe('match');
-      expect(next.world.aimErrorDeg.away).toBe(DIFFICULTY[difficulty].aimErrorDeg);
+      let scene = createHubScene(context(difficulty));
+      for (let i = 0; i < 4; i++) scene = scene.update(frame(['confirm']), STEP)!;
+      const match = scene as MatchScene;
+      expect(match.kind).toBe('match');
+      expect(match.world.aimErrorDeg.away).toBe(DIFFICULTY[difficulty].aimErrorDeg);
     }
   });
 
-  it('PLAY MATCH plays the next ladder match', () => {
-    const ctx = testContext({ profile: { ...newProfile(), ladderWins: 4 } });
-    const next = createHubScene(ctx).update(frame(['confirm']), STEP) as MatchScene;
-    expect(next.match.id).toBe('backyard-5');
-    expect(next.world.away.stats).toEqual(maxStats(5));
+  it('the card says what is next in the career', () => {
+    expect(careerCardLines({ ...newProfile(), ladderWins: 4 })).toEqual({ first: 'NEXT: MAX - MATCH 5/10', second: 'MAX HAS BEEN TRAINING: SPEED UP' });
   });
 
   it('B on the Hub goes back to Press Start', () => {
@@ -53,7 +67,7 @@ describe('hub', () => {
   });
 
   it('Start on the Hub starts the selected item, like A', () => {
-    expect(createHubScene(context()).update(frame(['pause']), STEP)?.kind).toBe('match');
+    expect(createHubScene(context()).update(frame(['pause']), STEP)?.kind).toBe('roadMap');
     expect(createHubScene(context(), 3).update(frame(['pause']), STEP)?.kind).toBe('help');
   });
 
@@ -62,7 +76,7 @@ describe('hub', () => {
   });
 
   it('Enter on the Hub still confirms', () => {
-    expect(createHubScene(context()).update(frame(['pause', 'confirm']), STEP)?.kind).toBe('match');
+    expect(createHubScene(context()).update(frame(['pause', 'confirm']), STEP)?.kind).toBe('roadMap');
   });
 
   it('HELP opens Help, and B there comes back to the Hub on HELP', () => {
@@ -100,7 +114,7 @@ describe('hub', () => {
     s.update(frame(['down']), STEP);
     s.update(frame(['down']), STEP);
     s.update(frame(['up']), STEP);
-    expect(s.update(frame(['confirm']), STEP)?.kind).toBe('match');
+    expect(s.update(frame(['confirm']), STEP)?.kind).toBe('roadMap');
   });
 
   it('Press Start and the Hub play the title theme', () => {

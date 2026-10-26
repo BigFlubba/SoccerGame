@@ -49,7 +49,7 @@ describe('the road map', () => {
     const hub = createRoadMapScene(ctx).update(frame(['back']), STEP)!;
     expect(hub.kind).toBe('hub');
     expect(ctx.audio.played).toContain('menuBack');
-    expect(hub.update(frame(['confirm']), STEP)?.kind).toBe('match'); // 'roadMap' once CAREER is on the Hub
+    expect(hub.update(frame(['confirm']), STEP)?.kind).toBe('roadMap');
   });
 
   it('B on the venue screen comes back to the map', () => {

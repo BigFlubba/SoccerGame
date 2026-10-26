@@ -1,20 +1,20 @@
 import { MASTER } from '../art/colors';
 import { STAT_NAMES, type StatName, type Stats } from '../game/stats';
+import { careerCardLines } from '../meta/career';
 import { xpToNext } from '../meta/economy';
-import { isChampion, nextMatch, nextMatchLine, trainingLine } from '../meta/ladder';
 import { drawBackdrop } from './backdrop';
 import type { GameContext } from './context';
 import { createHelpScene } from './helpScene';
-import { createMatchScene, newSeed } from './matchScene';
 import { drawMenu, menuCue, stepMenu, type MenuState } from './menu';
 import { createOptionsScene } from './optionsScene';
 import { drawBar, drawCoins, drawPanel } from './panel';
+import { createRoadMapScene } from './roadMapScene';
 import type { Scene } from './scene';
 import { createShopScene } from './shopScene';
 import { createPressStartScene } from './titleScene';
 
 /** No QUIT: a web page can't close its own tab. */
-export const HUB_ITEMS = ['PLAY MATCH', 'SHOP', 'OPTIONS', 'HELP'] as const;
+export const HUB_ITEMS = ['CAREER', 'SHOP', 'OPTIONS', 'HELP'] as const;
 
 const SHORT: Record<StatName, string> = { speed: 'SPD', power: 'PWR', jump: 'JMP', control: 'CTL' };
 const CARD = { x: 16, y: 8, w: 288, h: 80 };
@@ -31,10 +31,10 @@ export function statsLine(s: Stats): string {
 }
 
 /**
- * Harrison's card (portrait, level and XP, coins, stats, and the next
- * ladder match) over the drifting Backyard, with PLAY MATCH, SHOP, OPTIONS
- * and HELP. Up/down choose, A or Start confirms, B or Esc goes back to
- * Press Start.
+ * Harrison's card (portrait, level and XP, coins, stats, and what's next in
+ * the career) over the drifting Backyard, with CAREER, SHOP, OPTIONS and
+ * HELP. Up/down choose, A or Start confirms, B or Esc goes back to Press
+ * Start.
  */
 export function createHubScene(ctx: GameContext, index = 0): Scene {
   const { art } = ctx;
@@ -52,7 +52,7 @@ export function createHubScene(ctx: GameContext, index = 0): Scene {
       if (cue) ctx.audio.play(cue);
       menu = r.m;
       if (r.back) return createPressStartScene(ctx);
-      if (chosen === 'PLAY MATCH') return createMatchScene(ctx, newSeed());
+      if (chosen === 'CAREER') return createRoadMapScene(ctx);
       if (chosen === 'SHOP') return createShopScene(ctx, backHere);
       if (chosen === 'HELP') return createHelpScene(ctx, backHere);
       if (chosen === 'OPTIONS') return createOptionsScene(ctx, backHere, true);
@@ -69,9 +69,9 @@ export function createHubScene(ctx: GameContext, index = 0): Scene {
       g.drawImage(level, TEXT_X, CARD.y + 26);
       drawBar(g, TEXT_X + level.width + XP_BAR.gap, CARD.y + 28, XP_BAR.w, XP_BAR.h, p.xp / xpToNext(p.level), MASTER.electric);
       g.drawImage(art.text(statsLine(p.stats), 1, 'white', 'outline'), TEXT_X, CARD.y + 38);
-      g.drawImage(art.text(nextMatchLine(p.ladderWins), 1, 'energyGold', 'outline'), TEXT_X, CARD.y + 54);
-      const second = isChampion(p.ladderWins) ? 'BACKYARD CHAMPION!' : trainingLine(nextMatch(p.ladderWins));
-      if (second) g.drawImage(art.text(second, 1, 'silver', 'outline'), TEXT_X, CARD.y + 65);
+      const career = careerCardLines(p);
+      g.drawImage(art.text(career.first, 1, 'energyGold', 'outline'), TEXT_X, CARD.y + 54);
+      if (career.second) g.drawImage(art.text(career.second, 1, 'silver', 'outline'), TEXT_X, CARD.y + 65);
       drawMenu(g, art, menu, MENU_CX, MENU_TOP);
     },
   };
