@@ -23,7 +23,7 @@ export interface DogProfile {
   reactionS: number;
   /** Seconds a ball at Harrison's feet must sit in his muzzle before it's his, at Control 1. */
   dwellS: number;
-  /** He jinks when a blocker is within this far ahead... */
+  /** He jinks when a blocker is within this far ahead: the later he cuts, the less time Harrison has to read it... */
   jinkAhead: number;
   /** ...and goes this wide. */
   jinkWidth: number;
@@ -34,9 +34,9 @@ export interface DogProfile {
 }
 
 export const DOG_DIFFICULTY: Readonly<Record<Difficulty, DogProfile>> = {
-  easy: { reactionS: 0.32, dwellS: 0.55, jinkAhead: 18, jinkWidth: 14, staminaS: 2.2, braceSense: DIFFICULTY.easy.braceSense },
-  normal: { reactionS: 0.18, dwellS: 0.35, jinkAhead: 22, jinkWidth: 18, staminaS: 3, braceSense: DIFFICULTY.normal.braceSense },
-  hard: { reactionS: 0.1, dwellS: 0.2, jinkAhead: 30, jinkWidth: 22, staminaS: 4, braceSense: DIFFICULTY.hard.braceSense },
+  easy: { reactionS: 0.32, dwellS: 0.55, jinkAhead: 26, jinkWidth: 14, staminaS: 2.4, braceSense: DIFFICULTY.easy.braceSense },
+  normal: { reactionS: 0.18, dwellS: 0.35, jinkAhead: 22, jinkWidth: 18, staminaS: 2.9, braceSense: DIFFICULTY.normal.braceSense },
+  hard: { reactionS: 0.1, dwellS: 0.2, jinkAhead: 18, jinkWidth: 22, staminaS: 4, braceSense: DIFFICULTY.hard.braceSense },
 };
 
 /** The Harrison he's tuned against: one stat level above Max's last rung. */
@@ -51,8 +51,8 @@ export const DOG_ACCEL = 1400;
 export const DOG_CATCH_SPEED = 260;
 /** He takes a ball whose centre is no higher than this, which also keeps him off the net roofs. */
 export const DOG_CATCH_HEIGHT = 16;
-/** His muzzle zone along his facing, REACH_Z either side in depth. */
-export const MUZZLE_REACH = { ahead0: 4, ahead1: 14 };
+/** His muzzle zone along his facing, REACH_Z either side in depth; for a ball at Harrison's feet he noses in further, and wider, round his legs. */
+export const MUZZLE_REACH = { ahead0: 4, ahead1: 14, nosingIn: 20, nosingInZ: REACH_Z + 4 };
 /** The dwell grows this much per Control level above 1. */
 export const DWELL_PER_CONTROL = 0.08;
 export const JINK_S = 0.5;
@@ -64,6 +64,9 @@ export const PANT_S = 1.2;
 export const REGRAB_S = 1;
 /** A knocked-out ball pops this fast, ahead of the tackle. */
 export const DROP_POP = { vx: 90, vy: 60 };
+/** Pressed this close against a Harrison slower than STILL_SPEED px/s, he noses round his legs for the ball at his feet. */
+const PRESSED_GAP = 2;
+const STILL_SPEED = 20;
 /** Carrying, trying to run but held to under TRAPPED_SPEED px/s for TRAPPED_S, he's pinned: he sets the ball down. */
 export const TRAPPED_S = 1;
 const TRAPPED_SPEED = 10;
@@ -77,6 +80,8 @@ export interface DogState {
   carrying: boolean;
   /** Seconds he has carried the ball so far (0 when he hasn't it): the view shows the grab at first. */
   carryS: number;
+  /** Whether he took the ball he carries off Harrison's feet: he darts away from him with it first. */
+  snatched: boolean;
   /** Muzzle time on a controlled ball so far. */
   dwellS: number;
   /** Time left in the jink. */
@@ -102,36 +107,56 @@ export interface DogEvents {
 export const quietDog = (): DogEvents => ({ grabbed: false, dropped: false, jinked: false, panted: false });
 
 export function createDog(profile: DogProfile): DogState {
-  return { profile, carrying: false, carryS: 0, dwellS: 0, jinkS: 0, jinkSide: 1, jinkCooldownS: 0, runS: 0, pantS: 0, regrabS: 0, stuckS: 0 };
+  return { profile, carrying: false, carryS: 0, snatched: false, dwellS: 0, jinkS: 0, jinkSide: 1, jinkCooldownS: 0, runS: 0, pantS: 0, regrabS: 0, stuckS: 0 };
 }
 
-/** Clears everything a kickoff starts afresh. */
+/** Clears everything a kickoff starts afresh; he has rested through the pause, so his stamina is full. */
 export function resetDog(d: DogState): void {
-  Object.assign(d, { carrying: false, carryS: 0, dwellS: 0, jinkS: 0, pantS: 0, regrabS: 0, stuckS: 0 });
+  Object.assign(d, { carrying: false, carryS: 0, snatched: false, dwellS: 0, jinkS: 0, jinkCooldownS: 0, runS: 0, pantS: 0, regrabS: 0, stuckS: 0 });
 }
 
 export const dwellFor = (profile: DogProfile, control: number): number => profile.dwellS + DWELL_PER_CONTROL * (control - 1);
 
-/** His muzzle zone, facing-relative like footZone. */
-export function muzzleZone(p: Player): Rect {
-  const [a, b] = [p.x + p.facing * MUZZLE_REACH.ahead0, p.x + p.facing * MUZZLE_REACH.ahead1];
-  return { x0: Math.min(a, b), x1: Math.max(a, b), y0: p.y, y1: p.y + DOG_CATCH_HEIGHT, z0: p.z - REACH_Z, z1: p.z + REACH_Z };
+/** His muzzle zone, facing-relative like footZone; `nosingIn` reaches further. */
+export function muzzleZone(p: Player, nosingIn = false): Rect {
+  const [a, b] = [p.x + p.facing * MUZZLE_REACH.ahead0, p.x + p.facing * (nosingIn ? MUZZLE_REACH.nosingIn : MUZZLE_REACH.ahead1)];
+  const side = nosingIn ? MUZZLE_REACH.nosingInZ : REACH_Z;
+  return { x0: Math.min(a, b), x1: Math.max(a, b), y0: p.y, y1: p.y + DOG_CATCH_HEIGHT, z0: p.z - side, z1: p.z + side };
 }
 
 /** He's slow and the ball can be won: jinking or panting. */
 export const vulnerable = (d: DogState): boolean => d.jinkS > 0 || d.pantS > 0;
 
-/** Whether the ball is where his muzzle can take it: in the muzzle zone, or against his body. */
-function inReach(dog: Player, w: World): boolean {
-  const b = w.ball;
-  return ballIn(muzzleZone(dog), b, BALL_R) || (Math.hypot(b.x - dog.x, b.z - dog.z) < PLAYER_R + BALL_R && b.y <= DOG_CATCH_HEIGHT);
+/** Pressed against a Harrison standing still, with the ball on the side he faces. */
+function pressedOnStill(dog: Player, w: World): boolean {
+  const them = w.home;
+  const still = Math.hypot(them.vx, them.vz) < STILL_SPEED;
+  return still && Math.hypot(them.x - dog.x, them.z - dog.z) <= 2 * PLAYER_R + PRESSED_GAP && (w.ball.x - dog.x) * dog.facing > 0;
 }
 
-/** Whether a loose or controlled ball can be taken this tick (reach, speed, height, not fallen/blown/bracing, no regrab wait, not panting). */
+/**
+ * Whether the ball is where his muzzle can take it: in the muzzle zone, or
+ * against his body. A ball at Harrison's feet he noses in for, and round
+ * the legs of a Harrison who stands still on it, so a boy standing on it in
+ * a corner, or walling off the strip beside a goal, can't shut him out.
+ */
+function inReach(dog: Player, w: World): boolean {
+  const b = w.ball;
+  const atFeet = ballAtFeet(w.home, b);
+  if (atFeet && pressedOnStill(dog, w)) return true;
+  return ballIn(muzzleZone(dog, atFeet), b, BALL_R) || (Math.hypot(b.x - dog.x, b.z - dog.z) < PLAYER_R + BALL_R && b.y <= DOG_CATCH_HEIGHT);
+}
+
+/**
+ * Whether a loose or controlled ball can be taken this tick (reach, speed,
+ * height, not fallen/blown/bracing, no regrab wait, not panting). Never on
+ * the tick Harrison strikes the Energy Wave: the wave has the ball.
+ */
 export function canGrab(w: World): boolean {
   const d = w.dog;
   const b = w.ball;
-  if (!d || d.carrying || w.match.phase !== 'playing' || w.wave?.live) return false;
+  const striking = w.home.kick?.kind === 'wave' && w.home.kick.active;
+  if (!d || d.carrying || w.match.phase !== 'playing' || w.wave?.live || striking) return false;
   if (w.away.state !== 'ground' || d.regrabS > 0 || d.pantS > 0) return false;
   return Math.hypot(b.vx, b.vy, b.vz) <= DOG_CATCH_SPEED && b.y <= DOG_CATCH_HEIGHT && inReach(w.away, w);
 }
@@ -165,6 +190,7 @@ export function dropBall(w: World, pop: boolean): void {
   const d = w.dog!;
   d.carrying = false;
   d.carryS = 0;
+  d.snatched = false;
   d.jinkS = 0;
   d.dwellS = 0;
   d.regrabS = Math.max(d.regrabS, REGRAB_S);
@@ -216,10 +242,12 @@ function grab(w: World, d: DogState, dt: number, ev: DogEvents): void {
     if (!d.carrying && !inReach(w.away, w)) d.dwellS = 0;
     return;
   }
-  if (ballAtFeet(w.home, w.ball)) {
+  const fromFeet = ballAtFeet(w.home, w.ball);
+  if (fromFeet) {
     d.dwellS += dt;
     if (d.dwellS < dwellFor(d.profile, w.home.stats.control)) return;
   }
+  d.snatched = fromFeet;
   d.carrying = true;
   d.carryS = 0;
   d.dwellS = 0;

@@ -19,7 +19,8 @@ const looping = (name: DogAnim, nowS: number): DogClip => ({ name, frame: Math.f
 
 /**
  * Which clip and frame the dog shows: blown or braced from his body's state
- * (flat out in the air, then on his back once down); then the pant; the
+ * (flat out going up, tumbling on the way down, then on his feet shaking it
+ * off); then the pant, which is also how he shakes off a lost ball; the
  * jink (crouch, then cut); the grab for GRAB_SHOW_S after he takes the
  * ball; the carry, standing or galloping; the run when moving; idle
  * otherwise. Looping clips run on `nowS`.
@@ -27,9 +28,10 @@ const looping = (name: DogAnim, nowS: number): DogClip => ({ name, frame: Math.f
 export function dogClip(w: World, nowS: number): DogClip {
   const d = w.dog!;
   const p = w.away;
-  if (p.state === 'blown') return { name: 'blown', frame: p.y > 0 || p.vy > 0 ? 0 : 1 };
+  if (p.state === 'blown' && (p.y > 0 || p.vy > 0)) return { name: 'blown', frame: p.vy > 0 ? 0 : 1 };
   if (p.state === 'bracing') return { name: 'brace', frame: 0 };
-  if (d.pantS > 0) return looping('pant', nowS);
+  // Landed from a wave, knocked off the ball, or out of breath: standing, heaving.
+  if (p.state === 'blown' || d.pantS > 0 || (d.regrabS > 0 && !d.carrying)) return looping('pant', nowS);
   if (d.jinkS > 0) return { name: 'jink', frame: d.jinkS > JINK_S / 2 ? 0 : 1 };
   if (d.carrying && d.carryS < GRAB_SHOW_S) return { name: 'grab', frame: Math.min(BISCUIT_FRAMES.grab.length - 1, Math.floor(d.carryS * BISCUIT_FPS.grab)) };
   const moving = Math.hypot(p.vx, p.vz) >= IDLE_SPEED;

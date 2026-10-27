@@ -317,7 +317,13 @@ like Max.
   Biscuit's muzzle has been on it for a short dwell, a visible wind-up
   Harrison can turn away from. The dwell grows with Harrison's Control and
   shrinks with difficulty (builder's curve, so upgrades matter). A shot
-  above his catch speed passes him.
+  above his catch speed passes him. *As built:* close to the ball he settles
+  where his muzzle stays on it, on its far side from Harrison, and for a
+  ball at Harrison's feet he noses in further; pressed against a Harrison
+  standing still on it he noses round his legs. So standing on the ball,
+  in a corner or in the narrow strip beside a goal, never shuts him out:
+  the dwell runs and the ball is his. A ball pressed between the two of
+  them is no 50/50 squirt: the dwell decides.
 - **Carry.** The ball goes in his mouth. While carried it isn't simulated:
   it rides at his muzzle, nobody else can touch it, and the HUD, camera and
   goal logic treat its position as the ball's. He runs it straight at
@@ -326,7 +332,12 @@ like Max.
   normal away-goal moment plays, and Harrison kicks off as the side that
   conceded. Harrison kicks off at the start, as in every match. When it's
   Biscuit's kickoff, after a Harrison goal, the ball sits live at the
-  centre with him behind it, and he snatches it when play starts.
+  centre with him behind it, and he snatches it when play starts. *As
+  built:* just after a snatch from Harrison's feet he darts straight away
+  from him for 0.3 s before he turns for goal, since a jink right under the
+  boy he has just robbed would hand it straight back. Pinned with the ball
+  (cornered beside a goal with Harrison in front, getting nowhere for 1 s)
+  he sets it down.
 - **Speed.** Carrying or chasing, he runs about 10–15% faster than Harrison
   can sprint at the tuning stats below (builder's number). Chasing him from
   behind must lose.
@@ -336,12 +347,17 @@ like Max.
   The jink is the window: a slide tackle or a touch that reaches the ball
   during it knocks it out of his mouth. It pops free ahead of the tackle,
   live. Outside the jink, a slide on a full-speed Biscuit misses: he's
-  past it.
+  past it. *As built:* only a Harrison who waits for him gets the jink.
+  One charging at him (closing faster than 60 px/s) he dodges at full
+  speed, with no window; without that, a head-on chaser won most matches.
+  Knocked off the ball, he stands shaking it off for 1 s, then goes for it
+  after his reaction time.
 - **The pant.** His run has a stamina budget of a few seconds at full speed.
   When it's spent he stops, drops the ball at his feet and pants for about a
   second, during which he can't grab. If Harrison reaches the ball first,
   it's his. When the pant ends, Biscuit takes the ball again if it's still
-  at his feet. The budget refills while he isn't running.
+  at his feet. The budget refills while he isn't running, and a kickoff
+  rests him: he starts every kickoff with it full.
 - **Loose balls.** He chases any ball he can catch, like a dog. A saved,
   missed or rebounding shot usually ends in his mouth, so the way to score
   is early and hard, while he's away from the goal and before he's set.
@@ -363,7 +379,9 @@ like Max.
 - **Difficulty.** Easy / Normal / Hard set his reaction time, how early and
   how wide he jinks, how long he can run before panting, and how short the
   snatch's dwell is against Harrison's Control. The quiet ease-off is not in
-  this plan.
+  this plan. *As measured:* the later he jinks, the harder he is, since a
+  late cut leaves Harrison less time to read it; so Hard cuts late and Easy
+  early. How long he can run before panting is the strongest of the four.
 
 ### Teaching the lesson
 
@@ -393,41 +411,49 @@ Harrisons at those stats in headless matches:
 - a **chaser**, who runs at the ball wherever it is, must lose nearly every
   match;
 - a **blocker**, who drops between Biscuit and the goal, waits for the jink,
-  and shoots hard and early, must win about half.
+  and shoots hard and early, must win about half;
+- a **freezer**, who stands still on the ball while the dog is anywhere
+  near (added after the final review), must lose nearly every match.
 
 Those runs are tests, so a tuning change that breaks the lesson fails CI.
 The numbers are starting points, to revisit after Harrison plays.
 
-**Starting values, as built (2026-10-26).** `src/game/dog.ts` and
-`dogAi.ts`:
+**Starting values, as built (retuned 2026-10-26 after the final review).**
+`src/game/dog.ts` and `dogAi.ts`:
 
 | | Easy | Normal | Hard |
 |---|---|---|---|
 | Reaction | 0.32 s | 0.18 s | 0.1 s |
 | Snatch dwell at Control 1 (+0.08 s per level) | 0.55 s | 0.35 s | 0.2 s |
-| Jinks when a blocker is this close | 18 px | 22 px | 30 px |
+| Jinks when a blocker is this close | 26 px | 22 px | 18 px |
 | Jink width | 14 px | 18 px | 22 px |
-| Full-speed running before a pant | 2.2 s | 3 s | 4 s |
+| Full-speed running before a pant | 2.4 s | 2.9 s | 4 s |
 
 - His speed is 183 px/s, 1.12 × the tuning Harrison's sprint (163 px/s).
   Backing off from a power-up he goes at 98 px/s, Max's rung-10 pace.
 - He catches a ball under 260 px/s whose centre is no higher than 16 px.
   The jink lasts 0.5 s at 0.35 × his speed, with 0.6 s before the next.
-  A pant lasts 1.2 s.
-- **Dodge, not jink, for a charging Harrison.** One closing on him faster
-  than 60 px/s gets a full-speed dodge with no window. Only a Harrison who
-  waits for him gets the jink. Without this, a head-on chaser won most
-  matches.
-- **Knocked off the ball,** he stands shaking it off for 1 s, then goes
-  for it after his reaction time. A slide or touch that reaches the ball
-  during a jink knocks it free, popping ahead of the tackle.
-- **Pinned with the ball** (cornered beside a goal with Harrison in front)
-  for 1 s, he sets it down.
-- A ball pressed between the two of them is no 50/50: the dwell decides.
+  A pant lasts 1.2 s. A slide or touch that reaches the ball during a jink
+  knocks it free, popping ahead of the tackle.
+- The stamina budget is the sharpest dial: on Normal, 2.8 s gives the
+  blocker 0.63, 2.9 s 0.53 and 3 s 0.47. Move it in tenths.
+- The jink distance works backwards from the first guess: a jink from
+  further off gives Harrison longer to read it. Hard at 30 px measured
+  0.47 for the blocker, the same as Normal.
 
-Measured by the headless runs (blocker wins on 32 seeds; the blocker's
-reaction to a jink varies from 0.05 to 0.35 s per match): Easy 0.66,
-Normal 0.59, Hard 0.41. The chaser wins 0.03 on Normal.
+Measured by the headless runs, blocker wins on the test's 32 seeds (and on
+128): Easy 0.88 (0.80), Normal 0.50 (0.55), Hard 0.31 (0.23). The freezer
+wins none on any difficulty, and the chaser none on Normal. The scripted
+Harrisons vary as players do, per exchange: how fast the blocker reacts
+to a jink (0.05 to 0.45 s, and he follows its cut only once he has), how
+far off he waits (26 to 46 px), and how long each shot is held (0.5 to
+0.9 s).
+
+These boss matches score freely (often ten goals or more each). After
+Harrison's kickoff, the blocker scores next about 70% of the time, mostly
+with a hard shot straight from the spot, since the dog's goal is open and
+he can't catch a hard shot. So a match is decided by the dog's
+possessions, and that is where the lesson is.
 
 ## The save: profile version 3
 

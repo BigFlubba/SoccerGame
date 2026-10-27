@@ -38,8 +38,9 @@ describe('dogClip', () => {
     const w = boss();
     Object.assign(w.dog!, { carrying: true, carryS: 0, jinkS: 0.3, pantS: 0.5 });
     w.away.vx = -120;
-    w.away.state = 'blown';
+    Object.assign(w.away, { state: 'blown', y: 8 });
     expect(name(w)).toBe('blown');
+    w.away.y = 0;
     w.away.state = 'bracing';
     expect(name(w)).toBe('brace');
     w.away.state = 'ground';
@@ -61,12 +62,20 @@ describe('dogClip', () => {
     expect(dogClip(w, 1 / BISCUIT_FPS.pant).frame).toBe(1);
   });
 
-  it('blown: flat out in the air, then on his back once down', () => {
+  it('blown: flat out going up, tumbling on the way down, then on his feet shaking it off', () => {
     const w = boss();
     Object.assign(w.away, { state: 'blown', y: 10, vy: 50 });
     expect(dogClip(w, 0)).toEqual({ name: 'blown', frame: 0 });
-    Object.assign(w.away, { y: 0, vy: 0 });
+    Object.assign(w.away, { y: 10, vy: -50 });
     expect(dogClip(w, 0)).toEqual({ name: 'blown', frame: 1 });
+    Object.assign(w.away, { y: 0, vy: 0 });
+    expect(dogClip(w, 0).name).toBe('pant');
+  });
+
+  it('knocked off the ball, he stands shaking it off', () => {
+    const w = boss();
+    w.dog!.regrabS = 0.6;
+    expect(dogClip(w, 0).name).toBe('pant');
   });
 
   it('the jink crouches, then cuts', () => {

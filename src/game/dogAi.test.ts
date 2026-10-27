@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { BALL_REST_Y } from './ball';
-import { DOG_BACKPEDAL_SPEED, DOG_DIFFICULTY, JINK_S, TUNING_STATS, parkBall, type DogProfile } from './dog';
+import { DOG_BACKPEDAL_SPEED, DOG_DIFFICULTY, DOG_SPEED, JINK_S, TUNING_STATS, dwellFor, parkBall, type DogProfile } from './dog';
 import { createDogBrain, dogThink, type DogBrain } from './dogAi';
 import { NO_INTENT, type PlayerIntent } from './player';
 import { POWERED_S } from './power';
@@ -132,6 +132,94 @@ describe('dogThink', () => {
     const brain2 = createDogBrain(DOG_DIFFICULTY.normal);
     expect(dogThink(brain2, atFeet, STEP).moveX).toBeLessThan(0);
     expect(brain2.plan).toBe('chase');
+  });
+
+  it('takes the ball off a Harrison who stands still on it, from any side', () => {
+    const failed: string[] = [];
+    for (const facing of [1, -1] as const) {
+      for (let k = 0; k < 8; k++) {
+        const angle = (k * Math.PI) / 4;
+        const w = scene({ dog: 320 + 60 * Math.cos(angle), home: 320, ball: 320 + facing * 8 });
+        w.home.facing = facing;
+        w.away.z = 32 + 24 * Math.sin(angle);
+        const brain = createDogBrain(DOG_DIFFICULTY.normal);
+        const step = stepper(w, brain);
+        const budget = Math.ceil((dwellFor(DOG_DIFFICULTY.normal, w.home.stats.control) + 1.5) / STEP);
+        for (let i = 0; i < budget && !w.dog!.carrying; i++) step();
+        if (!w.dog!.carrying) failed.push(`facing ${facing}, from ${k * 45} degrees`);
+      }
+    }
+    expect(failed).toEqual([]);
+  });
+
+  it('noses in to a ball a still Harrison guards in the corner beside a goal', () => {
+    const w = scene({ dog: 30.4, home: 21.5, ball: 11.7 });
+    Object.assign(w.home, { z: 57.8, facing: -1 });
+    w.away.z = 53.3;
+    w.ball.z = 54;
+    const brain = createDogBrain(DOG_DIFFICULTY.normal);
+    const step = stepper(w, brain);
+    const budget = Math.ceil((dwellFor(DOG_DIFFICULTY.normal, w.home.stats.control) + 1) / STEP);
+    for (let i = 0; i < budget && !w.dog!.carrying; i++) step();
+    expect(w.dog!.carrying).toBe(true);
+    // And by the near post, where Harrison seals the pocket beside the goal.
+    const post = scene({ dog: 33, home: 32.3, ball: 24.4 });
+    Object.assign(post.home, { z: 8.1, facing: -1 });
+    post.away.z = 18.1;
+    post.ball.z = 7.5;
+    const brain2 = createDogBrain(DOG_DIFFICULTY.normal);
+    const step2 = stepper(post, brain2);
+    for (let i = 0; i < budget && !post.dog!.carrying; i++) step2();
+    expect(post.dog!.carrying).toBe(true);
+  });
+
+  it('noses round the legs of a still Harrison who walls off the strip beside a goal', () => {
+    // The strip under the goal is too narrow for the dog to pass him, and the ball is behind him by the boards.
+    const w = scene({ dog: 31.4, home: 22.8, ball: 7.2, profile: DOG_DIFFICULTY.easy });
+    Object.assign(w.home, { z: 5.6, facing: -1 });
+    w.away.z = 10.8;
+    w.ball.z = 8.3;
+    const brain = createDogBrain(DOG_DIFFICULTY.easy);
+    const step = stepper(w, brain);
+    const budget = Math.ceil((dwellFor(DOG_DIFFICULTY.easy, w.home.stats.control) + 1) / STEP);
+    for (let i = 0; i < budget && !w.dog!.carrying; i++) step();
+    expect(w.dog!.carrying).toBe(true);
+  });
+
+  it('just after snatching the ball off a still Harrison, darts away from him instead of jinking under him', () => {
+    const w = scene({ dog: 340, home: 300, ball: 308 });
+    const brain = createDogBrain(DOG_DIFFICULTY.normal);
+    const step = stepper(w, brain);
+    for (let i = 0; i < 120 && !w.dog!.carrying; i++) step();
+    expect(w.dog!.carrying).toBe(true);
+    const gap = () => Math.hypot(w.away.x - w.home.x, w.away.z - w.home.z);
+    const atGrab = gap();
+    let jinked = false;
+    for (let i = 0; i < 15; i++) {
+      step();
+      jinked ||= w.dog!.jinkS > 0;
+    }
+    expect(jinked).toBe(false);
+    expect(w.dog!.carrying).toBe(true);
+    expect(gap()).toBeGreaterThan(atGrab + 20);
+  });
+
+  it('runs down a soft roll flat out, rather than settling short of it', () => {
+    const w = scene({ dog: 280, home: 100, ball: 300 });
+    Object.assign(w.away, { vx: DOG_SPEED });
+    w.ball.vx = 170;
+    const brain = createDogBrain(DOG_DIFFICULTY.normal);
+    const step = stepper(w, brain);
+    for (let i = 0; i < 18 && !w.dog!.carrying; i++) step();
+    expect(w.dog!.carrying).toBe(true);
+  });
+
+  it('runs down a ball Harrison dribbles away from him at a run', () => {
+    const w = scene({ dog: 160, home: 200, ball: 209 });
+    const brain = createDogBrain(DOG_DIFFICULTY.normal);
+    const step = stepper(w, brain);
+    for (let i = 0; i < 180 && !w.dog!.carrying; i++) step({ ...NO_INTENT, moveX: 1 });
+    expect(w.dog!.carrying).toBe(true);
   });
 
   it('goes round Harrison to reach a ball on his far side', () => {

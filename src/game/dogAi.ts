@@ -17,11 +17,13 @@ export interface DogBrain {
   profile: DogProfile;
   nextDecisionS: number;
   intent: PlayerIntent;
-  plan: 'chase' | 'carry' | 'jink' | 'pant' | 'dazed' | 'backOff' | 'hesitate' | 'faceWave';
+  plan: 'chase' | 'react' | 'carry' | 'jink' | 'pant' | 'dazed' | 'backOff' | 'hesitate' | 'faceWave';
   /** As Max's: while Harrison is powered up, where it means to stand and when it starts, or 'stay'. */
   backOff: null | 'stay' | { gap: number; inS: number };
   /** The depth the current jink cuts to. */
   jinkZ: number;
+  /** The side he's going round Harrison on, kept until he's past him, so he doesn't dither; 0 when nobody's in his way. */
+  roundSide: 0 | 1 | -1;
 }
 
 /** How far ahead he leads a rolling ball, as Max does. */
@@ -43,6 +45,26 @@ const SIDESTEP_LOOKAHEAD = 8;
 const CHARGING_SPEED = 60;
 /** He starts dodging a charging Harrison this much further out than a jink. */
 const DODGE_EXTRA = 16;
+/**
+ * Close to the ball he stops running at it and settles at a spot this far
+ * beyond it, on its open side away from Harrison, so his muzzle stays on it
+ * through the dwell however Harrison stands. He steers there every tick
+ * within NEAR_BALL, slowing over the last ARRIVE_SLOW.
+ */
+const MUZZLE_SPOT = 5;
+const NEAR_BALL = 40;
+const ARRIVE_SLOW = 24;
+/** He only settles on a ball slower than this, px/s; a rolling ball he runs down flat out. */
+const SETTLE_BALL_SPEED = 60;
+/** A ball this close to Harrison is with him: the dog comes at it from the side away from Harrison's body. */
+const WITH_HARRISON = 20;
+/**
+ * Just after taking the ball off Harrison's feet he darts straight away from
+ * him for this long, aiming this far ahead, before he turns for goal: a jink
+ * right under the boy he's just robbed would hand it straight back.
+ */
+const GETAWAY_S = 0.3;
+const GETAWAY_AHEAD = 24;
 /** With the ball beside or behind the goal, he first runs out to this far in front of its line. */
 const FRONT_OF_GOAL = 14;
 /** Backing off, as Max does: this fraction of the way across from the ball toward his own goal's centre... */
@@ -51,7 +73,7 @@ const BACK_OFF_COVER = 1 / 3;
 const LANE_LOOKAHEAD = 12;
 
 export function createDogBrain(profile: DogProfile): DogBrain {
-  return { profile, nextDecisionS: 0, intent: { ...NO_INTENT }, plan: 'chase', backOff: null, jinkZ: 0 };
+  return { profile, nextDecisionS: 0, intent: { ...NO_INTENT }, plan: 'chase', backOff: null, jinkZ: 0, roundSide: 0 };
 }
 
 const goal = (w: World, side: 'left' | 'right'): Goal => w.field.goals.find(g => g.side === side)!;
@@ -114,15 +136,28 @@ function jinkIntent(brain: DogBrain, w: World, me: Player): PlayerIntent {
   return { ...NO_INTENT, moveX: toward, moveZ, sprint: true };
 }
 
+/** Away from the Harrison he's just robbed, flat out, round the goals. */
+function getaway(w: World, me: Player, them: Player): PlayerIntent {
+  const [dx, dz] = [me.x - them.x, me.z - them.z];
+  const len = Math.hypot(dx, dz) || 1;
+  const spot = outOfGoals(w, me.x + (dx / len) * GETAWAY_AHEAD, clamp(me.z + (dz / len) * GETAWAY_AHEAD, PLAYER_R, w.field.depth - PLAYER_R));
+  const at = route(w, me, spot.x, spot.z);
+  const [moveX, moveZ] = steer(me, at.x, at.z);
+  return { ...NO_INTENT, moveX, moveZ, sprint: true };
+}
+
 /**
  * With the ball: at the left goal flat out, round its corner first if he's
- * beside it. A Harrison charging at him he dodges at full speed; one waiting
- * in his way he jinks round.
+ * beside it. Just after a snatch he darts away from Harrison first. A
+ * Harrison charging at him he dodges at full speed; one waiting in his way
+ * he jinks round.
  */
 function carry(brain: DogBrain, w: World): PlayerIntent {
   const d = w.dog!;
   const [me, them] = [w.away, w.home];
   if (d.jinkS > 0) return jinkIntent(brain, w, me);
+  brain.plan = 'carry';
+  if (d.snatched && d.carryS < GETAWAY_S) return getaway(w, me, them);
   const rushing = charging(me, them);
   if (rushing && inLane(me, them, brain.profile.jinkAhead + DODGE_EXTRA)) {
     brain.plan = 'carry';
@@ -148,31 +183,66 @@ function carry(brain: DogBrain, w: World): PlayerIntent {
 /**
  * Bodies are solid: with Harrison just ahead on the way to the ball, and the
  * ball beyond him, he sidesteps round, never into a goal (the goal would
- * push him straight back, every tick).
+ * push him straight back, every tick) or the boards. He keeps to the side
+ * he chose until he's past, while it stays open.
  */
-function goRound(w: World, me: Player, them: Player, [mx, mz]: [number, number], dist: number): [number, number] {
+function goRound(brain: DogBrain, w: World, me: Player, them: Player, [mx, mz]: [number, number], dist: number): [number, number] {
   const [rx, rz] = [them.x - me.x, them.z - me.z];
   const along = rx * mx + rz * mz;
   const across = rx * mz - rz * mx;
-  if (along <= 0 || along > ROUND_AHEAD || along >= dist || Math.abs(across) >= ROUND_SIDE) return [mx, mz];
-  const preferred = Math.abs(me.z - them.z) >= 1 ? Math.sign(me.z - them.z) : roomySide(w, me.z);
-  for (const side of [preferred, -preferred]) {
+  if (along <= 0 || along > ROUND_AHEAD || along >= dist || Math.abs(across) >= ROUND_SIDE) {
+    brain.roundSide = 0;
+    return [mx, mz];
+  }
+  const preferred = brain.roundSide || (Math.abs(me.z - them.z) >= 1 ? (Math.sign(me.z - them.z) as 1 | -1) : roomySide(w, me.z));
+  for (const side of [preferred, -preferred as 1 | -1]) {
     const [sx, sz] = [mx, mz + side];
     const d = Math.hypot(sx, sz);
     const ahead = { x: me.x + (sx / d) * SIDESTEP_LOOKAHEAD, z: me.z + (sz / d) * SIDESTEP_LOOKAHEAD };
-    if (!w.field.goals.some(g => inGoalBox(g, ahead.x, ahead.z, PLAYER_R))) return [sx / d, sz / d];
+    const onPitch = ahead.z >= PLAYER_R && ahead.z <= w.field.depth - PLAYER_R && ahead.x >= w.field.fenceL + PLAYER_R && ahead.x <= w.field.fenceR - PLAYER_R;
+    if (onPitch && !w.field.goals.some(g => inGoalBox(g, ahead.x, ahead.z, PLAYER_R))) {
+      brain.roundSide = side;
+      return [sx / d, sz / d];
+    }
   }
   return [mx, mz];
 }
 
-/** Without the ball: run it down, flat out, wherever it is, round a goal's corners as Max does. stepDog decides the grab. */
+const nearBall = (w: World): boolean => Math.hypot(w.ball.x - w.away.x, w.ball.z - w.away.z) <= NEAR_BALL;
+
+/** Where his centre goes to have the ball in reach: just beyond it, away from Harrison if it's with him, else on his own side of it. */
+function muzzleSpot(w: World): { x: number; z: number } {
+  const [me, them, b] = [w.away, w.home, w.ball];
+  const fromHarrison = Math.hypot(b.x - them.x, b.z - them.z);
+  const [ox, oz] = fromHarrison <= WITH_HARRISON && fromHarrison > 0 ? [b.x - them.x, b.z - them.z] : [me.x - b.x, me.z - b.z];
+  const len = Math.hypot(ox, oz) || 1;
+  const x = clamp(b.x + (ox / len) * MUZZLE_SPOT, w.field.fenceL + PLAYER_R, w.field.fenceR - PLAYER_R);
+  const z = clamp(b.z + (oz / len) * MUZZLE_SPOT, PLAYER_R, w.field.depth - PLAYER_R);
+  return outOfGoals(w, x, z);
+}
+
+/** Close in: make for the muzzle spot, flat out after a rolling ball, slowing to settle on a slow one, facing it. */
+function settle(brain: DogBrain, w: World): PlayerIntent {
+  brain.plan = 'chase';
+  const [me, them] = [w.away, w.home];
+  const spot = muzzleSpot(w);
+  const d = Math.hypot(spot.x - me.x, spot.z - me.z);
+  const [mx, mz] = goRound(brain, w, me, them, steer(me, spot.x, spot.z), d);
+  const rolling = Math.hypot(w.ball.vx, w.ball.vz) >= SETTLE_BALL_SPEED;
+  const pace = rolling ? 1 : Math.min(1, d / ARRIVE_SLOW);
+  const faceX: 1 | -1 = Math.abs(w.ball.x - me.x) >= 1 ? faceBall(w, me) : me.facing;
+  return { ...NO_INTENT, moveX: mx * pace, moveZ: mz * pace, sprint: true, faceX };
+}
+
+/** Without the ball: run it down, flat out, wherever it is, round a goal's corners as Max does; close in, settle on it. stepDog decides the grab. */
 function chase(brain: DogBrain, w: World): PlayerIntent {
+  if (nearBall(w)) return settle(brain, w);
   brain.plan = 'chase';
   const [me, them] = [w.away, w.home];
   const ball = predictBall(w);
   const spot = outOfGoals(w, ball.x, ball.z);
   const at = route(w, me, spot.x, spot.z);
-  const move = goRound(w, me, them, steer(me, at.x, at.z), Math.hypot(at.x - me.x, at.z - me.z));
+  const move = goRound(brain, w, me, them, steer(me, at.x, at.z), Math.hypot(at.x - me.x, at.z - me.z));
   return { ...NO_INTENT, moveX: move[0], moveZ: move[1], sprint: true };
 }
 
@@ -232,13 +302,14 @@ export function dogThink(brain: DogBrain, w: World, dt: number): PlayerIntent {
     brain.plan = powered ? 'hesitate' : d.pantS > 0 ? 'pant' : 'dazed';
     brain.intent = { ...NO_INTENT, faceX: faceBall(w, me) };
   } else if (d.carrying) brain.intent = carry(brain, w);
-  else if (brain.plan !== 'chase') {
+  else if (brain.plan !== 'chase' && brain.plan !== 'react') {
     // A loose ball after anything else (shaking off a lost ball, a pant, a power-up): he reacts to it first.
-    brain.plan = 'chase';
+    brain.plan = 'react';
     brain.nextDecisionS = brain.profile.reactionS;
-  } else if (brain.nextDecisionS <= 1e-9) {
+  } else if (brain.nextDecisionS <= 1e-9 || (brain.plan === 'chase' && nearBall(w))) {
+    // Chasing, close to the ball he steers every tick; further off he re-decides every reactionS.
     brain.intent = chase(brain, w);
-    brain.nextDecisionS = brain.profile.reactionS;
+    if (brain.nextDecisionS <= 1e-9) brain.nextDecisionS = brain.profile.reactionS;
   }
   return { ...brain.intent };
 }

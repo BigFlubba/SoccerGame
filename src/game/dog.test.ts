@@ -8,7 +8,7 @@ import { BACKYARD, goalScored, inGoalBox } from './field';
 import { BLOWN_DOWN_S, BRACE_S, NO_INTENT, PLAYER_R, type PlayerIntent } from './player';
 import { SPRINT_MULTIPLIER, runSpeed } from './stats';
 import { WAVE_SPEED } from './wave';
-import { createWorld, stepWorld, type World } from './world';
+import { createWorld, placeForKickoff, stepWorld, type World } from './world';
 
 const STEP = 1 / 60;
 const ERR = { home: 4, away: 6 };
@@ -107,6 +107,13 @@ describe('the dog', () => {
     expect(w.dog!.carrying).toBe(false);
     expect(w.match.kickoffTeam).toBe('home');
     expect(w.ball.x).toBe(BACKYARD.width / 2);
+  });
+
+  it('a kickoff rests him: a full stamina budget and no jink cooldown', () => {
+    const w = boss({ dog: [300, 32], home: [100, 32], ball: [500, 32] });
+    Object.assign(w.dog!, { runS: DOG_DIFFICULTY.normal.staminaS - 0.1, jinkCooldownS: 0.5 });
+    placeForKickoff(w);
+    expect([w.dog!.runS, w.dog!.jinkCooldownS]).toEqual([0, 0]);
   });
 
   it('pants after staminaS of running flat out: sets the ball down, cannot grab, then takes it again', () => {
@@ -274,6 +281,18 @@ describe('the wave and the dog', () => {
       expect(w.away.x).toBeLessThanOrEqual(w.field.fenceR - PLAYER_R);
       for (const g of w.field.goals) expect(inGoalBox(g, w.away.x, w.away.z)).toBe(false);
     }
+  });
+
+  it('a dwell that would finish on the tick the wave fires loses: the wave takes the ball', () => {
+    const w = readyToFire(420);
+    // He arrives at Harrison's feet with the snatch one tick from done just as Harrison fires.
+    Object.assign(w.away, { x: 216, z: 32, facing: -1, vx: 0, vz: 0 });
+    w.dog!.dwellS = dwellFor(w.dog!.profile, w.home.stats.control) - STEP / 2;
+    fire(w);
+    expect(w.events.power.fired).toBe(true);
+    expect(w.events.dog.grabbed).toBe(false);
+    expect(w.dog!.carrying).toBe(false);
+    expect(Math.abs(w.ball.vx)).toBeGreaterThan(DOG_CATCH_SPEED);
   });
 
   it('a wave never fires while he carries, because Harrison has no ball', () => {
