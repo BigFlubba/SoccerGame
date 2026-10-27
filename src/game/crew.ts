@@ -14,16 +14,28 @@ export const CREW_STATS: Readonly<Record<CrewId, Readonly<Stats>>> = {
 
 const STYLES: Record<CrewId, Style> = { brick: 'blocker', leo: 'shooter', tia: 'dribbler', pete: 'presser' };
 
-const crewProfiles = (id: CrewId): Record<Difficulty, AiProfile> => ({
-  easy: { ...DIFFICULTY.easy, style: STYLES[id] },
-  normal: { ...DIFFICULTY.normal, style: STYLES[id] },
-  hard: { ...DIFFICULTY.hard, style: STYLES[id] },
+type Dials = Partial<Omit<AiProfile, 'style'>>;
+
+/** A kid's profiles: Max's for each difficulty, their style, and the dials they tune. */
+const crewProfiles = (id: CrewId, dials: Record<Difficulty, Dials>): Record<Difficulty, AiProfile> => ({
+  easy: { ...DIFFICULTY.easy, ...dials.easy, style: STYLES[id] },
+  normal: { ...DIFFICULTY.normal, ...dials.normal, style: STYLES[id] },
+  hard: { ...DIFFICULTY.hard, ...dials.hard, style: STYLES[id] },
 });
 
-/** Each kid's three difficulty profiles. Mutable like DIFFICULTY, so headless sweeps can tune them at runtime. */
+/**
+ * Each kid's three difficulty profiles, measured by crewTuning.test.ts on
+ * seeds 100–163 against the scripted Harrison a level up. Mutable like
+ * DIFFICULTY, so headless sweeps can tune them at runtime.
+ */
 export const CREW_PROFILES: Record<CrewId, Record<Difficulty, AiProfile>> = {
-  brick: crewProfiles('brick'),
-  leo: crewProfiles('leo'),
-  tia: crewProfiles('tia'),
-  pete: crewProfiles('pete'),
+  // Big Brick: hardly slides. Measured E 0.828, N 0.594, H 0.031; defends 85 px deeper than Max, a third of his slides.
+  brick: crewProfiles('brick', {
+    easy: { aggression: 0.1, shootRange: 190 },
+    normal: { aggression: 0.2, shootRange: 200, paceFactor: 1.05 },
+    hard: { aggression: 0.4, shootRange: 210, paceFactor: 1.2, cleanSteal: 0.4, reactionS: 0.08 },
+  }),
+  leo: crewProfiles('leo', { easy: {}, normal: {}, hard: {} }),
+  tia: crewProfiles('tia', { easy: {}, normal: {}, hard: {} }),
+  pete: crewProfiles('pete', { easy: {}, normal: {}, hard: {} }),
 };

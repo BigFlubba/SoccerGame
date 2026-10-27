@@ -7,6 +7,7 @@ import { NO_INTENT, PLAYER_R, type Player, type PlayerIntent } from './player';
 import type { Aim } from './kick';
 import { METER_MIN_REFILL_S, WAVE_READY_S, canStartPower } from './power';
 import { BASE_STATS, STAT_NAMES, type StatName, type Stats } from './stats';
+import { defendSpot } from './styles';
 import { BRACE_DISTANCE } from './wave';
 import { createWorld, placeForKickoff, stepWorld, type World } from './world';
 
@@ -650,5 +651,55 @@ describe('Max and the Energy Wave', () => {
 
   it('Easy gets it right about half the time, Normal three in four, Hard nine in ten', () => {
     expect([DIFFICULTY.easy.braceSense, DIFFICULTY.normal.braceSense, DIFFICULTY.hard.braceSense]).toEqual([0.5, 0.75, 0.9]);
+  });
+});
+
+describe('styles at the decision points', () => {
+  /** Harrison on the ball at x 400 running right; the away player stands at (520, 32). */
+  function onTheBall(profile: AiProfile): { w: World; brain: AiBrain } {
+    const w = createWorld(BASE_STATS, BASE_STATS, 1, { home: 0, away: 0 }, null, null, profile);
+    w.match.phase = 'playing';
+    Object.assign(w.home, { x: 392, z: 20, vx: 120, facing: 1 });
+    Object.assign(w.ball, { x: 400, y: BALL_REST_Y, z: 20, vx: 120, vy: 0, vz: 0 });
+    Object.assign(w.away, { x: 470, z: 40, facing: -1 });
+    return { w, brain: createBrain(profile) };
+  }
+  const toward = (me: Player, intent: PlayerIntent, spot: { x: number; z: number }) => {
+    const [dx, dz] = [spot.x - me.x, spot.z - me.z];
+    return (intent.moveX * dx + intent.moveZ * dz) / Math.hypot(dx, dz);
+  };
+
+  it("a blocker whose opponent has the ball heads for the blocker's spot, deeper than Max's", () => {
+    const { w, brain } = onTheBall({ ...DIFFICULTY.normal, style: 'blocker' });
+    const own = w.field.goals.find(g => g.side === 'right')!;
+    const intent = think(brain, w, w.away, w.home, STEP);
+    expect(brain.plan).toBe('defend');
+    expect(toward(w.away, intent, defendSpot('blocker', w, w.away, own))).toBeGreaterThan(0.99);
+    expect(intent.moveX).toBeGreaterThan(0);
+  });
+
+  it("the blocker doesn't drop off a ball beside Harrison that he can't play: he goes for it", () => {
+    const { w, brain } = onTheBall({ ...DIFFICULTY.normal, style: 'blocker' });
+    // The ball sits by his own near post with Harrison beside it, facing away from it.
+    Object.assign(w.ball, { x: 38, z: 21, vx: 0 });
+    Object.assign(w.home, { x: 50, z: 14, vx: 0, facing: 1 });
+    Object.assign(w.away, { x: 160, z: 23 });
+    const intent = think(brain, w, w.away, w.home, STEP);
+    expect(brain.plan).toBe('chase');
+    expect(intent.moveX).toBeLessThan(0);
+    // Max treats it as Harrison's ball, as today.
+    const max = onTheBall(DIFFICULTY.normal);
+    Object.assign(max.w.ball, { x: 38, z: 21, vx: 0 });
+    Object.assign(max.w.home, { x: 50, z: 14, vx: 0, facing: 1 });
+    think(max.brain, max.w, max.w.away, max.w.home, STEP);
+    expect(max.brain.plan).toBe('defend');
+  });
+
+  it("Max still heads for his own spot, goal-side of the ball", () => {
+    const { w, brain } = onTheBall(DIFFICULTY.normal);
+    const own = w.field.goals.find(g => g.side === 'right')!;
+    const intent = think(brain, w, w.away, w.home, STEP);
+    expect(toward(w.away, intent, defendSpot('allRound', w, w.away, own))).toBeGreaterThan(0.99);
+    expect(intent.moveX).toBeLessThan(0);
   });
 });

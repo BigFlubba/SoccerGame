@@ -4,6 +4,7 @@ import { GRAVITY } from './constants';
 import { inGoalBox, type Goal } from './field';
 import type { Aim } from './kick';
 import { NO_INTENT, PLAYER_R, type Player, type PlayerIntent } from './player';
+import { DEFEND_COVER, POSSESSION_RANGE, attackDir, defendSpot, goalCentreZ, theirBall } from './styles';
 import type { Wave } from './wave';
 import type { World } from './world';
 import { REACH_Z } from './zones';
@@ -68,15 +69,9 @@ export interface AiBrain {
   kickoffHoldS: number | null;
 }
 
-/** The ball counts as at someone's feet within this distance, on the ground. */
-const POSSESSION_RANGE = 16;
 const BALL_LOW = 6;
 /** It runs to this far behind a loose ball, so it pushes the ball toward goal. */
 const CHASE_OFFSET = 8;
-/** It stands this far goal-side of the ball when defending... */
-const DEFEND_OFFSET = 20;
-/** ...and this fraction of the way across from the ball toward its own goal's centre. */
-const DEFEND_COVER = 1 / 3;
 const SLIDE_RANGE = 26;
 const SLIDE_COOLDOWN_S = 1.2;
 const HIGH_BALL = 30;
@@ -131,8 +126,6 @@ export function createBrain(profile: AiProfile): AiBrain {
   return { profile, nextDecisionS: 0, intent: { ...NO_INTENT }, plan: 'chase', chargeLeftS: 0, slideReadyS: 0, backOff: null, wrongFootedS: 0, kickoffHoldS: null };
 }
 
-const attackDir = (me: Player): 1 | -1 => (me.team === 'home' ? 1 : -1);
-const goalCentreZ = (g: Goal): number => (g.z0 + g.z1) / 2;
 
 /** Where a loose ball will be: its landing spot if airborne, a little ahead if rolling. */
 function predictBall(w: World): { x: number; z: number } {
@@ -350,7 +343,7 @@ function decide(brain: AiBrain, w: World, me: Player, them: Player): void {
   }
 
   // The opponent has it: get goal-side across the pitch, and slide in when close.
-  if (low && Math.hypot(ball.x - them.x, ball.z - them.z) <= POSSESSION_RANGE) {
+  if (low && theirBall(profile.style, w, them)) {
     brain.plan = 'defend';
     const facingBall = Math.sign(ball.x - me.x) === me.facing;
     const close = dist <= SLIDE_RANGE;
@@ -366,8 +359,8 @@ function decide(brain: AiBrain, w: World, me: Player, them: Player): void {
       brain.intent = { ...intent, chipHeld: true };
       return;
     }
-    const spotZ = ball.z + (goalCentreZ(defending) - ball.z) * DEFEND_COVER;
-    brain.intent = moveTo(ball.x - dir * DEFEND_OFFSET, spotZ);
+    const spot = defendSpot(profile.style, w, me, defending);
+    brain.intent = moveTo(spot.x, spot.z);
     return;
   }
 

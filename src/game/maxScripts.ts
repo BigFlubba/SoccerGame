@@ -1,7 +1,8 @@
 import { seeded } from '../engine/random';
 import { LADDER_MATCHES, maxStats } from '../meta/ladder';
-import { DIFFICULTY, createBrain, think, type AiBrain, type AiProfile, type Difficulty } from './ai';
+import { createBrain, think, type AiBrain, type AiProfile, type Difficulty } from './ai';
 import { HUMAN_AIM_ERROR_DEG } from './kick';
+import { opponentProfile, opponentStats, type HumanOpponentId } from './opponents';
 import { NO_INTENT, type PlayerIntent } from './player';
 import { MAX_STAT_LEVEL, STAT_NAMES, type Stats } from './stats';
 import { inStealReach, maxHasBall } from './steal';
@@ -52,12 +53,16 @@ const STILL_PX = 0.05;
 /** The ball is still on the centre spot within this, px. */
 const ON_SPOT = 0.5;
 
+/** An opponent's stats with every stat one level higher, capped: what Harrison can afford by the time he meets them. */
+export function harrisonStatsFor(opponent: Stats): Stats {
+  const up = { ...opponent };
+  for (const k of STAT_NAMES) up[k] = Math.min(opponent[k] + 1, MAX_STAT_LEVEL);
+  return up;
+}
+
 /** Max's stats for the rung with every stat one level higher, capped. */
 export function harrisonStats(rung: number): Stats {
-  const max = maxStats(rung);
-  const up = { ...max };
-  for (const k of STAT_NAMES) up[k] = Math.min(max[k] + 1, MAX_STAT_LEVEL);
-  return up;
+  return harrisonStatsFor(maxStats(rung));
 }
 
 export interface ScriptMemo {
@@ -102,22 +107,69 @@ export interface MaxMatch {
   longestStillS: number;
 }
 
-/** Plays a whole match against Max on rung `rung` headlessly, and reports it from Harrison's side. */
-export function maxMatch(d: Difficulty, seed: number, rung = LADDER_MATCHES): MaxMatch {
-  const profile = DIFFICULTY[d];
-  const w = createWorld(harrisonStats(rung), maxStats(rung), seed, { home: HUMAN_AIM_ERROR_DEG, away: profile.aimErrorDeg }, null, null, profile);
+/** Who Harrison plays: their stats and their brain's profile. */
+export interface Matchup {
+  stats: Stats;
+  profile: AiProfile;
+}
+
+/** How the opponent played, for the personality checks. Recording them draws no random numbers. */
+export interface Traits {
+  /** Distance from the goal line it attacks at each of its shots and chips, px. */
+  shotsFrom: number[];
+  slides: number;
+  /** Mean distance from its own goal line while Harrison has the ball, px. */
+  defendDepth: number;
+  /** Mean distance from the ball while Harrison has it, px. */
+  pressGap: number;
+  /** Fakes started (the dribbler's). */
+  fakes: number;
+}
+
+export interface OpponentMatch extends MaxMatch {
+  traits: Traits;
+}
+
+/** Plays a whole match against `m` headlessly, Harrison a level up on its stats, and reports it from Harrison's side. */
+export function playMatchup(m: Matchup, seed: number, harrison: Stats = harrisonStatsFor(m.stats)): OpponentMatch {
+  const { profile } = m;
+  const w = createWorld(harrison, { ...m.stats }, seed, { home: HUMAN_AIM_ERROR_DEG, away: profile.aimErrorDeg }, null, null, profile);
   const brain = createBrain(profile);
   const memo = scriptMemo(seed);
+  const attacks = w.field.goals.find(g => g.side === 'left')!;
+  const own = w.field.goals.find(g => g.side === 'right')!;
+  const shotsFrom: number[] = [];
+  let [slides, depthSum, gapSum, held] = [0, 0, 0, 0];
   let [t, stillS, longestStillS] = [0, 0, 0];
   for (let i = 0; i < MAX_TICKS && w.match.result === null; i++) {
     const home = harrisonIntent(w, t, STEP, memo);
     const away = think(brain, w, w.away, w.home, STEP);
     const [x, y, z] = [w.ball.x, w.ball.y, w.ball.z];
+    const wasSliding = w.away.state === 'sliding';
     stepWorld(w, home, away, STEP);
     t += STEP;
     const still = Math.hypot(w.ball.x - x, w.ball.y - y, w.ball.z - z) < STILL_PX;
     stillS = w.match.phase === 'playing' && still ? stillS + STEP : 0;
     longestStillS = Math.max(longestStillS, stillS);
+    const kick = w.events.kicks[1]?.kicked;
+    if (kick === 'shot' || kick === 'chip') shotsFrom.push(Math.abs(w.away.x - attacks.lineX));
+    if (!wasSliding && w.away.state === 'sliding') slides++;
+    if (w.match.phase === 'playing' && maxHasBall(w.home, w.ball)) {
+      held++;
+      depthSum += Math.abs(own.lineX - w.away.x);
+      gapSum += Math.hypot(w.ball.x - w.away.x, w.ball.z - w.away.z);
+    }
   }
-  return { result: w.match.result, score: { ...w.match.score }, longestStillS };
+  const traits: Traits = { shotsFrom, slides, defendDepth: held ? depthSum / held : 0, pressGap: held ? gapSum / held : 0, fakes: 0 };
+  return { result: w.match.result, score: { ...w.match.score }, longestStillS, traits };
+}
+
+/** A whole headless match against a human opponent at difficulty `d` (Max at rung `rung`). */
+export function opponentMatch(id: HumanOpponentId, d: Difficulty, seed: number, rung = LADDER_MATCHES): OpponentMatch {
+  return playMatchup({ stats: opponentStats(id, rung), profile: opponentProfile(id, d) }, seed);
+}
+
+/** Plays a whole match against Max on rung `rung` headlessly, and reports it from Harrison's side. */
+export function maxMatch(d: Difficulty, seed: number, rung = LADDER_MATCHES): MaxMatch {
+  return opponentMatch('max', d, seed, rung);
 }
