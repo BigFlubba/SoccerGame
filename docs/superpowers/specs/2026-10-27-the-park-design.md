@@ -395,6 +395,38 @@ stops and reports the numbers rather than widening the bands.
 `dogTuning.test.ts`, the AI-vs-AI tests and the no-kit parity test pass
 unchanged. Max and Biscuit play exactly as they do today.
 
+**As built (part 1, 2026-10-27).** Measured by `crewTuning.test.ts` on
+seeds 100–163, the scripted Harrison a level up on each kid's stats.
+Max measures E 0.875 / N 0.625 / H 0.016 on main and on the branch alike.
+
+| Kid | Easy | Normal | Hard | Personality, against Max's Normal brain at the kid's stats |
+|---|---|---|---|---|
+| Brick | 0.828 | 0.594 | 0.031 | defends 208 px from his line to Max's 305; 1.0 slides a match to 3.6 |
+| Leo | 0.859 | 0.625 | 0.063 | his wind-ups start 177 px out to Max's 97 |
+| Tia | 0.766 | 0.594 | 0.016 | 5.6 fakes a match; Max none |
+| Pete | 0.797 | 0.641 | 0.031 | sprints 30% of Harrison's time on the ball, Max 0%; 4.0 slides to 3.5 |
+
+- Hard's band is at most 0.1. Depth and pressing are measured in open
+  play, leaving out the kickoff hold every opponent keeps alike.
+- **Leo's shots are measured where his wind-up starts.** The scripted
+  Harrison steals most long wind-ups, which is the lesson, so released
+  shots alone come from close in.
+- **Pete's press is measured by intensity, not distance.** Max already
+  defends 20 px from the ball, so no opponent can stand 20 px closer.
+  Pete sprints at the ball carrier and slides more, and he commits: a
+  clean steal leaves him standing longer than Max, and his shooting is
+  wilder.
+- **Brick counts a dribble touch ahead of Harrison as Harrison's ball,**
+  so he holds his spot while Harrison dribbles at him. He goes for a
+  ball lying beside or behind Harrison that Harrison can't play.
+- **Tia's fake uses close control:** the ball stays at her feet through
+  the lean and the cut, placed before steals and tackles resolve, so both
+  still work on her. She leans toward the tighter side and cuts into the
+  room.
+- Against one fixed Harrison (Brick's level-up), Normal: Brick 0.594,
+  Leo 0.609, Tia 0.422, Pete 0.313. Pete is tougher than Brick, as
+  planned; Leo is level with Brick.
+
 ## The save: profile version 4
 
 - **No new fields.** The Park adds catalog ids (`park-1` … `park-4`,
