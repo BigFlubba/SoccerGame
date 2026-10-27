@@ -99,6 +99,8 @@ export interface Player {
   stumbleS: number;
   /** Time until he may try another steal. */
   stealCooldownS: number;
+  /** Time left on a drag-back turn, when he plants facing his new way; the world counts it down. */
+  turnS: number;
 }
 
 export const PLAYER_H = 40;
@@ -171,6 +173,7 @@ export function createPlayer(team: 'home' | 'away', stats: Stats, x: number, fac
     takeoffSpeed: 0,
     stumbleS: 0,
     stealCooldownS: 0,
+    turnS: 0,
   };
 }
 
@@ -321,6 +324,8 @@ function chooseAnim(p: Player, sprinting: boolean): { name: AnimName; frame: num
     default: {
       // A missed steal: his foot is still out, jabbing at nothing.
       if (p.stumbleS > 0) return { name: 'shoot', frame: SHOOT_STRIKE_FRAME };
+      // A drag-back: planted, his sole on the ball.
+      if (p.turnS > 0) return { name: 'shoot', frame: SHOOT_CHARGE_FRAME };
       const name: AnimName = Math.hypot(p.vx, p.vz) < IDLE_SPEED ? 'idle' : sprinting ? 'sprint' : 'run';
       const time = name === p.anim.name ? p.animT : 0;
       return { name, frame: Math.floor(time * CLIPS[name].fps) % CLIPS[name].frameCount };
@@ -354,7 +359,9 @@ function dropWallSpeed(p: Player, intent: PlayerIntent, field: Field): void {
  * otherwise, when X is a normal shot.
  *
  * Stumbling, he plays on no intent, but buttons held still count as held,
- * so one pressed during the stumble needs a fresh press afterwards.
+ * so one pressed during the stumble needs a fresh press afterwards. In a
+ * drag-back he plants, facing his new way, and a press waits for the turn
+ * to end.
  */
 export function stepPlayer(
   p: Player,
@@ -364,12 +371,13 @@ export function stepPlayer(
   ballAtFeet: boolean,
   waveDir: 1 | -1 | 'wait' | null = null,
 ): void {
-  const intent = p.stumbleS > 0 ? NO_INTENT : given;
+  const turning = p.turnS > 0;
+  const intent = p.stumbleS > 0 ? NO_INTENT : turning ? { ...NO_INTENT, faceX: p.facing } : given;
   const shootPressed = intent.shootHeld && !p.held.shoot;
   const chipPressed = intent.chipHeld && !p.held.chip;
   if (intent.powerHeld && !p.held.power) p.powerArmed = true;
   if (!intent.powerHeld) p.powerArmed = false;
-  p.held = { shoot: given.shootHeld, chip: given.chipHeld, power: given.powerHeld };
+  if (!turning) p.held = { shoot: given.shootHeld, chip: given.chipHeld, power: given.powerHeld };
   p.aim = intent.aim;
   p.stateT += dt;
   p.slideCooldown = Math.max(0, p.slideCooldown - dt);

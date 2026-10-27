@@ -6,6 +6,7 @@ import { resolveBodies } from './bodies';
 import { resolveContacts, type ContactEvents } from './contact';
 import { checkPinned, createDog, dropBall, parkBall, quietDog, resetDog, stepDog, vulnerable, type DogEvents, type DogProfile, type DogState } from './dog';
 import { BACKYARD, goalScored, type Field } from './field';
+import { startDragBack, stepDragBack } from './dragBack';
 import { createMatch, stepMatch, type MatchState, type Team } from './match';
 import { NO_INTENT, createPlayer, stepPlayer, type Player, type PlayerIntent } from './player';
 import {
@@ -196,7 +197,7 @@ function powerEnds(w: World, live: boolean, [, away]: ContactEvents[]): boolean 
 function dogContacts(w: World, dog: DogState, ev: DogEvents, steal: boolean): ContactEvents[] {
   let home = quietContact();
   const carried = dog.carrying;
-  if (!w.wave?.live && (!carried || vulnerable(dog))) {
+  if (!w.wave?.live && w.home.turnS === 0 && (!carried || vulnerable(dog))) {
     if (carried) w.ball.y = BALL_REST_Y;
     home = resolveContacts(w.home, w.away, w.ball, w.aimErrorDeg.home, w.rng, w.field, { trips: false, squeeze: false });
     const jab = steal && dog.jinkS > 0 && w.home.state === 'ground' && ballIn(stealZone(w.home), w.ball, BALL_R);
@@ -232,6 +233,7 @@ export function stepWorld(w: World, homeIntent: PlayerIntent, awayIntent: Player
   if (wasReadying && w.power && waveReady(w.power)) power.ready = true;
   // Powered up, X only ever fires the wave: until it can (ready, with the ball, a clean line), the press does nothing.
   const waveDir = live && canFireWave(w) ? maxGoalDir(w) : live && (w.power?.activeS ?? 0) > 0 ? 'wait' : null;
+  startDragBack(w, homeIntent);
   stepOne(home, homeIntent, live, w, dt, waveDir);
   // The dog runs on his own legs; braced or blown away, his body is a player's like Max's.
   const dogBody = w.dog !== null && w.away.state !== 'bracing' && w.away.state !== 'blown';
@@ -252,6 +254,7 @@ export function stepWorld(w: World, homeIntent: PlayerIntent, awayIntent: Player
   resolveBodies(home, w.away, w.field);
   if (dogBody && live && checkPinned(w, awayIntent, Math.hypot(w.away.x - dogFrom.x, w.away.z - dogFrom.z), dt)) dog.dropped = true;
   const steal = resolveSteal(w, homeIntent);
+  stepDragBack(w, dt);
 
   const { braced, blown } = stepWave(w, dt);
   [power.braced, power.blown] = [braced, blown];
@@ -260,8 +263,9 @@ export function stepWorld(w: World, homeIntent: PlayerIntent, awayIntent: Player
   // The second player to act on the ball has the last word, so take turns going first.
   // A ball just trapped at his feet isn't a 50/50 this tick, so the squirt can't undo the trap at once.
   const squeeze = steal !== 'stole' && steal !== 'trapped';
+  // In a drag-back his sole has the ball: only the other player's contacts can take it.
   const contact = (p: Player, other: Player) =>
-    w.wave?.live ? quietContact() : resolveContacts(p, other, w.ball, w.aimErrorDeg[p.team], w.rng, w.field, { trips: true, squeeze, clearUpfield: p === home });
+    w.wave?.live || (p === home && home.turnS > 0) ? quietContact() : resolveContacts(p, other, w.ball, w.aimErrorDeg[p.team], w.rng, w.field, { trips: true, squeeze, clearUpfield: p === home });
   const homeFirst = w.tick % 2 === 0;
   let kicks: ContactEvents[];
   if (w.dog) kicks = dogContacts(w, w.dog, dog, live && homeIntent.steal);

@@ -99,8 +99,9 @@ describe('world', () => {
   it('follows intents once play starts', () => {
     const w = createWorld(BASE_STATS, BASE_STATS, 1, ERR);
     w.match.phase = 'playing';
-    stepWorld(w, move(-1), NO_INTENT, STEP);
-    expect(w.home.x).toBeLessThan(308);
+    // Rightward: leftward, with the kickoff ball at his feet, is a drag-back, which plants him.
+    stepWorld(w, move(1), NO_INTENT, STEP);
+    expect(w.home.x).toBeGreaterThan(308);
   });
 
   it('a ball into the right goal is a home goal, then everyone resets for kickoff', () => {
