@@ -4,7 +4,7 @@ import { GRAVITY } from './constants';
 import { inGoalBox, type Goal } from './field';
 import type { Aim } from './kick';
 import { NO_INTENT, PLAYER_R, type Player, type PlayerIntent } from './player';
-import { DEFEND_COVER, POSSESSION_RANGE, attackDir, defendSpot, goalCentreZ, theirBall } from './styles';
+import { DEFEND_COVER, POSSESSION_RANGE, attackDir, chargeHold, defendSpot, goalCentreZ, theirBall } from './styles';
 import type { Wave } from './wave';
 import type { World } from './world';
 import { REACH_Z } from './zones';
@@ -89,8 +89,6 @@ const SIDESTEP_LOOKAHEAD = 8;
 const EDGE_SLACK = 0.5;
 /** A spot it wants inside a goal moves out to this far from the goal's outline: a body radius and a little. */
 const GOAL_CLEARANCE = PLAYER_R + 1;
-const CHARGE_MIN_S = 0.25;
-const CHARGE_SPREAD_S = 0.55;
 const SPRINT_DISTANCE = 120;
 const SPRINT_MIN_STAMINA = 0.4;
 /** Close enough to a target spot to stop. */
@@ -330,7 +328,7 @@ function decide(brain: AiBrain, w: World, me: Player, them: Player): void {
     if (charging) return;
     if (toGoal > 0 && toGoal <= profile.shootRange) {
       brain.plan = 'charge';
-      brain.chargeLeftS = CHARGE_MIN_S + w.rng() * CHARGE_SPREAD_S;
+      brain.chargeLeftS = chargeHold(profile.style, w.rng);
       brain.intent = { ...intent, moveX: dir, shootHeld: true, aim: pickAim(w) };
       return;
     }

@@ -42,9 +42,16 @@ const PERSONALITY: Partial<Record<CrewId, { name: string; check: (id: CrewId) =>
       expect(slides).toBeLessThanOrEqual(maxSlides / 2);
     },
   },
+  leo: {
+    name: 'shoots from much further out',
+    check: id => {
+      const [from, maxFrom] = trait(id, t => mean(t.shotsFrom));
+      expect(from - maxFrom).toBeGreaterThanOrEqual(80);
+    },
+  },
 };
 
-describe.each(['brick'] as const)('%s is fair on Easy and Normal, and Hard holds', id => {
+describe.each(['brick', 'leo'] as const)('%s is fair on Easy and Normal, and Hard holds', id => {
   it('Easy: the scripted Harrison wins about 80%', () => {
     expect(rate(id, 'easy')).toBeGreaterThanOrEqual(0.7);
     expect(rate(id, 'easy')).toBeLessThanOrEqual(0.9);

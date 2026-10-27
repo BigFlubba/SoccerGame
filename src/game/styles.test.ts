@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { DIFFICULTY } from './ai';
 import { BALL_REST_Y } from './ball';
 import { CREW_PROFILES, CREW_STATS } from './crew';
-import { BLOCKER, defendSpot } from './styles';
+import { BLOCKER, CHARGE_MIN_S, SHOOTER_CHARGE, chargeHold, defendSpot } from './styles';
 import { BASE_STATS } from './stats';
 import { createWorld, type World } from './world';
 
@@ -50,5 +50,21 @@ describe('defendSpot', () => {
 
   it("Max's defend spot is unchanged by the crew's styles", () => {
     expect(DIFFICULTY.normal.style).toBe('allRound');
+  });
+});
+
+describe('chargeHold', () => {
+  it("allRound winds up as Max always has; the shooter winds up fully", () => {
+    expect(chargeHold('allRound', () => 0)).toBe(CHARGE_MIN_S);
+    expect(chargeHold('shooter', () => 0)).toBe(0.55);
+    expect(chargeHold('shooter', () => 1)).toBeCloseTo(SHOOTER_CHARGE.from + SHOOTER_CHARGE.spread, 9);
+  });
+
+  it('each draws exactly one random number', () => {
+    for (const style of ['allRound', 'shooter'] as const) {
+      let draws = 0;
+      chargeHold(style, () => (draws++, 0.5));
+      expect(draws, style).toBe(1);
+    }
   });
 });

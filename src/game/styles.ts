@@ -59,3 +59,15 @@ export function theirBall(style: Style, w: World, them: Player): boolean {
   const ahead = (ball.x - them.x) * them.facing;
   return ahead >= 0 && ahead <= BLOCKER.touchAhead && Math.abs(ball.z - them.z) <= BLOCKER.touchSide;
 }
+
+/** allRound holds a shot this long and up to this much longer, s, as Max always has. */
+export const CHARGE_MIN_S = 0.25;
+const CHARGE_SPREAD_S = 0.55;
+/** The shooter winds up fully: a hard shot from long range. */
+export const SHOOTER_CHARGE = { from: 0.55, spread: 0.3 };
+
+/** How long it holds a shot before letting go, s, from one draw of `rng`. */
+export function chargeHold(style: Style, rng: () => number): number {
+  if (style === 'shooter') return SHOOTER_CHARGE.from + rng() * SHOOTER_CHARGE.spread;
+  return CHARGE_MIN_S + rng() * CHARGE_SPREAD_S;
+}

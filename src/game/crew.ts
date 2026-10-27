@@ -35,7 +35,12 @@ export const CREW_PROFILES: Record<CrewId, Record<Difficulty, AiProfile>> = {
     normal: { aggression: 0.2, shootRange: 200, paceFactor: 1.05 },
     hard: { aggression: 0.4, shootRange: 210, paceFactor: 1.2, cleanSteal: 0.4, reactionS: 0.08 },
   }),
-  leo: crewProfiles('leo', { easy: {}, normal: {}, hard: {} }),
+  // Boomer Leo: shoots from around halfway, with a full wind-up. Measured E 0.859, N 0.625, H 0.063; his shots start 81 px further out than Max's.
+  leo: crewProfiles('leo', {
+    easy: { shootRange: 300 },
+    normal: { shootRange: 360, cleanSteal: 0.65, reactionS: 0.14, paceFactor: 1.06 },
+    hard: { shootRange: 380, cleanSteal: 0.45, paceFactor: 1.15, reactionS: 0.08 },
+  }),
   tia: crewProfiles('tia', { easy: {}, normal: {}, hard: {} }),
   pete: crewProfiles('pete', { easy: {}, normal: {}, hard: {} }),
 };

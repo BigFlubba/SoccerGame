@@ -115,7 +115,7 @@ export interface Matchup {
 
 /** How the opponent played, for the personality checks. Recording them draws no random numbers. */
 export interface Traits {
-  /** Distance from the goal line it attacks at each of its shots and chips, px. */
+  /** Distance from the goal line it attacks where each of its shots and chips started (it began winding up), px. */
   shotsFrom: number[];
   slides: number;
   /** Mean distance from its own goal line while Harrison has the ball, px. */
@@ -145,15 +145,15 @@ export function playMatchup(m: Matchup, seed: number, harrison: Stats = harrison
     const home = harrisonIntent(w, t, STEP, memo);
     const away = think(brain, w, w.away, w.home, STEP);
     const [x, y, z] = [w.ball.x, w.ball.y, w.ball.z];
-    const wasSliding = w.away.state === 'sliding';
+    const was = w.away.state;
     stepWorld(w, home, away, STEP);
     t += STEP;
     const still = Math.hypot(w.ball.x - x, w.ball.y - y, w.ball.z - z) < STILL_PX;
     stillS = w.match.phase === 'playing' && still ? stillS + STEP : 0;
     longestStillS = Math.max(longestStillS, stillS);
-    const kick = w.events.kicks[1]?.kicked;
-    if (kick === 'shot' || kick === 'chip') shotsFrom.push(Math.abs(w.away.x - attacks.lineX));
-    if (!wasSliding && w.away.state === 'sliding') slides++;
+    const windingUp = (s: string) => s === 'charging' || s === 'chipping';
+    if (!windingUp(was) && windingUp(w.away.state)) shotsFrom.push(Math.abs(w.away.x - attacks.lineX));
+    if (was !== 'sliding' && w.away.state === 'sliding') slides++;
     if (w.match.phase === 'playing' && maxHasBall(w.home, w.ball)) {
       held++;
       depthSum += Math.abs(own.lineX - w.away.x);

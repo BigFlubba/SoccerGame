@@ -8,6 +8,8 @@ import type { Aim } from './kick';
 import { METER_MIN_REFILL_S, WAVE_READY_S, canStartPower } from './power';
 import { BASE_STATS, STAT_NAMES, type StatName, type Stats } from './stats';
 import { defendSpot } from './styles';
+import { CREW_PROFILES, CREW_STATS } from './crew';
+import { maxHasBall } from './steal';
 import { BRACE_DISTANCE } from './wave';
 import { createWorld, placeForKickoff, stepWorld, type World } from './world';
 
@@ -701,5 +703,45 @@ describe('styles at the decision points', () => {
     const intent = think(brain, w, w.away, w.home, STEP);
     expect(toward(w.away, intent, defendSpot('allRound', w, w.away, own))).toBeGreaterThan(0.99);
     expect(intent.moveX).toBeLessThan(0);
+  });
+});
+
+describe('Boomer Leo', () => {
+  /** The away player on the ball 300 px from the goal it attacks (the left one), running at it. */
+  function onTheBall(profile: AiProfile): { w: World; brain: AiBrain } {
+    const w = createWorld(BASE_STATS, CREW_STATS.leo, 1, { home: 0, away: 0 }, null, null, profile);
+    w.match.phase = 'playing';
+    const lineX = w.field.goals.find(g => g.side === 'left')!.lineX;
+    Object.assign(w.away, { x: lineX + 300, z: 32, vx: -100, facing: -1 });
+    Object.assign(w.ball, { x: lineX + 292, y: BALL_REST_Y, z: 32, vx: -100, vy: 0, vz: 0 });
+    Object.assign(w.home, { x: 500, z: 10 });
+    return { w, brain: createBrain(profile) };
+  }
+
+  it('shoots from 300 px out on every difficulty, where Max dribbles on', () => {
+    for (const d of ['easy', 'normal', 'hard'] as const) {
+      const leo = onTheBall(CREW_PROFILES.leo[d]);
+      think(leo.brain, leo.w, leo.w.away, leo.w.home, STEP);
+      expect(leo.brain.plan, d).toBe('charge');
+      const max = onTheBall(DIFFICULTY[d]);
+      think(max.brain, max.w, max.w.away, max.w.home, STEP);
+      expect(max.brain.plan, d).toBe('dribble');
+    }
+  });
+
+  it('a steal tap during his wind-up takes the ball and cancels his shot', () => {
+    const { w, brain } = onTheBall(CREW_PROFILES.leo.normal);
+    const away = think(brain, w, w.away, w.home, STEP);
+    stepWorld(w, NO_INTENT, away, STEP);
+    expect(w.away.state).toBe('charging');
+    expect(maxHasBall(w.away, w.ball)).toBe(true);
+    Object.assign(w.home, { x: w.away.x + 10, z: w.away.z, vx: -60, facing: -1, state: 'ground' });
+    w.rng = () => 0;
+    stepWorld(w, { ...NO_INTENT, steal: true }, think(brain, w, w.away, w.home, STEP), STEP);
+    expect(w.events.steal).toBe('stole');
+    for (let i = 0; i < 60; i++) {
+      stepWorld(w, NO_INTENT, think(brain, w, w.away, w.home, STEP), STEP);
+      expect(w.events.kicks[1]?.kicked ?? null, `tick ${i}`).toBeNull();
+    }
   });
 });
