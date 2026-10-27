@@ -81,6 +81,8 @@ export function scriptMemo(seed: number): ScriptMemo {
 }
 
 const onSpot = (w: World): boolean => Math.hypot(w.ball.x - w.field.width / 2, w.ball.z - w.field.depth / 2) <= ON_SPOT;
+/** Harrison has the ball in open play. Waiting at his kickoff is a fair rule every opponent keeps alike, not how it defends, so it doesn't count. */
+const harrisons = (w: World): boolean => w.match.phase === 'playing' && maxHasBall(w.home, w.ball) && !onSpot(w);
 
 /** The scripted Harrison's intent this tick. */
 export function harrisonIntent(w: World, t: number, dt: number, memo: ScriptMemo): PlayerIntent {
@@ -118,10 +120,12 @@ export interface Traits {
   /** Distance from the goal line it attacks where each of its shots and chips started (it began winding up), px. */
   shotsFrom: number[];
   slides: number;
-  /** Mean distance from its own goal line while Harrison has the ball, px. */
+  /** Mean distance from its own goal line while Harrison has the ball in open play (not waiting at his kickoff), px. */
   defendDepth: number;
-  /** Mean distance from the ball while Harrison has it, px. */
+  /** Mean distance from the ball while Harrison has it in open play, px. */
   pressGap: number;
+  /** Share of that time it spends sprinting: the presser comes at him flat out. */
+  sprintShare: number;
   /** Fakes started (the dribbler's). */
   fakes: number;
 }
@@ -140,6 +144,7 @@ export function playMatchup(m: Matchup, seed: number, harrison: Stats = harrison
   const own = w.field.goals.find(g => g.side === 'right')!;
   const shotsFrom: number[] = [];
   let [slides, depthSum, gapSum, held] = [0, 0, 0, 0];
+  let sprints = 0;
   let [t, stillS, longestStillS] = [0, 0, 0];
   for (let i = 0; i < MAX_TICKS && w.match.result === null; i++) {
     const home = harrisonIntent(w, t, STEP, memo);
@@ -154,13 +159,14 @@ export function playMatchup(m: Matchup, seed: number, harrison: Stats = harrison
     const windingUp = (s: string) => s === 'charging' || s === 'chipping';
     if (!windingUp(was) && windingUp(w.away.state)) shotsFrom.push(Math.abs(w.away.x - attacks.lineX));
     if (was !== 'sliding' && w.away.state === 'sliding') slides++;
-    if (w.match.phase === 'playing' && maxHasBall(w.home, w.ball)) {
+    if (harrisons(w)) {
       held++;
       depthSum += Math.abs(own.lineX - w.away.x);
       gapSum += Math.hypot(w.ball.x - w.away.x, w.ball.z - w.away.z);
+      if (away.sprint) sprints++;
     }
   }
-  const traits: Traits = { shotsFrom, slides, defendDepth: held ? depthSum / held : 0, pressGap: held ? gapSum / held : 0, fakes: brain.fakes };
+  const traits: Traits = { shotsFrom, slides, defendDepth: held ? depthSum / held : 0, pressGap: held ? gapSum / held : 0, sprintShare: held ? sprints / held : 0, fakes: brain.fakes };
   return { result: w.match.result, score: { ...w.match.score }, longestStillS, traits };
 }
 

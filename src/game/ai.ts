@@ -4,7 +4,7 @@ import { GRAVITY } from './constants';
 import { inGoalBox, type Goal } from './field';
 import type { Aim } from './kick';
 import { NO_INTENT, PLAYER_R, type Player, type PlayerIntent } from './player';
-import { DEFEND_COVER, FAKE, POSSESSION_RANGE, attackDir, chargeHold, defendSpot, fakeMove, goalCentreZ, theirBall } from './styles';
+import { DEFEND_COVER, FAKE, POSSESSION_RANGE, attackDir, chargeHold, defendSpot, fakeMove, goalCentreZ, pressSprint, theirBall } from './styles';
 import type { Wave } from './wave';
 import type { World } from './world';
 import { REACH_Z } from './zones';
@@ -95,8 +95,6 @@ const SIDESTEP_LOOKAHEAD = 8;
 const EDGE_SLACK = 0.5;
 /** A spot it wants inside a goal moves out to this far from the goal's outline: a body radius and a little. */
 const GOAL_CLEARANCE = PLAYER_R + 1;
-const SPRINT_DISTANCE = 120;
-const SPRINT_MIN_STAMINA = 0.4;
 /** Close enough to a target spot to stop. */
 const ARRIVE = 3;
 /**
@@ -314,7 +312,7 @@ function decide(brain: AiBrain, w: World, me: Player, them: Player): void {
   const ahead = (ball.x - me.x) * dir;
   const inLine = Math.abs(ball.z - me.z) <= REACH_Z;
   const dist = Math.hypot(ball.x - me.x, ball.z - me.z);
-  const sprint = dist > SPRINT_DISTANCE && me.stamina > SPRINT_MIN_STAMINA;
+  const sprint = pressSprint(profile.style, dist, me.stamina);
   const intent: PlayerIntent = { ...NO_INTENT, sprint, pace: profile.paceFactor };
   const attacking = w.field.goals.find(g => g.side === (dir > 0 ? 'right' : 'left'))!;
   const defending = w.field.goals.find(g => g !== attacking)!;

@@ -18,6 +18,9 @@ export const DEFEND_OFFSET = 20;
 /** ...and this fraction of the way across from the ball toward its own goal's centre. */
 export const DEFEND_COVER = 1 / 3;
 
+/** The presser's spot: on the ball, this far to his side of it. */
+const PRESS_OFFSET = 4;
+
 /**
  * The blocker drops `cover` of the way from the ball back to his goal line,
  * at least `minAhead` goal-side of the ball and never within `offLine` of
@@ -32,6 +35,8 @@ export function defendSpot(style: Style, w: World, me: Player, defending: Goal):
   const ball = w.ball;
   const dir = attackDir(me);
   const centre = goalCentreZ(defending);
+  // The presser comes straight at the ball, from his side of it.
+  if (style === 'presser') return { x: ball.x - dir * PRESS_OFFSET, z: ball.z };
   if (style !== 'blocker') return { x: ball.x - dir * DEFEND_OFFSET, z: ball.z + (centre - ball.z) * DEFEND_COVER };
   // Distances measured from the ball back toward his own goal line.
   const toLine = (defending.lineX - ball.x) * -dir;
@@ -92,4 +97,13 @@ export function fakeMove(fake: { side: 1 | -1; t: number }, dir: 1 | -1): { move
   if (fake.t < FAKE.leanS) return { moveX: dir * LEAN.x, moveZ: fake.side * LEAN.z, pace: FAKE.leanPace };
   if (fake.t < FAKE.leanS + FAKE.cutS) return { moveX: dir * CUT.x, moveZ: -fake.side * CUT.z, pace: 1 };
   return null;
+}
+
+/** allRound sprints when the ball is further than this, with enough stamina; the presser sprints at any distance. */
+export const SPRINT_DISTANCE = 120;
+export const SPRINT_MIN_STAMINA = 0.4;
+
+/** Whether it sprints this decision, `dist` px from the ball. */
+export function pressSprint(style: Style, dist: number, stamina: number): boolean {
+  return (style === 'presser' || dist > SPRINT_DISTANCE) && stamina > SPRINT_MIN_STAMINA;
 }

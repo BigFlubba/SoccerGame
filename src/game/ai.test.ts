@@ -817,3 +817,24 @@ describe('Tricky Tia', () => {
     expect(brain.fakes).toBe(0);
   });
 });
+
+describe('Pesky Pete', () => {
+  /** Ticks until the away player, starting 120 px off with `profile`, gets within 12 px of Harrison's ball as he dribbles away. */
+  function ticksToBall(profile: AiProfile): number {
+    const w = createWorld(BASE_STATS, CREW_STATS.pete, 1, { home: 0, away: 0 }, null, null, profile);
+    w.match.phase = 'playing';
+    Object.assign(w.home, { x: 300, z: 32, facing: 1 });
+    Object.assign(w.ball, { x: 308, y: BALL_REST_Y, z: 32, vx: 0, vy: 0, vz: 0 });
+    Object.assign(w.away, { x: 420, z: 50, facing: -1 });
+    const brain = createBrain(profile);
+    for (let i = 0; i < 300; i++) {
+      stepWorld(w, NO_INTENT, think(brain, w, w.away, w.home, STEP), STEP);
+      if (Math.hypot(w.ball.x - w.away.x, w.ball.z - w.away.z) <= 12) return i;
+    }
+    return Infinity;
+  }
+
+  it('gets to the ball carrier sooner than Max would from the same start', () => {
+    expect(ticksToBall(CREW_PROFILES.pete.normal)).toBeLessThan(ticksToBall(DIFFICULTY.normal));
+  });
+});

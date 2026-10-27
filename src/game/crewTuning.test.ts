@@ -57,9 +57,19 @@ const PERSONALITY: Partial<Record<CrewId, { name: string; check: (id: CrewId) =>
       expect(maxFakes).toBe(0);
     },
   },
+  pete: {
+    name: 'comes at the ball carrier flat out and slides at least as often',
+    check: id => {
+      const [sprint, maxSprint] = trait(id, t => t.sprintShare);
+      expect(sprint).toBeGreaterThanOrEqual(0.2);
+      expect(maxSprint).toBeLessThanOrEqual(0.05);
+      const [slides, maxSlides] = trait(id, t => t.slides);
+      expect(slides).toBeGreaterThanOrEqual(maxSlides);
+    },
+  },
 };
 
-describe.each(['brick', 'leo', 'tia'] as const)('%s is fair on Easy and Normal, and Hard holds', id => {
+describe.each(['brick', 'leo', 'tia', 'pete'] as const)('%s is fair on Easy and Normal, and Hard holds', id => {
   it('Easy: the scripted Harrison wins about 80%', () => {
     expect(rate(id, 'easy')).toBeGreaterThanOrEqual(0.7);
     expect(rate(id, 'easy')).toBeLessThanOrEqual(0.9);

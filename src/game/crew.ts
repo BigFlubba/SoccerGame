@@ -47,5 +47,11 @@ export const CREW_PROFILES: Record<CrewId, Record<Difficulty, AiProfile>> = {
     normal: { shootRange: 110, aggression: 0.5 },
     hard: { shootRange: 120, aggression: 0.75 },
   }),
-  pete: crewProfiles('pete', { easy: {}, normal: {}, hard: {} }),
+  // Pesky Pete: on you fast, flat out, sliding; he commits, so a clean steal leaves him standing longer than Max, and his shooting is wild.
+  // Measured E 0.797, N 0.641, H 0.031; sprints 30% of Harrison's time on the ball (Max 0%), 4.0 slides a match to Max's 3.5.
+  pete: crewProfiles('pete', {
+    easy: { reactionS: 0.18, aggression: 0.4, cleanSteal: 0.98, wrongFootedS: 0.9, aimErrorDeg: 14, paceFactor: 0.95 },
+    normal: { reactionS: 0.13, aggression: 0.6, cleanSteal: 0.9, wrongFootedS: 0.7, aimErrorDeg: 10, paceFactor: 1 },
+    hard: { reactionS: 0.09, aggression: 0.85, cleanSteal: 0.7, wrongFootedS: 0.35, aimErrorDeg: 4, paceFactor: 1.1 },
+  }),
 };

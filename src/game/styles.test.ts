@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { DIFFICULTY } from './ai';
 import { BALL_REST_Y } from './ball';
 import { CREW_PROFILES, CREW_STATS } from './crew';
-import { BLOCKER, CHARGE_MIN_S, SHOOTER_CHARGE, chargeHold, defendSpot } from './styles';
+import { BLOCKER, CHARGE_MIN_S, SHOOTER_CHARGE, chargeHold, defendSpot, pressSprint } from './styles';
 import { BASE_STATS } from './stats';
 import { createWorld, type World } from './world';
 
@@ -66,5 +66,20 @@ describe('chargeHold', () => {
       chargeHold(style, () => (draws++, 0.5));
       expect(draws, style).toBe(1);
     }
+  });
+});
+
+describe('the presser', () => {
+  it("goes straight at the ball: his spot is the ball itself", () => {
+    const w = attacking(ownGoal(attacking(0)).lineX - 200);
+    const spot = defendSpot('presser', w, w.away, ownGoal(w));
+    expect(Math.hypot(spot.x - w.ball.x, spot.z - w.ball.z)).toBeLessThanOrEqual(8);
+  });
+
+  it('sprints at any distance while he has the legs; allRound only from far off', () => {
+    expect(pressSprint('presser', 30, 0.9)).toBe(true);
+    expect(pressSprint('presser', 30, 0.2)).toBe(false);
+    expect(pressSprint('allRound', 30, 0.9)).toBe(false);
+    expect(pressSprint('allRound', 130, 0.9)).toBe(true);
   });
 });
