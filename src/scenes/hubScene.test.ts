@@ -58,6 +58,10 @@ describe('hub', () => {
     }
   });
 
+  it('with Biscuit beaten, the card points into the Park', () => {
+    expect(careerCardLines({ ...newProfile(), ladderWins: 10, career: { stars: { 'backyard-boss': 1 }, milestonesPaid: 0, lossStreaks: {} } }).first).toBe('NEXT: BIG BRICK - THE PARK 1/4');
+  });
+
   it('the card says what is next in the career', () => {
     expect(careerCardLines({ ...newProfile(), ladderWins: 4 })).toEqual({ first: 'NEXT: MAX - MATCH 5/10', second: 'MAX HAS BEEN TRAINING: SPEED UP' });
   });

@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import { BOSS_ID } from '../meta/career';
+import { BOSS_ID, PARK_BOSS_ID } from '../meta/career';
 import { newProfile } from '../meta/profile';
 import { STOPS, createRoadMapScene } from './roadMapScene';
+import { fakeArt, recordingContext } from './testDraw';
 import { testContext } from './testContext';
 import { frame } from './testInput';
 import { createVenueScene, type VenueScene } from './venueScene';
@@ -67,5 +68,34 @@ describe('the road map', () => {
 
   it('B on the venue screen comes back to the map', () => {
     expect(createVenueScene(testContext(), 'backyard').update(frame(['back']), STEP)?.kind).toBe('roadMap');
+  });
+});
+
+describe('the road map into the Park', () => {
+  const inPark = (stars: Record<string, number> = {}) => testContext({ art: fakeArt(), profile: { ...newProfile(), ladderWins: 10, career: { stars: { [BOSS_ID]: 1, ...stars }, milestonesPaid: 0, lossStreaks: {} } } });
+
+  it('opens on the stop holding the next match', () => {
+    expect(createRoadMapScene(testContext()).index).toBe(0);
+    expect(createRoadMapScene(inPark()).index).toBe(1);
+    expect(createRoadMapScene(inPark(), 0).index).toBe(0);
+  });
+
+  it("once Biscuit is beaten the Park's card is a postcard of its own art", () => {
+    const { g, drawn } = recordingContext();
+    createRoadMapScene(inPark()).draw(g, 0);
+    expect(drawn).toContain('art.venues.park.layers.far');
+    const before = recordingContext();
+    createRoadMapScene(testContext({ art: fakeArt(), profile: { ...newProfile(), ladderWins: 10 } })).draw(before.g, 0);
+    expect(before.drawn).not.toContain('art.venues.park.layers.far');
+  });
+
+  it('after Sam the School says COMING SOON, and A on it still blips', () => {
+    const ctx = inPark({ [PARK_BOSS_ID]: 1 });
+    const { g, drawn } = recordingContext();
+    const s = createRoadMapScene(ctx, 2);
+    s.draw(g, 0);
+    expect(drawn.some(n => n.startsWith('art.text(COMING SOON,'))).toBe(true);
+    expect(s.update(frame(['confirm']), STEP)).toBeNull();
+    expect(ctx.audio.played).toContain('nope');
   });
 });

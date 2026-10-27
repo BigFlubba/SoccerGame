@@ -1,7 +1,7 @@
 import { MASTER } from '../art/colors';
 import { BASE_W } from '../engine/viewport';
 import type { Camera } from '../game/camera';
-import { TOTAL_STARS, VENUES, careerStars, stopLabel, venueOpen, type Venue } from '../meta/career';
+import { TOTAL_STARS, VENUES, careerStars, nextCareerMatch, stopLabel, venueOpen } from '../meta/career';
 import type { GameContext } from './context';
 import { createHubScene } from './hubScene';
 import { drawLayers } from './matchView';
@@ -47,9 +47,11 @@ const HINT_Y = 168;
  * Backyard. Left/right move the cursor, without wrapping; A or Start enters
  * an open venue and only blips on a locked one. B or Esc goes to the Hub.
  */
-export function createRoadMapScene(ctx: GameContext, index = 0): RoadMapScene {
+export function createRoadMapScene(ctx: GameContext, index?: number): RoadMapScene {
   const { art } = ctx;
-  let at = Math.min(Math.max(index, 0), VENUES.length - 1);
+  // Unless told where, the cursor starts on the stop holding the next match.
+  const start = index ?? VENUES.findIndex(v => v.id === nextCareerMatch(ctx.profile).venue);
+  let at = Math.min(Math.max(start, 0), VENUES.length - 1);
   // Reached from Results too, where the match crowd is still murmuring.
   menuAudio(ctx);
 

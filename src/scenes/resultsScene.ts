@@ -1,7 +1,7 @@
 import { MASTER } from '../art/colors';
 import type { Expression } from '../art/harrison/portrait';
 import { BASE_W } from '../engine/viewport';
-import { nextCareerMatch } from '../meta/career';
+import { nextCareerMatch, venueById } from '../meta/career';
 import { addXp, canUpgrade, xpToNext } from '../meta/economy';
 import { BONUSES, MAX_STARS } from '../meta/objectives';
 import type { MatchReward, Unlock } from '../meta/progress';
@@ -75,7 +75,11 @@ export function careerLine(reward: MatchReward): string {
   const { firstWin, champion, improved, stars, match } = reward.career;
   const { result } = reward.summary;
   if (firstWin && champion) return 'BACKYARD CHAMPION! BISCUIT AWAITS';
-  if (firstWin && match.kind === 'boss') return 'BISCUIT BEATEN! BACKYARD DONE!';
+  const venue = venueById(match.venue);
+  if (firstWin && match.kind === 'boss') return `${match.hudName} BEATEN! ${venue.name} DONE!`;
+  const numbered = venue.matches.filter(m => m.kind === 'match');
+  const boss = venue.matches.find(m => m.kind === 'boss');
+  if (firstWin && match.kind === 'match' && boss && match === numbered[numbered.length - 1]) return `${boss.name} AWAITS!`;
   if (firstWin) return `MATCH ${match.rung} BEATEN!`;
   if (result === 'win') return improved ? `NEW BEST: ${stars} STARS!` : 'REMATCH WON!';
   return result === 'draw' ? 'ALL SQUARE. GO AGAIN!' : `${match.hudName} TAKES THIS ONE. GO AGAIN!`;

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { BOSS_ID, grantRungStars, matchById, nextCareerMatch, type CareerMatch } from '../meta/career';
+import { BOSS_ID, PARK_BOSS_ID, grantRungStars, matchById, nextCareerMatch, type CareerMatch } from '../meta/career';
 import type { GoalRecord, MatchSummary } from '../meta/economy';
 import { nextMatch } from '../meta/ladder';
 import { newProfile, type Profile } from '../meta/profile';
@@ -224,6 +224,28 @@ describe('results screen', () => {
     const { ctx, reward } = after(WIN_3_0);
     const s = createResultsScene(ctx, reward, true);
     expect(s.update(frame(['pause']), STEP)?.kind).toBe('vs');
+  });
+});
+
+/** A profile with Biscuit beaten and these Park stars. */
+const inPark = (stars: Record<string, number> = {}) => ({ ...newProfile(), ladderWins: 10, career: { stars: { [BOSS_ID]: 1, ...stars }, milestonesPaid: 0, lossStreaks: {} } });
+const PARK_FOUR = { 'park-1': 1, 'park-2': 1, 'park-3': 1, 'park-4': 1 };
+
+describe('careerLine in the Park', () => {
+  it('a first win at a crew match names it; the last one sends him to Sam; beating Sam finishes the Park', () => {
+    expect(careerLine(after(WIN_3_0, inPark(), matchById('park-1')!).reward)).toBe('MATCH 1 BEATEN!');
+    expect(careerLine(after(WIN_3_0, inPark({ 'park-1': 1, 'park-2': 1, 'park-3': 1 }), matchById('park-4')!).reward)).toBe('SPEEDY SAM AWAITS!');
+    expect(careerLine(after(WIN_3_0, inPark(PARK_FOUR), matchById(PARK_BOSS_ID)!).reward)).toBe('SAM BEATEN! THE PARK DONE!');
+  });
+
+  it('a loss to a kid names them', () => {
+    expect(careerLine(after(LOSS_0_2, inPark(), matchById('park-1')!).reward)).toBe('BRICK TAKES THIS ONE. GO AGAIN!');
+  });
+
+  it('after beating Sam, NEXT MATCH becomes CAREER', () => {
+    const done = after(WIN_3_0, inPark(PARK_FOUR), matchById(PARK_BOSS_ID)!);
+    expect(resultsItems(done.reward)).toEqual(['CAREER', 'SHOP', 'HUB']);
+    expect(createResultsScene(done.ctx, done.reward, true).update(frame(['confirm']), STEP)?.kind).toBe('roadMap');
   });
 });
 

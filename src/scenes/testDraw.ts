@@ -1,6 +1,6 @@
 import type { GameArt } from './art';
 
-/** Every canvas of `fakeArt` is named by the path it was reached by, e.g. `opponents.brick.sprites.left.idle.0`. */
+/** Every canvas of `fakeArt` is named by the path it was reached by, e.g. `art.opponents.brick.sprites.left.idle.0`, or `art.text(GOAL!,2,white,outline)`. */
 export interface Named {
   readonly name: string;
 }
@@ -9,8 +9,8 @@ const SIZE = 10;
 
 /**
  * Stand-in art for draw tests: every property is more art, every call
- * (art.text) returns more, every image is SIZE px square, and every
- * list has one entry.
+ * (art.text) returns more, named with its arguments, every image is SIZE
+ * px square, and every list has one entry.
  */
 export function fakeArt(path = 'art'): GameArt {
   const target = () => undefined;
@@ -22,8 +22,8 @@ export function fakeArt(path = 'art'): GameArt {
       if (typeof prop === 'symbol') return undefined;
       return fakeArt(`${path}.${prop}`);
     },
-    apply() {
-      return fakeArt(`${path}()`);
+    apply(_, __, args: unknown[]) {
+      return fakeArt(`${path}(${args.join(',')})`);
     },
   }) as unknown as GameArt;
 }
