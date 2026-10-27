@@ -117,6 +117,17 @@ describe('the steal button', () => {
     expect(ballAtFeet(w.home, w.ball)).toBe(true);
   });
 
+  it('a clean steal at a run, the ball clear of Max, leaves it at his feet and no faster than him after the tick', () => {
+    // Harrison running at his own goal catches the ball 16 px ahead of Max, alongside him rather than behind.
+    const w = stage({ max: 300, ball: 284, home: 286, vx: -150, profile: DIFFICULTY.easy, seed: 3 });
+    w.home.z = 38;
+    stepWorld(w, { ...TAP, moveX: -1 }, NO_INTENT, STEP);
+    expect(w.events.steal).toBe('stole');
+    expect(w.events.kicks[0]!.touched, 'his own touch knocks it on').toBe(false);
+    expect(ballAtFeet(w.home, w.ball)).toBe(true);
+    expect(Math.abs(w.ball.vx)).toBeLessThanOrEqual(Math.abs(w.home.vx) + 1);
+  });
+
   it("a head-on clean steal sticks through Max's wrong-footed beat", () => {
     // Max dribbling at a Harrison standing his ground.
     const w = stage({ max: 300, ball: 292, home: 280, vx: -150, profile: DIFFICULTY.easy, seed: 3, homeVx: 1 });

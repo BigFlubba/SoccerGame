@@ -228,11 +228,14 @@ a later change can't quietly make it hard again.
   it did. The pace factor scales his run and sprint while he plays the
   ball, not while he backs off. Every Easy number is gentler than
   Normal's, and every Normal number gentler than Hard's.
-- **Measured as built:** rung 10, 64 seeds: **Easy 0.797, Normal 0.641,
-  Hard 0.016**; 128 seeds: 0.797 / 0.656 / 0.016 (Hard's 128-seed
-  baseline was 0.016). Rung 1: 32 seeds 1.000 / 0.813 / 0.063, 128 seeds
-  0.914 / 0.813 / 0.055, so the first rung is the easier one. Average
-  scores at rung 10: Easy 5.5–3.7, Normal 5.7–5.0, Hard 1.2–5.8.
+- **Measured as built** (after the final review's fix: a trap counts
+  as his touch, so his run doesn't knock a stolen ball on at once): rung
+  10, 64 seeds: **Easy 0.859, Normal 0.656, Hard 0.031**; 128 seeds:
+  0.875 / 0.664 / 0.039 (Hard's 128-seed baseline was 0.016). Rung 1:
+  32 seeds 1.000 / 0.781 / 0.031, 128 seeds 0.953 / 0.836 / 0.023, so the
+  first rung is the easier one. Easy sits above its 80% target, inside
+  the 70–90% band: left for the playtest. Average scores at rung 10
+  before the fix: Easy 5.5–3.7, Normal 5.7–5.0, Hard 1.2–5.8.
 - **Kickoff reaction (builder's ruling):** once Harrison plays the
   kickoff ball, Max, who has been standing, reacts after his reaction
   time. Without it his decision clock ran on through the hold and he

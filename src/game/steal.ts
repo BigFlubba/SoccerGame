@@ -1,7 +1,7 @@
 import { BALL_R } from '../art/ball';
 import { DIFFICULTY } from './ai';
 import { BALL_REST_Y, type Ball } from './ball';
-import { canPlace } from './contact';
+import { TOUCH_COOLDOWN_S, canPlace } from './contact';
 import { PLAYER_R, cancelCharge, type Player, type PlayerIntent } from './player';
 import { touchPush } from './stats';
 import type { World } from './world';
@@ -80,11 +80,12 @@ function trapSpot(w: World): { x: number; z: number } | null {
   );
 }
 
-/** He traps the ball at his feet, and both slow to TRAP_KEEP of his speed. */
+/** He traps the ball at his feet, and both slow to TRAP_KEEP of his speed; the trap is his touch, so his run doesn't knock it on at once. */
 function trap(w: World): void {
   const { home, ball } = w;
   const spot = trapSpot(w);
   if (spot) [ball.x, ball.z, ball.y] = [spot.x, spot.z, BALL_REST_Y];
+  home.touchCooldown = TOUCH_COOLDOWN_S;
   home.vx *= TRAP_KEEP;
   home.vz *= TRAP_KEEP;
   Object.assign(ball, { vx: home.vx, vy: 0, vz: home.vz, spin: 0 });

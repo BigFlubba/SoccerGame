@@ -20,7 +20,7 @@ export interface ContactEvents {
 const HEADER_MAX_AWAY_SPEED = 300;
 /** He must be running at least this fast to dribble. */
 const DRIBBLE_MIN_SPEED = 20;
-const TOUCH_COOLDOWN_S = 0.12;
+export const TOUCH_COOLDOWN_S = 0.12;
 const SLIDE_BALL_VX = 220;
 const SLIDE_BALL_VY = 80;
 /** Harrison's slide facing his own goal clears the ball to the nearer board and a little upfield, px/s. */
