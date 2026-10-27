@@ -8,13 +8,14 @@ import type { World } from './world';
 import { REACH_Z, ballIn, footZone, type Rect } from './zones';
 
 /**
- * Harrison's steal button. A tap with Max's ball in reach jabs for it: a
- * clean steal traps it at his feet, otherwise it's poked loose along his
- * run. A loose ball in reach is always trapped. A tap with nothing in reach
+ * Harrison's steal button. A tap with Max's ball in reach (round Max from
+ * behind him) jabs for it: a clean steal traps it at his feet, otherwise
+ * it's poked loose along his run. A loose ball in reach is always trapped.
+ * Max's ball just out of reach is a near miss; a tap with nothing in reach
  * is a whiff: he stumbles. Max doesn't get the button.
  */
 
-export type StealOutcome = 'stole' | 'poked' | 'trapped' | 'whiff';
+export type StealOutcome = 'stole' | 'poked' | 'trapped' | 'missed' | 'whiff';
 
 /** A ball this far ahead of Max along his facing, low and on his line, is his: his own possession test. */
 const MAX_BALL_AHEAD = 16;
@@ -22,6 +23,10 @@ const BALL_LOW = BALL_REST_Y + 3;
 /** The steal reaches from this far behind him to this far ahead, and this far either side in depth... */
 const STEAL_BEHIND = 2;
 export const STEAL_AHEAD = 20;
+/** From behind Max, past his body, it reaches this far ahead for his ball: where a dribbled ball runs. */
+export const STEAL_ROUND_MAX = 28;
+/** Max's ball this little beyond the reach is a near miss: no stumble, just the wait. */
+export const NEAR_MISS = 12;
 export const STEAL_SIDE = REACH_Z + 3;
 /** ...from the ground to this high. */
 const STEAL_HIGH = 12;
@@ -42,10 +47,21 @@ export function maxHasBall(max: Player, ball: Ball): boolean {
   return upright && ball.y <= BALL_LOW && ahead >= 0 && ahead <= MAX_BALL_AHEAD && Math.abs(ball.z - max.z) <= REACH_Z;
 }
 
-/** The steal's reach: his foot and a little more, low to the ground. */
-export function stealZone(p: Player): Rect {
-  const [a, b] = [p.x - p.facing * STEAL_BEHIND, p.x + p.facing * STEAL_AHEAD];
+/** The steal's reach: his foot and a little more (`ahead`), low to the ground. */
+export function stealZone(p: Player, ahead = STEAL_AHEAD): Rect {
+  const [a, b] = [p.x - p.facing * STEAL_BEHIND, p.x + p.facing * ahead];
   return { x0: Math.min(a, b), x1: Math.max(a, b), y0: p.y, y1: p.y + STEAL_HIGH, z0: p.z - STEAL_SIDE, z1: p.z + STEAL_SIDE };
+}
+
+/** How far ahead his steal reaches now: round Max to his ball when he's behind him, otherwise his foot and a little more. */
+function reachNow(w: World): number {
+  const behindMax = (w.home.x - w.away.x) * w.away.facing < 0;
+  return behindMax && maxHasBall(w.away, w.ball) ? STEAL_ROUND_MAX : STEAL_AHEAD;
+}
+
+/** Whether a steal tap now would reach the ball. */
+export function inStealReach(w: World): boolean {
+  return w.ball.y <= BALL_LOW && ballIn(stealZone(w.home, reachNow(w)), w.ball, BALL_R);
 }
 
 /** The chance a tap with Max's ball in reach takes it cleanly: the difficulty's odds, a little better with Control. */
@@ -136,7 +152,9 @@ export function resolveSteal(w: World, intent: PlayerIntent): StealOutcome | nul
   const ready = home.state === 'ground' && home.y === 0 && home.stumbleS === 0 && home.stealCooldownS === 0;
   if (!intent.steal || w.match.phase !== 'playing' || w.dog !== null || !ready || (w.power?.activeS ?? 0) > 0) return null;
   home.stealCooldownS = STEAL_COOLDOWN_S;
-  if (w.ball.y > BALL_LOW || !ballIn(stealZone(home), w.ball, BALL_R)) {
+  if (!inStealReach(w)) {
+    // Max's ball only just out of reach is a near miss, not a whiff.
+    if (maxHasBall(w.away, w.ball) && ballIn(stealZone(home, reachNow(w)), w.ball, BALL_R + NEAR_MISS)) return 'missed';
     home.stumbleS = STUMBLE_S;
     return 'whiff';
   }

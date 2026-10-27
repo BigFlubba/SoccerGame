@@ -223,8 +223,8 @@ describe('think', () => {
 
   it('difficulty profiles match the plan', () => {
     expect(DIFFICULTY.easy).toEqual({
-      reactionS: 0.26, aimErrorDeg: 8, aggression: 0.3, shootRange: 150, braceSense: 0.5, backOffS: 0.32,
-      cleanSteal: 0.9, wrongFootedS: 0.4, kickoffSpot: { back: 110, off: 20 }, kickoffRush: true, paceFactor: 1,
+      reactionS: 0.22, aimErrorDeg: 8, aggression: 0.3, shootRange: 150, braceSense: 0.5, backOffS: 0.32,
+      cleanSteal: 0.9, wrongFootedS: 0.35, kickoffSpot: { back: 110, off: 20 }, kickoffRush: true, paceFactor: 1,
     });
     expect(DIFFICULTY.normal).toEqual({
       reactionS: 0.16, aimErrorDeg: 6, aggression: 0.55, shootRange: 180, braceSense: 0.75, backOffS: 0.18,

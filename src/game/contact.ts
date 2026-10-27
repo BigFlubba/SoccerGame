@@ -109,11 +109,12 @@ function headBall(p: Player, ball: Ball, field: Field, ev: ContactEvents): void 
 
 const upfieldOf = (p: Player): 1 | -1 => (p.team === 'home' ? 1 : -1);
 
-/** Whether he's running toward his own goal with the ball in his keep-out zone, where his touches never push it at the goal. */
+/** Whether he's running toward his own goal with the ball in his keep-out zone (in front of his goal line), where his touches never push it at the goal. */
 export function keepingOut(p: Player, ball: { x: number }, field: Field): boolean {
   const up = upfieldOf(p);
   const own = field.goals.find(g => g.side === (up > 0 ? 'left' : 'right'))!;
-  return p.vx * up < 0 && (ball.x - own.lineX) * up <= KEEP_OUT_X;
+  const out = (ball.x - own.lineX) * up;
+  return p.vx * up < 0 && out > 0 && out <= KEEP_OUT_X;
 }
 
 /**

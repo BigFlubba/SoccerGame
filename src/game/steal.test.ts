@@ -6,7 +6,7 @@ import { DOG_DIFFICULTY, JINK_S, TUNING_STATS } from './dog';
 import { SIDE_CLEAR } from './contact';
 import { NO_INTENT, createPlayer, stepPlayer, type Player } from './player';
 import { BACKYARD } from './field';
-import { STEAL_COOLDOWN_S, STUMBLE_S, resolveSteal } from './steal';
+import { NEAR_MISS, STEAL_COOLDOWN_S, STEAL_ROUND_MAX, STUMBLE_S, resolveSteal } from './steal';
 import { BASE_STATS } from './stats';
 import { createWorld, stepWorld, type World } from './world';
 import { ballAtFeet, ballInBody } from './zones';
@@ -64,6 +64,29 @@ describe('the steal button', () => {
       return;
     }
     throw new Error('no poke in 40 seeds');
+  });
+
+  it("from right behind a dribbling Max, the steal reaches round him to his ball", () => {
+    // Body to body, the dribbled ball 15 px ahead of Max: 25 px ahead of Harrison.
+    for (let seed = 1; seed <= 20; seed++) {
+      const w = stage({ max: 300, ball: 285, home: 310, vx: -150, profile: DIFFICULTY.easy, seed });
+      expect(['stole', 'poked'], `seed ${seed}`).toContain(resolveSteal(w, TAP));
+    }
+  });
+
+  it('a loose ball, or Max coming head on, is only reached as close as before', () => {
+    const loose = stage({ max: 500, ball: 284, home: 310, vx: -150, profile: DIFFICULTY.easy, seed: 1 });
+    loose.away.facing = 1;
+    expect(resolveSteal(loose, TAP)).toBe('whiff');
+    const headOn = stage({ max: 300, ball: 286, home: 260, vx: -150, profile: DIFFICULTY.easy, seed: 1, homeVx: 1 });
+    expect(resolveSteal(headOn, TAP)).not.toBe('stole');
+  });
+
+  it("a tap with Max's ball just out of reach is a near miss: no stumble, but a wait", () => {
+    // A step behind Max, his dribbled ball 15 px ahead of him: a little beyond the reach round him.
+    const w = stage({ max: 300, ball: 285, home: 285 + STEAL_ROUND_MAX + NEAR_MISS / 2, vx: -150, profile: DIFFICULTY.easy, seed: 1 });
+    expect(resolveSteal(w, TAP)).toBe('missed');
+    expect([w.home.stumbleS, w.home.stealCooldownS]).toEqual([0, STEAL_COOLDOWN_S]);
   });
 
   it('a tap with nothing in reach is a whiff: a stumble and a wait', () => {

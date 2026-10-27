@@ -354,3 +354,33 @@ goals: 26% → 18%, 28% → 18%, 21% → 10%). Left: about 3% of Normal
 kickoffs end with the shot blocked by the onrushing Max and rolling into
 Harrison's empty net, and own goals after Harrison's own kicks (a shot
 off Max's body, a header) are untouched by this change.
+
+## Amended after the parent's second playtest (2026-10-27)
+
+Running up behind Max, Harrison couldn't get to the ball: Max's body
+keeps him about 10 px back, a dribbled ball runs 13–16 px ahead of Max,
+and the steal reached 20 px, so from right behind Max it reached his
+ball 0% of the time (and a tap there was a whiff and a stumble). Bodies
+stay solid (Biscuit's lesson and "go round Max" depend on it). Instead
+(parent-approved; a "you're in reach" cue was declined):
+
+1. **The steal reaches round Max.** From behind Max (on the far side of
+   his body from the ball) it reaches 28 px for Max's ball. A loose
+   ball, or Max coming head on, is reached only as close as before
+   (20 px), so nothing is snapped in from a distance. From right behind
+   a dribbling Max it now reaches his ball every time.
+2. **A near miss isn't a whiff.** A tap with Max's ball within 12 px
+   beyond the reach does nothing but start the 0.4 s wait: no stumble.
+   A tap with nothing near still stumbles.
+
+Also: the keep-out zone now counts only a ball in front of his goal line
+(a ball behind the line, beside the goal, can't be put in by a forward
+touch); the first cut let the scripted Harrison creep onto a ball in the
+corner behind his line and stall there.
+
+**Retuned:** Easy reaction 0.22 s, wrong-footed 0.35 s (Normal and Hard
+unchanged). **Measured** (rung 10): 64 seeds Easy 0.859, Normal 0.641,
+Hard 0.016; 128 seeds 0.844 / 0.656 / 0.047. Rung 1 (32 seeds)
+0.906 / 0.750 / 0.063. Kickoff shot: Easy 42%, Normal 41%. Own goals
+(rungs 1 and 10, 64 seeds each): Easy 50, Normal 70, Hard 78, against
+89 / 138 / 155 before the first amendment.

@@ -1,13 +1,12 @@
-import { BALL_R } from '../art/ball';
 import { seeded } from '../engine/random';
 import { LADDER_MATCHES, maxStats } from '../meta/ladder';
 import { DIFFICULTY, createBrain, think, type AiBrain, type AiProfile, type Difficulty } from './ai';
 import { HUMAN_AIM_ERROR_DEG } from './kick';
 import { NO_INTENT, type PlayerIntent } from './player';
 import { MAX_STAT_LEVEL, STAT_NAMES, type Stats } from './stats';
-import { maxHasBall, stealZone } from './steal';
+import { inStealReach, maxHasBall } from './steal';
 import { createWorld, stepWorld, type World } from './world';
-import { ballAtFeet, ballIn } from './zones';
+import { ballAtFeet } from './zones';
 
 /**
  * A scripted Harrison for measuring Max headlessly: Max's own brain plays
@@ -91,7 +90,7 @@ export function harrisonIntent(w: World, t: number, dt: number, memo: ScriptMemo
     return { ...NO_INTENT, faceX: 1, shootHeld: true };
   }
   const intent = think(memo.brain, w, w.home, w.away, dt);
-  const canSteal = w.home.stealCooldownS === 0 && maxHasBall(w.away, w.ball) && ballIn(stealZone(w.home), w.ball, BALL_R);
+  const canSteal = w.home.stealCooldownS === 0 && maxHasBall(w.away, w.ball) && inStealReach(w);
   return canSteal ? { ...intent, steal: true } : intent;
 }
 
