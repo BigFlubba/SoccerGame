@@ -135,31 +135,33 @@ describe('stepPlayer: depth', () => {
     expect(p.anim.name).toBe('run');
   });
 
-  it('up/down aims instead of moving while charging', () => {
+  it('up/down aims while charging, and moves him in depth at the wind-up pace', () => {
     const p = harrison();
     tick(p, { shootHeld: true });
     const z = p.z;
     tick(p, { shootHeld: true, moveZ: 1, aim: 'far' }, ticks(0.5));
     expect(isStriking(p)).toBe(true);
-    expect([p.z, p.vz]).toEqual([z, 0]);
+    expect(p.z).toBeGreaterThan(z);
+    expect(p.vz).toBeCloseTo(95 * 0.5);
     tick(p, { moveZ: 1, aim: 'far' });
     expect(p.kick?.aim).toBe('far');
   });
 
-  it('a charge stops his depth run', () => {
+  it('a charge slows his depth run to the wind-up pace', () => {
     const p = harrison();
     tick(p, { moveZ: 1 }, ticks(1));
     tick(p, { shootHeld: true, moveZ: 1 }, ticks(0.5));
-    expect(p.vz).toBe(0);
+    expect(p.vz).toBeCloseTo(95 * 0.5);
   });
 
-  it('up/down aims instead of moving while charging a chip', () => {
+  it('winding up a chip, up/down moves him in depth at the wind-up pace', () => {
     const p = harrison();
     tick(p, { chipHeld: true }, 1, true);
     expect(p.state).toBe('chipping');
     const z = p.z;
     tick(p, { chipHeld: true, moveZ: -1 }, ticks(0.3), true);
-    expect(p.z).toBe(z);
+    expect(p.z).toBeLessThan(z);
+    expect(p.vz).toBeCloseTo(-95 * 0.5);
   });
 
   it('keeps his jump’s depth direction in the air', () => {

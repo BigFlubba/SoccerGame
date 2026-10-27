@@ -384,3 +384,14 @@ Hard 0.016; 128 seeds 0.844 / 0.656 / 0.047. Rung 1 (32 seeds)
 0.906 / 0.750 / 0.063. Kickoff shot: Easy 42%, Normal 41%. Own goals
 (rungs 1 and 10, 64 seeds each): Easy 50, Normal 70, Hard 78, against
 89 / 138 / 155 before the first amendment.
+
+## Amended: moving in depth while winding up (2026-10-27)
+
+The parent found it counterintuitive that Harrison could move along the
+pitch while holding a kick but not in depth. Now, winding up a shot or a
+chip, up/down still aims at the far or near post **and** moves him in
+depth at the wind-up pace (half a run, as along the pitch). A ball at his
+feet when the wind-up starts rolls along with him in depth (unless that
+would put it through a wall, a post or a net), so aiming as he moves
+never walks him off the ball. Max and Biscuit never push up/down while
+winding up, so they play as before; the tuning measures are unchanged.

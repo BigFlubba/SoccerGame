@@ -80,6 +80,22 @@ describe('world', () => {
     }
   });
 
+  it('winding up with the ball at his feet, it comes with him in depth, so aiming as he moves still strikes it', () => {
+    const w = createWorld(BASE_STATS, BASE_STATS, 1, ERR);
+    w.match.phase = 'playing';
+    Object.assign(w.away, { x: 600 });
+    const start = { home: w.home.z, ball: w.ball.z };
+    for (let i = 0; i < 24; i++) stepWorld(w, { ...NO_INTENT, shootHeld: true, moveZ: 1, aim: 'far' }, NO_INTENT, STEP);
+    expect(w.home.z).toBeGreaterThan(start.home + 8);
+    expect(w.ball.z - start.ball).toBeCloseTo(w.home.z - start.home);
+    let kicked = false;
+    for (let i = 0; i < 10 && !kicked; i++) {
+      stepWorld(w, { ...NO_INTENT, aim: 'far' }, NO_INTENT, STEP);
+      kicked = w.events.kicks[0]!.kicked === 'shot';
+    }
+    expect(kicked).toBe(true);
+  });
+
   it('when away kicks off, away stands by the ball and home drops back', () => {
     const w = createWorld(BASE_STATS, BASE_STATS, 1, ERR);
     w.match.kickoffTeam = 'away';

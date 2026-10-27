@@ -196,7 +196,7 @@ function approach2(p: Player, tx: number, tz: number, dt: number, accel: number,
   else [p.vx, p.vz] = [p.vx + (dx / gap) * step, p.vz + (dz / gap) * step];
 }
 
-/** Striking the ball: charging a shot or chip, or in the air. Up/down aims instead of moving him. */
+/** Striking the ball: charging a shot or chip, or in the air. Up/down aims; winding up on the ground it also moves him, at the wind-up pace. */
 export function isStriking(p: Player): boolean {
   return p.state === 'charging' || (p.state === 'chipping' && !p.kick) || p.state === 'air';
 }
@@ -412,6 +412,8 @@ export function stepPlayer(
   const moving = intent.moveX !== 0 || intent.moveZ !== 0;
   const sprinting = p.state === 'ground' && intent.sprint && !p.exhausted && moving;
   const target = intent.moveX * runSpeed(p.stats);
+  // Winding up a kick he moves at CHARGE_MOVE_FACTOR of a run, in depth as along the pitch.
+  const windUp = (runSpeed(p.stats) * CHARGE_MOVE_FACTOR) / Math.max(1, Math.hypot(intent.moveX, intent.moveZ));
   // On the ground he runs the same speed in every direction, diagonals included.
   const moveLen = Math.max(1, Math.hypot(intent.moveX, intent.moveZ));
   const runTarget = (runSpeed(p.stats) * (sprinting ? SPRINT_MULTIPLIER : 1) * (intent.pace ?? 1)) / moveLen;
@@ -450,7 +452,7 @@ export function stepPlayer(
         release(p, 'shot', intent.aim);
       } else {
         addCharge(p, dt, true);
-        approach2(p, target * CHARGE_MOVE_FACTOR, 0, dt, ACCEL, DECEL);
+        approach2(p, intent.moveX * windUp, intent.moveZ * windUp, dt, ACCEL, DECEL);
       }
       break;
     case 'kicking':
@@ -462,7 +464,7 @@ export function stepPlayer(
         release(p, 'chip', intent.aim);
       } else if (!p.kick) {
         addCharge(p, dt, false);
-        approach2(p, target * CHARGE_MOVE_FACTOR, 0, dt, ACCEL, DECEL);
+        approach2(p, intent.moveX * windUp, intent.moveZ * windUp, dt, ACCEL, DECEL);
       } else {
         approach2(p, 0, 0, dt, ACCEL, DECEL);
         strike(p, CHIP_TIMING);

@@ -3,7 +3,7 @@ import { seeded, type Rng } from '../engine/random';
 import type { AiProfile } from './ai';
 import { BALL_REST_Y, stepBall, type Ball, type BallEvents } from './ball';
 import { resolveBodies } from './bodies';
-import { resolveContacts, type ContactEvents } from './contact';
+import { canPlace, resolveContacts, type ContactEvents } from './contact';
 import { checkPinned, createDog, dropBall, parkBall, quietDog, resetDog, stepDog, vulnerable, type DogEvents, type DogProfile, type DogState } from './dog';
 import { BACKYARD, goalScored, type Field } from './field';
 import { startDragBack, stepDragBack } from './dragBack';
@@ -161,6 +161,14 @@ function stepOne(p: Player, intent: PlayerIntent, live: boolean, w: World, dt: n
   if (!live) p.held = { shoot: intent.shootHeld, chip: intent.chipHeld, power: intent.powerHeld };
 }
 
+/** Charging a shot, or a chip not yet released. */
+const windingUp = (p: Player): boolean => p.state === 'charging' || (p.state === 'chipping' && !p.kick);
+
+/** Moves the ball dz in depth with him, unless that would put it through a wall, a post or a net. */
+function carryInDepth(w: World, dz: number): void {
+  if (dz !== 0 && canPlace(w.ball, w.ball.x, w.ball.z + dz, w.field)) w.ball.z += dz;
+}
+
 /** The meter's gains from Harrison's part in this tick's contacts. */
 function creditMeter(power: PowerState, home: ContactEvents, w: World): void {
   if (home.touched) addMeter(power, 'touch');
@@ -234,6 +242,8 @@ export function stepWorld(w: World, homeIntent: PlayerIntent, awayIntent: Player
   // Powered up, X only ever fires the wave: until it can (ready, with the ball, a clean line), the press does nothing.
   const waveDir = live && canFireWave(w) ? maxGoalDir(w) : live && (w.power?.activeS ?? 0) > 0 ? 'wait' : null;
   startDragBack(w, homeIntent);
+  // Winding up with the ball at his feet, he rolls it along with him in depth.
+  const carryFromZ = ballAtFeet(home, w.ball) ? home.z : null;
   stepOne(home, homeIntent, live, w, dt, waveDir);
   // The dog runs on his own legs; braced or blown away, his body is a player's like Max's.
   const dogBody = w.dog !== null && w.away.state !== 'bracing' && w.away.state !== 'blown';
@@ -253,6 +263,7 @@ export function stepWorld(w: World, homeIntent: PlayerIntent, awayIntent: Player
   }
   resolveBodies(home, w.away, w.field);
   if (dogBody && live && checkPinned(w, awayIntent, Math.hypot(w.away.x - dogFrom.x, w.away.z - dogFrom.z), dt)) dog.dropped = true;
+  if (carryFromZ !== null && windingUp(home)) carryInDepth(w, home.z - carryFromZ);
   const steal = resolveSteal(w, homeIntent);
   stepDragBack(w, dt);
 
