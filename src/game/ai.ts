@@ -395,12 +395,26 @@ function decide(brain: AiBrain, w: World, me: Player, them: Player): void {
   brain.intent = moveTo(behindX, z, at.z);
 }
 
+/** Her fake is over: she stops carrying the ball and decides afresh this tick. */
+function endFake(brain: AiBrain): void {
+  brain.fake = null;
+  brain.fakeReadyS = FAKE.cooldownS;
+  brain.nextDecisionS = 0;
+  brain.intent = { ...brain.intent, carry: false };
+}
+
+/** Whether `them` played the ball last tick: touched, kicked or tackled it, or poked or trapped it with the steal. */
+function playedIt(w: World, them: Player): boolean {
+  const ev = w.events.kicks[them.team === 'home' ? 0 : 1];
+  const stealt = them.team === 'home' && (w.events.steal === 'poked' || w.events.steal === 'trapped');
+  return stealt || (ev !== undefined && (ev.touched || ev.kicked !== null || ev.tackledBall));
+}
+
 /** One tick of her fake: her move, with the ball kept at her feet; ends it when it's over. */
 function fakeTick(brain: AiBrain, w: World, me: Player, dir: 1 | -1): boolean {
   const move = brain.fake && fakeMove(brain.fake, dir);
   if (!move) {
-    brain.fake = null;
-    brain.fakeReadyS = FAKE.cooldownS;
+    endFake(brain);
     return false;
   }
   brain.plan = 'dribble';
@@ -453,8 +467,8 @@ export function think(brain: AiBrain, w: World, me: Player, them: Player, dt: nu
     brain.plan = 'chase';
     brain.fake = null;
   }
-  // A fake ends early if she loses the ball, or play stops.
-  if (brain.fake && (!atFeet(w, me) || w.match.phase !== 'playing')) brain.fake = null;
+  // A fake ends early if the opponent plays her ball, she loses it, or play stops: her close control never undoes his touch.
+  if (brain.fake && (playedIt(w, them) || !atFeet(w, me) || w.match.phase !== 'playing')) endFake(brain);
   // Waiting for Harrison's kickoff, Max means to hold his spot once play starts.
   if (me.team === 'away' && w.match.phase === 'kickoff') brain.kickoffHoldS = w.match.kickoffTeam === them.team ? 0 : null;
   let released = false;

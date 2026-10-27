@@ -52,6 +52,13 @@ const MAX_TICKS = 60 * 400;
 const STILL_PX = 0.05;
 /** The ball is still on the centre spot within this, px. */
 const ON_SPOT = 0.5;
+/**
+ * A face-off: Harrison stands within `ahead` px in front of the opponent on
+ * the ball, within `lane` of its line. It beats him once it's `past` px
+ * beyond him with the ball within `keep` px; it doesn't if he wins the ball
+ * or `forS` goes by.
+ */
+const BEAT = { ahead: 30, lane: 10, past: 10, keep: 24, forS: 1.5 };
 
 /** An opponent's stats with every stat one level higher, capped: what Harrison can afford by the time he meets them. */
 export function harrisonStatsFor(opponent: Stats): Stats {
@@ -128,6 +135,10 @@ export interface Traits {
   sprintShare: number;
   /** Fakes started (the dribbler's). */
   fakes: number;
+  /** Times it took the ball at Harrison standing in its path and got past him with it... */
+  beats: number;
+  /** ...out of this many: each time he stood within BEAT.ahead px ahead of it, in its lane, while it had the ball. */
+  faceOffs: number;
 }
 
 export interface OpponentMatch extends MaxMatch {
@@ -145,6 +156,9 @@ export function playMatchup(m: Matchup, seed: number, harrison: Stats = harrison
   const shotsFrom: number[] = [];
   let [slides, depthSum, gapSum, held] = [0, 0, 0, 0];
   let sprints = 0;
+  let [beats, faceOffs] = [0, 0];
+  /** How long the face-off under way has run; null when there isn't one. */
+  let faceOffS: number | null = null;
   let [t, stillS, longestStillS] = [0, 0, 0];
   for (let i = 0; i < MAX_TICKS && w.match.result === null; i++) {
     const home = harrisonIntent(w, t, STEP, memo);
@@ -159,6 +173,16 @@ export function playMatchup(m: Matchup, seed: number, harrison: Stats = harrison
     const windingUp = (s: string) => s === 'charging' || s === 'chipping';
     if (!windingUp(was) && windingUp(w.away.state)) shotsFrom.push(Math.abs(w.away.x - attacks.lineX));
     if (was !== 'sliding' && w.away.state === 'sliding') slides++;
+    const [ahead, side] = [w.away.x - w.home.x, w.home.z - w.away.z];
+    if (faceOffS === null && w.match.phase === 'playing' && maxHasBall(w.away, w.ball) && ahead > 0 && ahead <= BEAT.ahead && Math.abs(side) <= BEAT.lane) {
+      faceOffS = 0;
+      faceOffs++;
+    } else if (faceOffS !== null) {
+      faceOffS += STEP;
+      const past = -ahead >= BEAT.past && Math.hypot(w.ball.x - w.away.x, w.ball.z - w.away.z) <= BEAT.keep;
+      if (past) beats++;
+      if (past || maxHasBall(w.home, w.ball) || w.match.phase !== 'playing' || faceOffS >= BEAT.forS) faceOffS = null;
+    }
     if (harrisons(w)) {
       held++;
       depthSum += Math.abs(own.lineX - w.away.x);
@@ -166,7 +190,7 @@ export function playMatchup(m: Matchup, seed: number, harrison: Stats = harrison
       if (away.sprint) sprints++;
     }
   }
-  const traits: Traits = { shotsFrom, slides, defendDepth: held ? depthSum / held : 0, pressGap: held ? gapSum / held : 0, sprintShare: held ? sprints / held : 0, fakes: brain.fakes };
+  const traits: Traits = { shotsFrom, slides, defendDepth: held ? depthSum / held : 0, pressGap: held ? gapSum / held : 0, sprintShare: held ? sprints / held : 0, fakes: brain.fakes, beats, faceOffs };
   return { result: w.match.result, score: { ...w.match.score }, longestStillS, traits };
 }
 

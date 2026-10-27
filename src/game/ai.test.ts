@@ -787,13 +787,52 @@ describe('Tricky Tia', () => {
     expect(maxHasBall(w.away, w.ball)).toBe(true);
   });
 
-  it("a slide at the line she leaned onto, launched as her cut begins, misses: she isn't there any more", () => {
+  it("a slide down her line the moment she starts to lean misses: she isn't there any more", () => {
+    const { w, brain } = dribbling(24);
+    const lineZ = w.away.z;
+    untilFake(w, brain);
+    Object.assign(w.home, { z: lineZ, facing: 1 });
+    for (let i = 0; i < 40; i++) {
+      stepWorld(w, i === 0 ? { ...NO_INTENT, chipHeld: true } : NO_INTENT, think(brain, w, w.away, w.home, STEP), STEP);
+      expect(w.events.kicks[0]?.tackledBall, `tick ${i}`).toBe(false);
+      expect(w.events.kicks[0]?.trippedOpponent, `tick ${i}`).toBe(false);
+    }
+  });
+
+  it('a slide that reaches her ball wins it: the fake ends and she never gets it back', () => {
     const { w, brain } = dribbling(24);
     let t = 0;
     while (!(brain.fake && brain.fake.t >= FAKE.leanS) && t++ < 120) play(w, brain, STEP);
     Object.assign(w.home, { z: w.away.z, facing: 1 });
-    play(w, brain, 0.6, i => (i === 0 ? { ...NO_INTENT, chipHeld: true } : NO_INTENT));
-    expect(maxHasBall(w.away, w.ball)).toBe(true);
+    let tackled = -1;
+    for (let i = 0; i < 40 && tackled < 0; i++) {
+      stepWorld(w, i === 0 ? { ...NO_INTENT, chipHeld: true } : NO_INTENT, think(brain, w, w.away, w.home, STEP), STEP);
+      if (w.events.kicks[0]?.tackledBall) tackled = i;
+    }
+    expect(tackled).toBeGreaterThanOrEqual(0);
+    const intent = think(brain, w, w.away, w.home, STEP);
+    expect(brain.fake).toBeNull();
+    expect(intent.carry).toBeFalsy();
+    // Knocked away, the ball runs on: her close control never brings it back.
+    for (let i = 0; i < 20; i++) {
+      const away = think(brain, w, w.away, w.home, STEP);
+      expect(away.carry, `tick ${i}`).toBeFalsy();
+      stepWorld(w, NO_INTENT, away, STEP);
+    }
+    expect(maxHasBall(w.away, w.ball)).toBe(false);
+  });
+
+  it('when her fake is over she stops carrying at once and decides afresh that tick', () => {
+    const { w, brain } = dribbling(24);
+    untilFake(w, brain);
+    let intent = think(brain, w, w.away, w.home, STEP);
+    for (let i = 0; i < 120 && brain.fake; i++) {
+      stepWorld(w, NO_INTENT, intent, STEP);
+      intent = think(brain, w, w.away, w.home, STEP);
+    }
+    expect(brain.fake).toBeNull();
+    expect(intent.carry).toBeFalsy();
+    expect(brain.nextDecisionS).toBeCloseTo(brain.profile.reactionS, 9);
   });
 
   it('with nobody ahead she never fakes, and one fake waits out its cooldown before the next', () => {
@@ -803,7 +842,7 @@ describe('Tricky Tia', () => {
     const { w, brain } = dribbling(24);
     untilFake(w, brain);
     expect(brain.fakes).toBe(1);
-    play(w, brain, FAKE.leanS + FAKE.cutS);
+    play(w, brain, FAKE.leanS + FAKE.cutS + FAKE.goS);
     expect(brain.fake).toBeNull();
     expect(brain.fakeReadyS).toBeGreaterThan(FAKE.cooldownS - 0.05);
     Object.assign(w.home, { x: w.away.x - 24, z: w.away.z, vx: 0, facing: 1 });

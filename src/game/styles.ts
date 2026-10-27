@@ -80,10 +80,11 @@ export function chargeHold(style: Style, rng: () => number): number {
 /**
  * The dribbler's fake: with the opponent standing within `trigger` px ahead
  * and `lane` px of her line, she leans one way in depth for `leanS` at
- * `leanPace`, the tell, then cuts the other way past him for `cutS`, the
- * ball at her feet throughout. No second fake for `cooldownS` after one.
+ * `leanPace`, the tell, then cuts the other way past him for `cutS`, then
+ * straightens up at goal for `goS`, the ball at her feet throughout. No
+ * second fake for `cooldownS` after one.
  */
-export const FAKE = { trigger: 30, lane: 10, leanS: 0.25, leanPace: 0.45, cutS: 0.3, cooldownS: 1.2 };
+export const FAKE = { trigger: 60, lane: 14, leanS: 0.25, leanPace: 0.45, cutS: 0.3, goS: 0.2, cooldownS: 1.2 };
 /**
  * The lean is a small shift in depth, easing back off him a touch; the cut
  * is mostly sideways, so she and the ball clear his body before they reach
@@ -92,10 +93,12 @@ export const FAKE = { trigger: 30, lane: 10, leanS: 0.25, leanPace: 0.45, cutS: 
 const LEAN = { x: -0.5, z: 0.87 };
 const CUT = { x: 0.3, z: 0.95 };
 
-/** Her move this tick while faking: lean one way in depth, then cut the other way past him; null once it's over. */
+/** Her move this tick while faking: lean one way in depth, cut the other way past him, then straighten up; null once it's over. */
 export function fakeMove(fake: { side: 1 | -1; t: number }, dir: 1 | -1): { moveX: number; moveZ: number; pace: number } | null {
   if (fake.t < FAKE.leanS) return { moveX: dir * LEAN.x, moveZ: fake.side * LEAN.z, pace: FAKE.leanPace };
   if (fake.t < FAKE.leanS + FAKE.cutS) return { moveX: dir * CUT.x, moveZ: -fake.side * CUT.z, pace: 1 };
+  // Straightening up, so the ball she lets go of runs on at goal with her, not off sideways.
+  if (fake.t < FAKE.leanS + FAKE.cutS + FAKE.goS) return { moveX: dir, moveZ: 0, pace: 1 };
   return null;
 }
 

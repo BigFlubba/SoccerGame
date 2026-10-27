@@ -403,7 +403,7 @@ Max measures E 0.875 / N 0.625 / H 0.016 on main and on the branch alike.
 |---|---|---|---|---|
 | Brick | 0.828 | 0.594 | 0.031 | defends 208 px from his line to Max's 305; 1.0 slides a match to 3.6 |
 | Leo | 0.859 | 0.625 | 0.063 | his wind-ups start 177 px out to Max's 97 |
-| Tia | 0.766 | 0.594 | 0.016 | 5.6 fakes a match; Max none |
+| Tia | 0.766 | 0.594 | 0.000 | 10.3 fakes a match; Max none |
 | Pete | 0.797 | 0.641 | 0.031 | sprints 30% of Harrison's time on the ball, Max 0%; 4.0 slides to 3.5 |
 
 - Hard's band is at most 0.1. Depth and pressing are measured in open
@@ -420,9 +420,18 @@ Max measures E 0.875 / N 0.625 / H 0.016 on main and on the branch alike.
   so he holds his spot while Harrison dribbles at him. He goes for a
   ball lying beside or behind Harrison that Harrison can't play.
 - **Tia's fake uses close control:** the ball stays at her feet through
-  the lean and the cut, placed before steals and tackles resolve, so both
-  still work on her. She leans toward the tighter side and cuts into the
-  room.
+  the lean, the cut and a short straightening-up at goal. It's placed
+  before steals and tackles resolve, so both still work on her, and the
+  fake ends the moment Harrison touches, kicks, tackles, pokes or traps
+  her ball. She leans toward the tighter side and cuts into the room, and
+  starts the move 60 px out, before the scripted Harrison's steal can
+  reach. A slide down her line as she starts to lean misses; a slide
+  that reaches her ball at the cut wins it.
+- **Open: Tia doesn't get past the scripted Harrison more often than
+  Max.** In a face-off (him standing within 30 px in her lane), she gets
+  past with the ball 6% of the time, Max 5%. The scripted Harrison never
+  dives in, which is the answer to her fake. That's for the parent's
+  playtest to judge.
 - Against one fixed Harrison (Brick's level-up), Normal: Brick 0.594,
   Leo 0.609, Tia 0.422, Pete 0.313. Pete is tougher than Brick, as
   planned; Leo is level with Brick.
