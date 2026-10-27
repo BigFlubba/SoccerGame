@@ -13,7 +13,7 @@ export const KIT_SLOT_NAMES = [
 ] as const;
 
 export type KitSlots = (typeof KIT_SLOT_NAMES)[number];
-export type KitId = 'home' | 'away' | 'blue' | 'orange' | 'purple' | 'teal' | 'lime';
+export type KitId = 'home' | 'away' | 'blue' | 'orange' | 'purple' | 'teal' | 'lime' | 'pink';
 
 /** Harrison's club kits and opponents' kits, as colours only (no logos or sponsor). */
 export const KITS: Record<KitId, Record<KitSlots, MasterColor>> = {
@@ -95,6 +95,18 @@ export const KITS: Record<KitId, Record<KitSlots, MasterColor>> = {
     Shorts: 'slate',
     SocksShadow: 'voltShadow',
     Socks: 'volt',
+  },
+  // Speedy Sam's: hot pink with black shorts, and white trim for his headband.
+  pink: {
+    JerseyShadow: 'pinkDark',
+    Jersey: 'pink',
+    JerseyLight: 'pinkLight',
+    TrimShadow: 'silver',
+    Trim: 'white',
+    ShortsShadow: 'charcoal',
+    Shorts: 'slate',
+    SocksShadow: 'pinkDark',
+    Socks: 'pink',
   },
 };
 

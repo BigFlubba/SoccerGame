@@ -98,6 +98,10 @@ export const MASTER = {
   tealDark: '#1a6e6a',
   teal: '#2a9e94',
   tealLight: '#6cd4c4',
+  // Speedy Sam's kit.
+  pinkDark: '#a8185e',
+  pink: '#e8388a',
+  pinkLight: '#ff86be',
 } as const;
 
 export type MasterColor = keyof typeof MASTER;

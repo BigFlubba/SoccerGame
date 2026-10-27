@@ -19,6 +19,7 @@ import { harrisonPortrait } from '../src/art/harrison/portrait';
 import { IndexedImage, blit, flipX } from '../src/art/indexedImage';
 import { MAX_HEADS, maxLook } from '../src/art/opponents/max';
 import { CREW_BODY, CREW_HEADS, crewLook } from '../src/art/opponents/crew';
+import { SAM_HEADS, samLook } from '../src/art/opponents/sam';
 import type { CrewId } from '../src/game/crew';
 import { BISCUIT_ANCHOR, BISCUIT_FACE, BISCUIT_FRAMES, type DogAnim } from '../src/art/opponents/biscuit';
 import type { AnimName } from '../src/art/body/animations';
@@ -39,6 +40,7 @@ const OUT_FILE = `${OUT_DIR}/character-sheet.png`;
 const VENUE_FILE = `${OUT_DIR}/backyard.png`;
 const PARK_FILE = `${OUT_DIR}/park.png`;
 const CREW_FILE = `${OUT_DIR}/crew-sheet.png`;
+const SAM_FILE = `${OUT_DIR}/sam-sheet.png`;
 const CREW: readonly CrewId[] = ['brick', 'leo', 'tia', 'pete'];
 const VENUE_SCALE = 3;
 /** Biscuit galloping the ball at the left goal, one Backyard view per frame in a strip, for slicing into a GIF. */
@@ -225,6 +227,23 @@ const crewRow = (id: CrewId): SheetItem[] => {
     ...[...b.idle.frames.slice(0, 1), ...b.run.frames, ...b.shoot.frames].map(f => resolved(f, look)),
   ];
 };
+
+const sam = bakeAll(HARRISON_BODY, SAM_HEADS);
+/** Speedy Sam's row: face, the three head facings, then idle, run, sprint, shoot and both skid frames, in his kit. */
+const samRow = (): SheetItem[] => {
+  const look = samLook();
+  return [
+    resolved(SAM_HEADS.front.image, look, true),
+    ...FACINGS.map(f => resolved(SAM_HEADS[f].image, look, true)),
+    ...[...sam.idle.frames.slice(0, 1), ...sam.run.frames.slice(0, 4), ...sam.sprint.frames.slice(0, 4), ...sam.shoot.frames.slice(0, 3), ...sam.skid.frames].map(f => resolved(f, look)),
+  ];
+};
+const samAt = (x: number, z: number, clip: AnimName, frame: number, facing: 1 | -1 = -1): Actor => {
+  const img = sam[clip].frames[frame]!;
+  return { x, y: 0, z, img: facing === 1 ? img : flipX(img), palette: resolvePalette(samLook()), anchor: facing === 1 ? ANCHOR : { x: img.width - 1 - ANCHOR.x, y: ANCHOR.y }, shadow: true };
+};
+/** The Park: Harrison has dragged the ball back, and Sam skids past him. */
+const samParkView = () => parkView(24, [withShadow(harrisonAt(200, 30, 'shoot', 1, 1)), ballAt(208, BALL_R, 30), samAt(150, 32, 'skid', 1, -1)]);
 const EXPRESSIONS = ['neutral', 'celebrate', 'determined', 'disappointed'] as const;
 
 const rows: SheetItem[][] = [
@@ -252,6 +271,7 @@ const rows: SheetItem[][] = [
   [bossView()],
   ...CREW.map(crewRow),
   [parkMatchView()],
+  samRow(),
   ballRow,
   [text("HARRISON 0-0 MAX 45'", 1), text('ABCDEFGHIJKLMNOPQRSTUVWXYZ', 1), text("0123456789 -':!?.,/+", 1)],
   [text("HARRISON 0-0 MAX 45'", 2), text('GOAL! PERFECT', 2)],
@@ -272,6 +292,13 @@ writeFileSync(`${OUT_DIR}/crew-faces.png`, encodePNG(crewFaces.width, crewFaces.
 const crewSheet = composeSheet([...CREW.map(crewRow), [parkMatchView()]], { scale: VENUE_SCALE, gap: GAP * 2, background: BACKGROUND });
 writeFileSync(CREW_FILE, encodePNG(crewSheet.width, crewSheet.height, crewSheet.rgba));
 console.log(`wrote ${CREW_FILE} (${crewSheet.width}×${crewSheet.height})`);
+
+const samSheet = composeSheet(
+  [samRow(), [resolved(SAM_HEADS.front.image, samLook(), true), resolved(CREW_HEADS.pete.front.image, crewLook('pete'), true), resolved(MAX_HEADS.front.image, maxLook(), true)], [samParkView()]],
+  { scale: VENUE_SCALE, gap: GAP * 2, background: BACKGROUND },
+);
+writeFileSync(SAM_FILE, encodePNG(samSheet.width, samSheet.height, samSheet.rgba));
+console.log(`wrote ${SAM_FILE} (${samSheet.width}×${samSheet.height})`);
 
 const park = composeSheet([[parkMatchView()], [parkEndView()]], { scale: VENUE_SCALE, gap: GAP, background: BACKGROUND });
 writeFileSync(PARK_FILE, encodePNG(park.width, park.height, park.rgba));

@@ -4,11 +4,11 @@ import { HARRISON_HEADS, HARRISON_POWER_HEADS } from '../harrison/head';
 import { harrisonLook } from '../harrison/look';
 import { MAX_HEADS } from '../opponents/max';
 import { opaqueBounds } from '../raster';
-import { CLIPS } from './animations';
+import { CLIPS, SKID_FRAME_HOLD } from './animations';
 import { bakeAll, frameIndexAt, samplePoses } from './bake';
 import { flipX } from '../indexedImage';
-import { ANCHOR, FRAME_W, lerpPose, mirrorPose } from './pose';
-import { HARRISON_BODY, standingHipHeight } from './proportions';
+import { ANCHOR, FRAME_W, lerpPose, mirrorPose, solvePose } from './pose';
+import { BRICK_BODY, HARRISON_BODY, standingHipHeight } from './proportions';
 
 const KITS = ['home', 'away'] as const;
 const FORMS = ['base', 'golden', 'storm', 'ultra'] as const;
@@ -33,7 +33,31 @@ describe('bakeAll', () => {
       juggle: 4,
       celebrate: 2,
       brace: 1,
+      skid: 2,
     });
+  });
+
+  it('bakes the skid: two frames at 8 fps that hold, not loop', () => {
+    expect(baked.skid.frames.length).toBe(2);
+    expect([CLIPS.skid.fps, CLIPS.skid.loop]).toEqual([8, false]);
+    expect(SKID_FRAME_HOLD).toBe(1);
+  });
+
+  it('skidding, he leans back with his front foot planted out ahead of his hips', () => {
+    const j = solvePose(samplePoses(CLIPS.skid)[SKID_FRAME_HOLD]!, HARRISON_BODY);
+    expect(j.nearLeg.ankle.x - j.hip.x).toBeGreaterThanOrEqual(6);
+    expect(j.neck.x).toBeLessThan(j.hip.x);
+    expect(j.nearLeg.ankle.y).toBeCloseTo(53 - HARRISON_BODY.ankleHeight, 0);
+  });
+
+  it('the skid bakes inside the frame for every body, both soles down', () => {
+    for (const body of [HARRISON_BODY, BRICK_BODY]) {
+      for (const f of bakeAll(body, MAX_HEADS).skid.frames) {
+        const b = opaqueBounds(f)!;
+        expect(b.x >= 1 && b.y >= 1 && b.x + b.w <= FRAME_W - 1 && b.y + b.h <= 55).toBe(true);
+        expect(b.y + b.h - 1).toBe(54);
+      }
+    }
   });
 
   it('bakes the one-frame brace clip for Harrison and Max, inside the frame and planted', () => {

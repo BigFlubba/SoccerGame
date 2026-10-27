@@ -1,7 +1,7 @@
 import { plantLeg, type ArmPose, type HeadFacing, type LegPose, type Pose } from './pose';
 import { HARRISON_BODY, standingHipHeight, type BodyProportions } from './proportions';
 
-export type AnimName = 'idle' | 'run' | 'jump' | 'shoot' | 'powerUp' | 'sprint' | 'chip' | 'header' | 'volley' | 'slide' | 'fall' | 'juggle' | 'celebrate' | 'brace';
+export type AnimName = 'idle' | 'run' | 'jump' | 'shoot' | 'powerUp' | 'sprint' | 'chip' | 'header' | 'volley' | 'slide' | 'fall' | 'juggle' | 'celebrate' | 'brace' | 'skid';
 
 /** Shoot frame held while a shot charges. */
 export const SHOOT_CHARGE_FRAME = 1;
@@ -9,6 +9,8 @@ export const SHOOT_CHARGE_FRAME = 1;
 export const SHOOT_STRIKE_FRAME = 2;
 /** Slide frame held for as long as he slides. */
 export const SLIDE_HOLD_FRAME = 2;
+/** Skid frame held for as long as he's still braking. */
+export const SKID_FRAME_HOLD = 1;
 
 export interface AnimationClip {
   name: AnimName;
@@ -235,6 +237,17 @@ export function clipsFor(body: BodyProportions): Record<AnimName, AnimationClip>
       loop: false,
       // Leaning into a beam: both arms thrust forward, the front foot planted and the back leg driving.
       keys: [k({ hip: -4, torso: 25, near: { plant: 8 }, far: { plant: -10 }, nearArm: [62, 5], farArm: [70, 10] })],
+    },
+    skid: {
+      name: 'skid',
+      frameCount: 2,
+      fps: 8,
+      loop: false,
+      // The brakes go on: the front foot reaches out ahead, then he sits back on it, heel dug in, arms flung back.
+      keys: [
+        k({ x: -1, hip: -2, torso: -5, near: { plant: 7, ankle: -10 }, far: { plant: -4 }, nearArm: [-30, 40], farArm: [-20, 40] }),
+        k({ x: -3, hip: -5, torso: -24, head: { dx: -1 }, near: { plant: 9, ankle: -20 }, far: { plant: -3 }, nearArm: [-70, 30], farArm: [-50, 40] }),
+      ],
     },
   };
 }

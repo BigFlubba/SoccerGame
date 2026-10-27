@@ -14,6 +14,7 @@ import { IndexedImage, blit, flipX } from '../art/indexedImage';
 import { BISCUIT_FACE, BISCUIT_FRAMES, type DogAnim } from '../art/opponents/biscuit';
 import { CREW_BODY, CREW_HEADS, crewLook } from '../art/opponents/crew';
 import { MAX_HEADS, maxLook } from '../art/opponents/max';
+import { SAM_HEADS, samLook } from '../art/opponents/sam';
 import { addOutline } from '../art/raster';
 import { backyardLayers, goalSprites, type GoalArt, type VenueLayers } from '../art/venues/backyard';
 import { JOGGERS, joggerFrames, parkLayers } from '../art/venues/park';
@@ -62,8 +63,8 @@ export interface GameArt {
   homePower: SpriteSet;
   /** ...and in Golden Form's gold. */
   homeGolden: SpriteSet;
-  /** Every human opponent: their sprites, and their face, front on and outlined, for the venue panel and the boss node. Sam is Pete's art until part 2. */
-  opponents: Record<Exclude<OpponentId, 'biscuit'>, OpponentArt>;
+  /** Every human opponent: their sprites, and their face, front on and outlined, for the venue panel and the boss node. */
+  opponents: Record<HumanOpponent, OpponentArt>;
   /** Harrison's portrait in each expression, in the home kit. */
   portraits: Record<Expression, HTMLCanvasElement>;
   /** Biscuit the Dog, the Backyard's boss. */
@@ -74,7 +75,26 @@ export interface GameArt {
   text(s: string, scale: number, ink: MasterColor, outline: MasterColor): HTMLCanvasElement;
 }
 
-function spriteSet(cache: SpriteCache, who: string, heads: Record<HeadFacing, HeadSprite>, look: LookColors, body: BodyProportions = HARRISON_BODY): SpriteSet {
+type HumanOpponent = Exclude<OpponentId, 'biscuit'>;
+interface OpponentLook {
+  heads: Readonly<Record<HeadFacing, HeadSprite>>;
+  look: LookColors;
+  body: BodyProportions;
+}
+
+const crewKid = (id: CrewId): OpponentLook => ({ heads: CREW_HEADS[id], look: crewLook(id), body: CREW_BODY[id] });
+
+/** What each human opponent's sprites and face are drawn from. */
+export const OPPONENT_LOOKS: Readonly<Record<HumanOpponent, OpponentLook>> = {
+  max: { heads: MAX_HEADS, look: maxLook(), body: HARRISON_BODY },
+  brick: crewKid('brick'),
+  leo: crewKid('leo'),
+  tia: crewKid('tia'),
+  pete: crewKid('pete'),
+  sam: { heads: SAM_HEADS, look: samLook(), body: HARRISON_BODY },
+};
+
+function spriteSet(cache: SpriteCache, who: string, heads: Readonly<Record<HeadFacing, HeadSprite>>, look: LookColors, body: BodyProportions = HARRISON_BODY): SpriteSet {
   const baked = bakeAll(body, heads);
   const palette = resolvePalette(look);
   const set: SpriteSet = { right: {} as SpriteSet['right'], left: {} as SpriteSet['left'] };
@@ -116,8 +136,10 @@ export function loadGameArt(): GameArt {
     const [a, b] = joggerFrames(j.shirt, j.hair);
     return j.dir === 1 ? ([a, b] as const) : ([flipX(a), flipX(b)] as const);
   });
-  const crewArt = (id: CrewId): OpponentArt => ({ sprites: spriteSet(cache, id, CREW_HEADS[id], crewLook(id), CREW_BODY[id]), face: faceCanvas(CREW_HEADS[id].front, crewLook(id)) });
-  const crew = { brick: crewArt('brick'), leo: crewArt('leo'), tia: crewArt('tia'), pete: crewArt('pete') };
+  const opponentArt = (id: HumanOpponent): OpponentArt => {
+    const { heads, look, body } = OPPONENT_LOOKS[id];
+    return { sprites: spriteSet(cache, id, heads, look, body), face: faceCanvas(heads.front, look) };
+  };
   const texts = new Map<string, HTMLCanvasElement>();
   return {
     venues: { backyard: venueCanvases(backyardLayers(), [], master), park: venueCanvases(parkLayers(), parkJoggers, master) },
@@ -127,12 +149,7 @@ export function loadGameArt(): GameArt {
     home: spriteSet(cache, 'harrison', HARRISON_HEADS, harrisonLook('home')),
     homePower: spriteSet(cache, 'harrison-power', HARRISON_POWER_HEADS, harrisonLook('home')),
     homeGolden: spriteSet(cache, 'harrison-golden', HARRISON_POWER_HEADS, harrisonLook('home', 'golden')),
-    opponents: {
-      max: { sprites: spriteSet(cache, 'max', MAX_HEADS, maxLook()), face: faceCanvas(MAX_HEADS.front, maxLook()) },
-      ...crew,
-      // Stand-in until Sam lands (part 2).
-      sam: crew.pete,
-    },
+    opponents: Object.fromEntries((Object.keys(OPPONENT_LOOKS) as HumanOpponent[]).map(id => [id, opponentArt(id)])) as Record<HumanOpponent, OpponentArt>,
     portraits: Object.fromEntries(EXPRESSIONS.map(e => [e, toCanvas(harrisonPortrait(e), resolvePalette(harrisonLook('home')))])) as Record<Expression, HTMLCanvasElement>,
     biscuit: Object.fromEntries(
       Object.entries(BISCUIT_FRAMES).map(([name, frames]) => [name, cache.frames(`biscuit/${name}`, () => ({ frames: [...frames], palette: master }))]),
