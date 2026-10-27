@@ -132,13 +132,20 @@ function reset(p: Player, x: number, z: number): void {
   Object.assign(p, createPlayer(p.team, p.stats, x, attackDir(p.team), z), { stamina, held, exhausted });
 }
 
-/** Ball on the centre spot, the kicking-off player just behind it, the other back in his own half. */
+/**
+ * Ball on the centre spot, the kicking-off player just behind it, the other
+ * back in his own half; at Harrison's kickoff Max waits where his
+ * difficulty says (Biscuit, and a world without Max's profile, as before).
+ */
 export function placeForKickoff(w: World): void {
   const centre = w.field.width / 2;
-  Object.assign(w.ball, { x: centre, y: BALL_REST_Y, z: w.field.depth / 2, vx: 0, vy: 0, vz: 0, spin: 0 });
+  const mid = w.field.depth / 2;
+  Object.assign(w.ball, { x: centre, y: BALL_REST_Y, z: mid, vx: 0, vy: 0, vz: 0, spin: 0 });
+  const spot = w.match.kickoffTeam === 'home' && w.dog === null && w.maxProfile ? w.maxProfile.kickoffSpot : { back: KICKOFF_DEFENDER_DEPTH, off: 0 };
   for (const p of [w.home, w.away]) {
     const dir = attackDir(p.team);
-    reset(p, p.team === w.match.kickoffTeam ? centre - KICKOFF_GAP * dir : centre - KICKOFF_DEFENDER_DEPTH * dir, w.field.depth / 2);
+    if (p.team === w.match.kickoffTeam) reset(p, centre - KICKOFF_GAP * dir, mid);
+    else reset(p, centre - spot.back * dir, mid + spot.off);
   }
   if (w.dog) resetDog(w.dog);
 }
@@ -254,7 +261,7 @@ export function stepWorld(w: World, homeIntent: PlayerIntent, awayIntent: Player
   // A ball just trapped at his feet isn't a 50/50 this tick, so the squirt can't undo the trap at once.
   const squeeze = steal !== 'stole' && steal !== 'trapped';
   const contact = (p: Player, other: Player) =>
-    w.wave?.live ? quietContact() : resolveContacts(p, other, w.ball, w.aimErrorDeg[p.team], w.rng, w.field, { trips: true, squeeze });
+    w.wave?.live ? quietContact() : resolveContacts(p, other, w.ball, w.aimErrorDeg[p.team], w.rng, w.field, { trips: true, squeeze, clearUpfield: p === home });
   const homeFirst = w.tick % 2 === 0;
   let kicks: ContactEvents[];
   if (w.dog) kicks = dogContacts(w, w.dog, dog, live && homeIntent.steal);

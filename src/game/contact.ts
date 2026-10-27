@@ -23,6 +23,8 @@ const DRIBBLE_MIN_SPEED = 20;
 const TOUCH_COOLDOWN_S = 0.12;
 const SLIDE_BALL_VX = 220;
 const SLIDE_BALL_VY = 80;
+/** Harrison's slide facing his own goal clears the ball to the nearer board and a little upfield, px/s. */
+export const SIDE_CLEAR = { vx: 60, vz: 200 };
 /** A ball hitting his body keeps this fraction of its speed, reversed. */
 const BODY_RESTITUTION = 0.4;
 const PINNED_POP_VY = 160;
@@ -43,12 +45,18 @@ function hit(ball: Ball, k: { vx: number; vy: number; vz: number; spin: number }
   ball.spin = k.spin;
 }
 
-/** A slide wins the ball if it reaches it, otherwise it can take the opponent's feet (unless `trips` is off). */
-function slide(p: Player, opponent: Player, ball: Ball, ev: ContactEvents, trips: boolean): void {
+/**
+ * A slide wins the ball if it reaches it, otherwise it can take the opponent's feet (unless `trips` is off).
+ * With `clearUpfield`, one facing his own goal sends it to the nearer board and upfield, never at his goal.
+ */
+function slide(p: Player, opponent: Player, ball: Ball, ev: ContactEvents, trips: boolean, clearUpfield: boolean, field: Field): void {
   if (p.state !== 'sliding' || !p.kick?.active) return;
   const reach = slideZone(p);
   if (ballIn(reach, ball, BALL_R)) {
-    hit(ball, { vx: p.facing * SLIDE_BALL_VX, vy: SLIDE_BALL_VY, vz: 0, spin: 0 });
+    const upfield: 1 | -1 = p.team === 'home' ? 1 : -1;
+    const clearing = clearUpfield && p.facing !== upfield;
+    const toBoard = ball.z < field.depth / 2 ? -1 : 1;
+    hit(ball, clearing ? { vx: upfield * SIDE_CLEAR.vx, vy: SLIDE_BALL_VY, vz: toBoard * SIDE_CLEAR.vz, spin: 0 } : { vx: p.facing * SLIDE_BALL_VX, vy: SLIDE_BALL_VY, vz: 0, spin: 0 });
     p.kick.active = false;
     ev.tackledBall = true;
     return;
@@ -236,6 +244,7 @@ function squirt(p: Player, opponent: Player, ball: Ball, rng: Rng, field: Field)
  * Everything player `p` does to the ball (and to the opponent's feet) this
  * tick. Against the dog, `trips` is off (nobody trips him) and so is
  * `squeeze`: he contests a ball by his muzzle's dwell, never a 50/50.
+ * `clearUpfield` is Harrison's against Max: a slide facing his own goal clears sideways.
  */
 export function resolveContacts(
   p: Player,
@@ -244,12 +253,12 @@ export function resolveContacts(
   aimErrorDeg: number,
   rng: Rng,
   field: Field,
-  { trips, squeeze }: { trips: boolean; squeeze: boolean } = { trips: true, squeeze: true },
+  { trips, squeeze, clearUpfield = false }: { trips: boolean; squeeze: boolean; clearUpfield?: boolean } = { trips: true, squeeze: true },
 ): ContactEvents {
   const ev: ContactEvents = { touched: false, kicked: null, perfect: false, tackledBall: false, trippedOpponent: false };
   // Flying through the air after a wave, he can't block, dribble or head it.
   if (p.state === 'blown') return ev;
-  slide(p, opponent, ball, ev, trips);
+  slide(p, opponent, ball, ev, trips, clearUpfield, field);
   strike(p, ball, aimErrorDeg, rng, field, ev);
   if (!ev.kicked) headBall(p, ball, field, ev);
   if (ev.kicked || ev.tackledBall || onRoof(ball, field)) return ev;

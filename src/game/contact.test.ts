@@ -2,7 +2,7 @@ import { BALL_R } from '../art/ball';
 import { describe, expect, it } from 'vitest';
 import { seeded } from '../engine/random';
 import { BALL_REST_Y, stepBall, type Ball } from './ball';
-import { resolveContacts } from './contact';
+import { SIDE_CLEAR, resolveContacts } from './contact';
 import { BACKYARD, goalScored } from './field';
 import { POST_INSET, aimLine, header, shot } from './kick';
 import { NO_INTENT, PLAYER_R, createPlayer, stepPlayer, type Kick, type Player } from './player';
@@ -165,6 +165,30 @@ describe('resolveContacts: headers and tackles', () => {
     const ev = contact(p, opp, b);
     expect([b.vx, b.vy]).toEqual([220, 80]);
     expect(ev.tackledBall).toBe(true);
+  });
+
+  it('a Harrison slide facing his own goal that wins the ball clears it sideways and upfield', () => {
+    for (const [z, side] of [[20, -1], [44, 1]] as const) {
+      const { p, opp } = setup();
+      Object.assign(p, { state: 'sliding', facing: -1, kick: kick({ kind: 'slide' }) });
+      const b = ball({ x: 290, z });
+      p.z = z;
+      const ev = resolveContacts(p, opp, b, 4, seeded(5), BACKYARD, { trips: true, squeeze: true, clearUpfield: true });
+      expect(ev.tackledBall).toBe(true);
+      expect([b.vx, b.vy, b.vz]).toEqual([SIDE_CLEAR.vx, 80, side * SIDE_CLEAR.vz]);
+    }
+  });
+
+  it('facing the goal he attacks, or without the side-clear, a slide plays as before', () => {
+    const { p, opp } = setup();
+    Object.assign(p, { state: 'sliding', kick: kick({ kind: 'slide' }) });
+    const ahead = ball({ x: 310 });
+    resolveContacts(p, opp, ahead, 4, seeded(5), BACKYARD, { trips: true, squeeze: true, clearUpfield: true });
+    expect([ahead.vx, ahead.vz]).toEqual([220, 0]);
+    Object.assign(p, { facing: -1, kick: kick({ kind: 'slide' }) });
+    const back = ball({ x: 290 });
+    contact(p, opp, back);
+    expect([back.vx, back.vz]).toEqual([-220, 0]);
   });
 
   it('a slide tackle that misses the ball trips the opponent', () => {

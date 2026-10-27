@@ -24,12 +24,17 @@ export interface AiProfile {
   cleanSteal: number;
   /** Seconds it stands wrong-footed after Harrison steals the ball off it cleanly. */
   wrongFootedS: number;
+  /**
+   * Where it waits at Harrison's kickoff: `back` px from the centre spot into its own half,
+   * `off` px off the ball's line in depth (deeper, away from the camera).
+   */
+  kickoffSpot: { back: number; off: number };
 }
 
 export const DIFFICULTY: Record<Difficulty, AiProfile> = {
-  easy: { reactionS: 0.32, aimErrorDeg: 10, aggression: 0.3, shootRange: 150, braceSense: 0.5, cleanSteal: 0.9, wrongFootedS: 0.5 },
-  normal: { reactionS: 0.18, aimErrorDeg: 6, aggression: 0.55, shootRange: 180, braceSense: 0.75, cleanSteal: 0.75, wrongFootedS: 0.4 },
-  hard: { reactionS: 0.1, aimErrorDeg: 3, aggression: 0.8, shootRange: 210, braceSense: 0.9, cleanSteal: 0.55, wrongFootedS: 0.3 },
+  easy: { reactionS: 0.32, aimErrorDeg: 10, aggression: 0.3, shootRange: 150, braceSense: 0.5, cleanSteal: 0.9, wrongFootedS: 0.5, kickoffSpot: { back: 110, off: 18 } },
+  normal: { reactionS: 0.18, aimErrorDeg: 6, aggression: 0.55, shootRange: 180, braceSense: 0.75, cleanSteal: 0.75, wrongFootedS: 0.4, kickoffSpot: { back: 110, off: 18 } },
+  hard: { reactionS: 0.1, aimErrorDeg: 3, aggression: 0.8, shootRange: 210, braceSense: 0.9, cleanSteal: 0.55, wrongFootedS: 0.3, kickoffSpot: { back: 70, off: 0 } },
 };
 
 export interface AiBrain {
@@ -49,6 +54,8 @@ export interface AiBrain {
   backOff: null | 'stay' | { gap: number; inS: number };
   /** Time left standing wrong-footed after Harrison stole the ball off it. */
   wrongFootedS: number;
+  /** How long it has held its spot at Harrison's kickoff; null once the ball is played or the hold is over. */
+  kickoffHoldS: number | null;
 }
 
 /** The ball counts as at someone's feet within this distance, on the ground. */
@@ -99,6 +106,10 @@ export const BACK_OFF_GOAL_ROOM = 10;
 /** Its mistakes: reacting late, or misjudging and stopping too close. */
 const LATE_REACTION = { from: 0.6, spread: 0.3 };
 const TOO_CLOSE_GAP = { from: 35, spread: 25 };
+/** At Harrison's kickoff it holds its spot until he plays the ball, or this long, s. */
+export const KICKOFF_HOLD_S = 2;
+/** The ball is still on the centre spot within this, px. */
+const ON_SPOT = 0.5;
 /** Where it aims its shots: mostly the far post, then the near post, sometimes straight. */
 const AIM_ODDS: readonly (readonly [Aim, number])[] = [
   ['far', 1 / 2],
@@ -107,7 +118,7 @@ const AIM_ODDS: readonly (readonly [Aim, number])[] = [
 ];
 
 export function createBrain(profile: AiProfile): AiBrain {
-  return { profile, nextDecisionS: 0, intent: { ...NO_INTENT }, plan: 'chase', chargeLeftS: 0, slideReadyS: 0, backOff: null, wrongFootedS: 0 };
+  return { profile, nextDecisionS: 0, intent: { ...NO_INTENT }, plan: 'chase', chargeLeftS: 0, slideReadyS: 0, backOff: null, wrongFootedS: 0, kickoffHoldS: null };
 }
 
 const attackDir = (me: Player): 1 | -1 => (me.team === 'home' ? 1 : -1);
@@ -372,6 +383,22 @@ function decide(brain: AiBrain, w: World, me: Player, them: Player): void {
 }
 
 /**
+ * At Harrison's kickoff Max holds his spot until Harrison plays the ball
+ * (it leaves the centre spot), or for KICKOFF_HOLD_S if he never does: the
+ * game's version of waiting outside the centre circle. Counts the hold.
+ */
+function holdingKickoff(brain: AiBrain, w: World, dt: number): boolean {
+  if (brain.kickoffHoldS === null || w.match.phase === 'kickoff') return false;
+  const onSpot = Math.hypot(w.ball.x - w.field.width / 2, w.ball.z - w.field.depth / 2) <= ON_SPOT;
+  if (w.match.phase !== 'playing' || !onSpot || brain.kickoffHoldS >= KICKOFF_HOLD_S - 1e-9) {
+    brain.kickoffHoldS = null;
+    return false;
+  }
+  brain.kickoffHoldS += dt;
+  return true;
+}
+
+/**
  * The computer player's intent for this tick. It re-decides every
  * reactionS and holds its intent in between; a charged shot releases on
  * its own timer. Jumps and slides are one-tick presses.
@@ -385,6 +412,8 @@ export function think(brain: AiBrain, w: World, me: Player, them: Player, dt: nu
     brain.intent = { ...NO_INTENT };
     brain.plan = 'chase';
   }
+  // Waiting for Harrison's kickoff, Max means to hold his spot once play starts.
+  if (me.team === 'away' && w.match.phase === 'kickoff') brain.kickoffHoldS = w.match.kickoffTeam === them.team ? 0 : null;
   let released = false;
   if (brain.plan === 'charge' && brain.intent.shootHeld) {
     brain.chargeLeftS -= dt;
@@ -412,6 +441,8 @@ export function think(brain: AiBrain, w: World, me: Player, them: Player, dt: nu
     brain.plan = 'hesitate';
     brain.intent = { ...NO_INTENT, faceX: Math.sign(w.ball.x - me.x) >= 0 ? 1 : -1 };
     brain.nextDecisionS = brain.profile.reactionS;
+  } else if (holdingKickoff(brain, w, dt)) {
+    brain.intent = { ...NO_INTENT, faceX: Math.sign(w.ball.x - me.x) >= 0 ? 1 : -1 };
   } else if (brain.wrongFootedS > 1e-9) {
     // Wrong-footed, he stands facing the ball, never sliding, then challenges again.
     brain.wrongFootedS = Math.max(0, brain.wrongFootedS - dt);

@@ -1,11 +1,16 @@
+import { BALL_R } from '../art/ball';
 import { seeded } from '../engine/random';
 import { describe, expect, it } from 'vitest';
+import { DIFFICULTY, KICKOFF_HOLD_S, createBrain, think } from './ai';
+import { DOG_DIFFICULTY } from './dog';
+import type { Aim } from './kick';
 import { inGoalBox } from './field';
 import { NO_INTENT, PLAYER_R, type PlayerIntent } from './player';
-import { BASE_STATS } from './stats';
+import { BASE_STATS, chargeTime, type Stats } from './stats';
 import { BALL_REST_Y } from './ball';
 import { POWERED_S, WAVE_READY_S } from './power';
 import { createWorld, placeForKickoff, stepWorld, type World } from './world';
+import { ballIn, ballInBody, footZone } from './zones';
 
 const STEP = 1 / 60;
 const ERR = { home: 4, away: 6 };
@@ -17,6 +22,62 @@ describe('world', () => {
     expect([w.ball.x, w.ball.y]).toEqual([320, BALL_REST_Y]);
     expect([w.home.x, w.home.facing]).toEqual([308, 1]);
     expect([w.away.x, w.away.facing]).toEqual([390, -1]);
+  });
+
+  it("at Harrison's kickoff on Easy and Normal Max waits off the line, on Hard on it", () => {
+    for (const [d, x, z] of [['easy', 430, 50], ['normal', 430, 50], ['hard', 390, 32]] as const) {
+      const w = createWorld(BASE_STATS, BASE_STATS, 1, ERR, null, null, DIFFICULTY[d]);
+      expect([w.away.x, w.away.z], d).toEqual([x, z]);
+    }
+  });
+
+  it("Max's own kickoff and Biscuit's spots are unchanged by the difficulty", () => {
+    const w = createWorld(BASE_STATS, BASE_STATS, 1, ERR, null, null, DIFFICULTY.easy);
+    w.match.kickoffTeam = 'away';
+    placeForKickoff(w);
+    expect([w.home.x, w.home.z, w.away.x, w.away.z]).toEqual([250, 32, 332, 32]);
+    const dog = createWorld(BASE_STATS, BASE_STATS, 1, ERR, null, DOG_DIFFICULTY.easy, DIFFICULTY.easy);
+    expect([dog.away.x, dog.away.z]).toEqual([390, 32]);
+  });
+
+  it('the next kickoff after a difficulty change uses the new spot', () => {
+    const w = createWorld(BASE_STATS, BASE_STATS, 1, ERR, null, null, DIFFICULTY.easy);
+    w.maxProfile = DIFFICULTY.hard;
+    placeForKickoff(w);
+    expect([w.away.x, w.away.z]).toEqual([390, 32]);
+  });
+
+  it('a straight full shot from the spot, and one at each post, passes Max on Easy and Normal', () => {
+    for (const d of ['easy', 'normal'] as const)
+      for (let power = 1; power <= 10; power++)
+        for (const aim of ['straight', 'far', 'near'] as Aim[]) {
+          const stats: Stats = { ...BASE_STATS, power };
+          const w = createWorld(stats, BASE_STATS, 1, { home: 0, away: 0 }, null, null, DIFFICULTY[d]);
+          w.match.phase = 'playing';
+          const hold = Math.round(chargeTime(stats) / STEP);
+          for (let i = 0; i < hold; i++) stepWorld(w, { ...NO_INTENT, shootHeld: true, aim }, NO_INTENT, STEP);
+          for (let i = 0; i < 60 && w.ball.x < w.away.x + 20 && w.match.phase === 'playing'; i++) {
+            stepWorld(w, { ...NO_INTENT, aim }, NO_INTENT, STEP);
+            const why = `${d} power ${power} ${aim} at (${w.ball.x.toFixed(1)}, ${w.ball.y.toFixed(1)}, ${w.ball.z.toFixed(1)})`;
+            expect(ballInBody(w.away, w.ball, BALL_R), why).toBe(false);
+            expect(ballIn(footZone(w.away), w.ball, BALL_R), why).toBe(false);
+          }
+          expect(w.ball.x, `${d} power ${power} ${aim} went past him`).toBeGreaterThan(w.away.x);
+        }
+  });
+
+  it("if Harrison never plays the ball at his kickoff, Max comes for it after the hold, on every difficulty", () => {
+    for (const d of ['easy', 'normal', 'hard'] as const) {
+      const w = createWorld(BASE_STATS, BASE_STATS, 1, ERR, null, null, DIFFICULTY[d]);
+      const brain = createBrain(DIFFICULTY[d]);
+      let t = 0;
+      while (t < 6 && Math.hypot(w.ball.x - 320, w.ball.z - 32) < 1) {
+        stepWorld(w, NO_INTENT, think(brain, w, w.away, w.home, STEP), STEP);
+        if (w.match.phase === 'playing') t += STEP;
+      }
+      expect(t, d).toBeGreaterThanOrEqual(KICKOFF_HOLD_S);
+      expect(t, d).toBeLessThan(4);
+    }
   });
 
   it('when away kicks off, away stands by the ball and home drops back', () => {

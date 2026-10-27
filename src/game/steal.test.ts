@@ -14,7 +14,7 @@ const STEP = 1 / 60;
 const TAP = { ...NO_INTENT, steal: true };
 
 /**
- * A world in play on the centre line: Max at `max` with the ball at `ball`,
+ * A world in play on the pitch's middle line in depth: Max at `max` with the ball at `ball`,
  * Harrison at `home`. Both run at `vx` (facing that way, left when still),
  * unless `homeVx` says otherwise.
  */
@@ -22,9 +22,10 @@ function stage(o: { max: number; ball: number; home: number; vx: number; profile
   const w = createWorld(BASE_STATS, BASE_STATS, o.seed, { home: 0, away: 0 }, null, null, o.profile);
   w.match.phase = 'playing';
   const homeVx = o.homeVx ?? o.vx;
-  Object.assign(w.away, { x: o.max, vx: o.vx, facing: o.vx > 0 ? 1 : -1 });
-  Object.assign(w.home, { x: o.home, vx: homeVx, facing: homeVx > 0 ? 1 : -1 });
-  Object.assign(w.ball, { x: o.ball, y: BALL_REST_Y, vx: o.vx, vy: 0, vz: 0 });
+  const z = w.field.depth / 2;
+  Object.assign(w.away, { x: o.max, z, vx: o.vx, facing: o.vx > 0 ? 1 : -1 });
+  Object.assign(w.home, { x: o.home, z, vx: homeVx, facing: homeVx > 0 ? 1 : -1 });
+  Object.assign(w.ball, { x: o.ball, y: BALL_REST_Y, z, vx: o.vx, vy: 0, vz: 0 });
   return w;
 }
 
