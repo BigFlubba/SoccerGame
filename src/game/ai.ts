@@ -20,12 +20,14 @@ export interface AiProfile {
   shootRange: number;
   /** Chance (0..1) that it backs off and squares up properly when Harrison powers up. */
   braceSense: number;
+  /** Chance (0..1), before Harrison's Control, that his steal tap takes the ball cleanly off it. */
+  cleanSteal: number;
 }
 
 export const DIFFICULTY: Record<Difficulty, AiProfile> = {
-  easy: { reactionS: 0.32, aimErrorDeg: 10, aggression: 0.3, shootRange: 150, braceSense: 0.5 },
-  normal: { reactionS: 0.18, aimErrorDeg: 6, aggression: 0.55, shootRange: 180, braceSense: 0.75 },
-  hard: { reactionS: 0.1, aimErrorDeg: 3, aggression: 0.8, shootRange: 210, braceSense: 0.9 },
+  easy: { reactionS: 0.32, aimErrorDeg: 10, aggression: 0.3, shootRange: 150, braceSense: 0.5, cleanSteal: 0.9 },
+  normal: { reactionS: 0.18, aimErrorDeg: 6, aggression: 0.55, shootRange: 180, braceSense: 0.75, cleanSteal: 0.75 },
+  hard: { reactionS: 0.1, aimErrorDeg: 3, aggression: 0.8, shootRange: 210, braceSense: 0.9, cleanSteal: 0.55 },
 };
 
 export interface AiBrain {

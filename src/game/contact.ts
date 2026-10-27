@@ -138,7 +138,7 @@ function throughGoal(field: Field, y: number, from: { x: number; z: number }, to
 }
 
 /** Whether the ball's centre may be moved to (x, z): inside the walls, not up on a net roof, and not through a goal's netting or posts. */
-function canPlace(ball: Ball, x: number, z: number, field: Field): boolean {
+export function canPlace(ball: Ball, x: number, z: number, field: Field): boolean {
   const inside = x === clamp(x, field.fenceL + BALL_R, field.fenceR - BALL_R) && z === clamp(z, BALL_R, field.depth - BALL_R);
   return inside && !onRoof({ x, y: ball.y, z }, field) && !throughGoal(field, ball.y, ball, { x, z });
 }

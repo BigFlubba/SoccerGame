@@ -90,6 +90,7 @@ function harrisonIntent(input: InputFrame): PlayerIntent {
     chipHeld: input.held.has('chip'),
     powerHeld: input.held.has('power'),
     sprint: input.held.has('sprint'),
+    steal: input.pressed.has('steal'),
   };
 }
 
@@ -112,6 +113,7 @@ export function createMatchScene(ctx: GameContext, seed: number, match: CareerMa
     { home: HUMAN_AIM_ERROR_DEG, away: thinking.aimErrorDeg },
     powerKit(ctx.profile),
     boss ? DOG_DIFFICULTY[difficulty] : null,
+    boss ? null : thinking,
   );
   const brain = createBrain(thinking);
   const dogBrain = boss ? createDogBrain(DOG_DIFFICULTY[difficulty]) : null;
@@ -181,6 +183,7 @@ export function createMatchScene(ctx: GameContext, seed: number, match: CareerMa
     difficulty = ctx.settings.difficulty;
     brain.profile = DIFFICULTY[difficulty];
     world.aimErrorDeg.away = brain.profile.aimErrorDeg;
+    if (world.maxProfile) world.maxProfile = brain.profile;
     if (dogBrain && world.dog) dogBrain.profile = world.dog.profile = DOG_DIFFICULTY[difficulty];
     return scene;
   };

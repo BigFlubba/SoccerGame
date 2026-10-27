@@ -334,6 +334,29 @@ describe('match scene: pause menu screens', () => {
     expect(s.difficulty).toBe('hard');
   });
 
+  it("Max's difficulty reaches the world for the steal, and a change from pause replaces it", () => {
+    const ctx = testContext();
+    const s = liveWith(ctx);
+    expect(s.world.maxProfile).toEqual(DIFFICULTY.normal);
+    const options = pick(s, 'OPTIONS')!;
+    options.update(frame(['right']), STEP);
+    options.update(frame(['back']), STEP);
+    expect(s.world.maxProfile).toEqual(DIFFICULTY.hard);
+  });
+
+  it('against Biscuit the world has no Max profile', () => {
+    const s = createMatchScene(testContext({ profile: { ...newProfile(), ladderWins: 10 } }), 1);
+    expect(s.world.maxProfile).toBeNull();
+  });
+
+  it('LB in play is a steal press: with nothing in reach he stumbles', () => {
+    const s = live();
+    s.world.ball.x += 100;
+    s.update(frame(['steal']), STEP);
+    expect(s.world.events.steal).toBe('whiff');
+    expect(s.world.home.stumbleS).toBeGreaterThan(0);
+  });
+
   it('Options mid-match re-applies the dog profile', () => {
     const ctx = testContext({ profile: { ...newProfile(), ladderWins: 10 } });
     const s = liveWith(ctx);

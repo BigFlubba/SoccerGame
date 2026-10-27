@@ -109,8 +109,9 @@ describe('think', () => {
   });
 
   it('difficulty profiles match the plan', () => {
-    expect(DIFFICULTY.easy).toEqual({ reactionS: 0.32, aimErrorDeg: 10, aggression: 0.3, shootRange: 150, braceSense: 0.5 });
-    expect(DIFFICULTY.hard).toEqual({ reactionS: 0.1, aimErrorDeg: 3, aggression: 0.8, shootRange: 210, braceSense: 0.9 });
+    expect(DIFFICULTY.easy).toEqual({ reactionS: 0.32, aimErrorDeg: 10, aggression: 0.3, shootRange: 150, braceSense: 0.5, cleanSteal: 0.9 });
+    expect(DIFFICULTY.normal.cleanSteal).toBe(0.75);
+    expect(DIFFICULTY.hard).toEqual({ reactionS: 0.1, aimErrorDeg: 3, aggression: 0.8, shootRange: 210, braceSense: 0.9, cleanSteal: 0.55 });
   });
 
   it('a whole simulated match between two AIs finishes with a result and no exceptions', () => {

@@ -5,7 +5,7 @@ import { TAP_CHARGE, type Aim } from './kick';
 import { SPRINT_MULTIPLIER, chargeTime, jumpVelocity, runSpeed, type Stats } from './stats';
 
 /**
- * jump is a one-tick pulse (pressed this tick); shootHeld/chipHeld/powerHeld
+ * jump and steal are one-tick pulses (pressed this tick); shootHeld/chipHeld/powerHeld
  * are held states whose release fires the kick. moveZ +1 is away from the
  * camera.
  */
@@ -18,6 +18,8 @@ export interface PlayerIntent {
   chipHeld: boolean;
   powerHeld: boolean;
   sprint: boolean;
+  /** Harrison's steal button, pressed this tick; the world resolves it. */
+  steal: boolean;
   /** Face this way whatever way he moves, as when backing off from someone. */
   faceX?: 1 | -1;
 }
@@ -31,6 +33,7 @@ export const NO_INTENT: Readonly<PlayerIntent> = Object.freeze({
   chipHeld: false,
   powerHeld: false,
   sprint: false,
+  steal: false,
 });
 
 export type PlayerState =
@@ -92,6 +95,10 @@ export interface Player {
   animT: number;
   /** Horizontal speed (px/s) at the last take-off: steering in the air never goes faster than this or a run. */
   takeoffSpeed: number;
+  /** Time left stumbling after a missed steal, when the stick and buttons do nothing. */
+  stumbleS: number;
+  /** Time until he may try another steal. */
+  stealCooldownS: number;
 }
 
 export const PLAYER_H = 40;
@@ -162,6 +169,8 @@ export function createPlayer(team: 'home' | 'away', stats: Stats, x: number, fac
     touchCooldown: 0,
     animT: 0,
     takeoffSpeed: 0,
+    stumbleS: 0,
+    stealCooldownS: 0,
   };
 }
 
@@ -310,6 +319,8 @@ function chooseAnim(p: Player, sprinting: boolean): { name: AnimName; frame: num
       return { name: 'fall', frame: Math.min(CLIPS.fall.frameCount - 1, BLOWN_GET_UP_FRAME + Math.floor(down * getUpFrames)) };
     }
     default: {
+      // A missed steal: his foot is still out, jabbing at nothing.
+      if (p.stumbleS > 0) return { name: 'shoot', frame: SHOOT_STRIKE_FRAME };
       const name: AnimName = Math.hypot(p.vx, p.vz) < IDLE_SPEED ? 'idle' : sprinting ? 'sprint' : 'run';
       const time = name === p.anim.name ? p.animT : 0;
       return { name, frame: Math.floor(time * CLIPS[name].fps) % CLIPS[name].frameCount };
@@ -341,24 +352,30 @@ function dropWallSpeed(p: Player, intent: PlayerIntent, field: Field): void {
  * to Max's goal; an X press then strikes the Energy Wave, turning him to
  * face it. 'wait' while the wave readies, when X does nothing. Null
  * otherwise, when X is a normal shot.
+ *
+ * Stumbling, he plays on no intent, but buttons held still count as held,
+ * so one pressed during the stumble needs a fresh press afterwards.
  */
 export function stepPlayer(
   p: Player,
-  intent: PlayerIntent,
+  given: PlayerIntent,
   dt: number,
   field: Field,
   ballAtFeet: boolean,
   waveDir: 1 | -1 | 'wait' | null = null,
 ): void {
+  const intent = p.stumbleS > 0 ? NO_INTENT : given;
   const shootPressed = intent.shootHeld && !p.held.shoot;
   const chipPressed = intent.chipHeld && !p.held.chip;
   if (intent.powerHeld && !p.held.power) p.powerArmed = true;
   if (!intent.powerHeld) p.powerArmed = false;
-  p.held = { shoot: intent.shootHeld, chip: intent.chipHeld, power: intent.powerHeld };
+  p.held = { shoot: given.shootHeld, chip: given.chipHeld, power: given.powerHeld };
   p.aim = intent.aim;
   p.stateT += dt;
   p.slideCooldown = Math.max(0, p.slideCooldown - dt);
   p.touchCooldown = Math.max(0, p.touchCooldown - dt);
+  p.stumbleS = Math.max(0, p.stumbleS - dt);
+  p.stealCooldownS = Math.max(0, p.stealCooldownS - dt);
 
   if (p.state === 'ground') {
     if (shootPressed && waveDir !== null) {

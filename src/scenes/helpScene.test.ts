@@ -18,7 +18,7 @@ describe('help', () => {
 
   it('covers every control on the gamepad and the keyboard', () => {
     const controls = HELP_PAGES[0]!.lines.join('\n');
-    for (const word of ['A:', 'B:', 'X:', 'Y:', 'RT:', 'START:', 'STICK', 'ARROWS', 'KEY Z', 'KEY X', 'KEY C', 'KEY V', 'SHIFT', 'ENTER']) {
+    for (const word of ['A:', 'B:', 'X:', 'Y:', 'LB:', 'RT:', 'START:', 'STICK', 'ARROWS', 'KEY Z', 'KEY X', 'KEY C', 'KEY V', 'KEY A', 'SHIFT', 'ENTER']) {
       expect(controls).toContain(word);
     }
   });
@@ -27,6 +27,11 @@ describe('help', () => {
     for (const phrase of ['90 SECONDS', 'KICKS OFF', 'CHARGE', 'GOLD', 'CHIP', 'SLIDE', 'HEADER', 'VOLLEY', 'SPRINT', 'STAMINA']) {
       expect(allText()).toContain(phrase);
     }
+  });
+
+  it('the moves page explains the steal and the whiff', () => {
+    const page = HELP_PAGES[2]!.lines.join(' ');
+    for (const phrase of ['LB', 'STEALS IT', 'STUMBLE']) expect(page).toContain(phrase);
   });
 
   it('the power moves page explains buying, filling, holding and Max', () => {

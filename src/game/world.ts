@@ -1,4 +1,5 @@
 import { seeded, type Rng } from '../engine/random';
+import type { AiProfile } from './ai';
 import { BALL_REST_Y, stepBall, type Ball, type BallEvents } from './ball';
 import { resolveBodies } from './bodies';
 import { resolveContacts, type ContactEvents } from './contact';
@@ -22,6 +23,7 @@ import {
   type PowerState,
 } from './power';
 import type { Stats } from './stats';
+import { resolveSteal, type StealOutcome } from './steal';
 import { fireWave, stepWave, type Wave } from './wave';
 import { ballAtFeet } from './zones';
 
@@ -43,6 +45,8 @@ export interface WorldEvents {
   power: PowerEvents;
   /** What Biscuit did this tick. All false without him. */
   dog: DogEvents;
+  /** What Harrison's steal press did this tick; null without one. */
+  steal: StealOutcome | null;
 }
 
 export interface World {
@@ -60,6 +64,8 @@ export interface World {
   wave: Wave | null;
   /** Biscuit, when the away body is the dog; null in every match against Max, which then plays exactly as before. */
   dog: DogState | null;
+  /** Max's difficulty, for the steal's odds; null falls back to Normal's. */
+  maxProfile: AiProfile | null;
   /** Fixed ticks so far; its parity decides who acts on the ball first. */
   tick: number;
 }
@@ -80,6 +86,7 @@ const quietEvents = (): WorldEvents => ({
   goal: null,
   power: quietPower(),
   dog: quietDog(),
+  steal: null,
 });
 
 /** The kicks that make a goal a style goal. */
@@ -96,6 +103,7 @@ export function createWorld(
   aimErrorDeg: { home: number; away: number },
   kit: PowerKit | null = null,
   dog: DogProfile | null = null,
+  maxProfile: AiProfile | null = null,
 ): World {
   const centre = BACKYARD.width / 2;
   const w: World = {
@@ -110,6 +118,7 @@ export function createWorld(
     power: kit ? createPower(kit) : null,
     wave: null,
     dog: dog ? createDog(dog) : null,
+    maxProfile,
     tick: 0,
   };
   placeForKickoff(w);
@@ -231,14 +240,17 @@ export function stepWorld(w: World, homeIntent: PlayerIntent, awayIntent: Player
   }
   resolveBodies(home, w.away, w.field);
   if (dogBody && live && checkPinned(w, awayIntent, Math.hypot(w.away.x - dogFrom.x, w.away.z - dogFrom.z), dt)) dog.dropped = true;
+  const steal = resolveSteal(w, homeIntent);
 
   const { braced, blown } = stepWave(w, dt);
   [power.braced, power.blown] = [braced, blown];
   // A carried ball isn't simulated: it rides in the dog's mouth.
   const ball = w.dog?.carrying ? quietBall() : stepBall(w.ball, dt, w.field);
   // The second player to act on the ball has the last word, so take turns going first.
+  // A ball just trapped at his feet isn't a 50/50 this tick, so the squirt can't undo the trap at once.
+  const squeeze = steal !== 'stole' && steal !== 'trapped';
   const contact = (p: Player, other: Player) =>
-    w.wave?.live ? quietContact() : resolveContacts(p, other, w.ball, w.aimErrorDeg[p.team], w.rng, w.field);
+    w.wave?.live ? quietContact() : resolveContacts(p, other, w.ball, w.aimErrorDeg[p.team], w.rng, w.field, { trips: true, squeeze });
   const homeFirst = w.tick % 2 === 0;
   let kicks: ContactEvents[];
   if (w.dog) kicks = dogContacts(w, w.dog, dog);
@@ -266,7 +278,7 @@ export function stepWorld(w: World, homeIntent: PlayerIntent, awayIntent: Player
     if (goal === 'home' && STYLE_KINDS.has(w.power.lastKind)) addMeter(w.power, 'styleGoal');
     w.power.lastKind = null;
   }
-  w.events = { kicks, ball, goal, power, dog };
+  w.events = { kicks, ball, goal, power, dog, steal };
   if (resetForKickoff) {
     placeForKickoff(w);
     w.wave = null;

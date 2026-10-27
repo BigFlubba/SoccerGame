@@ -46,6 +46,11 @@ describe('padActions', () => {
     expect([...keyActions(new Set(['KeyV'])).held]).toEqual(['power']);
   });
 
+  it('LB on the pad and A on the keyboard steal', () => {
+    expect([...padActions(fakePad({ 4: true })).held]).toEqual(['steal']);
+    expect([...keyActions(new Set(['KeyA'])).held]).toEqual(['steal']);
+  });
+
   it('a missing pad holds nothing', () => {
     expect(padActions(null)).toEqual({ held: new Set(), moveX: 0, moveY: 0 });
   });

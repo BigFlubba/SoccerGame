@@ -1,18 +1,21 @@
+import { BALL_R } from '../art/ball';
 import { seeded } from '../engine/random';
 import { LADDER_MATCHES, maxStats } from '../meta/ladder';
 import { DIFFICULTY, createBrain, think, type AiBrain, type AiProfile, type Difficulty } from './ai';
 import { HUMAN_AIM_ERROR_DEG } from './kick';
 import { NO_INTENT, type PlayerIntent } from './player';
 import { MAX_STAT_LEVEL, STAT_NAMES, type Stats } from './stats';
+import { maxHasBall, stealZone } from './steal';
 import { createWorld, stepWorld, type World } from './world';
-import { ballAtFeet } from './zones';
+import { ballAtFeet, ballIn } from './zones';
 
 /**
  * A scripted Harrison for measuring Max headlessly: Max's own brain plays
  * Harrison's side with a human's reactions and aim, at stats a level above
  * Max's for the rung (the ladder's own assumption about what he can afford
  * by then). He takes the kickoff shot whenever the ball is on the spot at
- * his feet, so the measure sees what Max does at a kickoff.
+ * his feet, so the measure sees what Max does at a kickoff, and taps steal
+ * whenever Max's ball is in his reach, so it sees the steal's odds.
  */
 
 /** The scripted Harrison's brain: reactionS is replaced per match (REACT). */
@@ -70,7 +73,9 @@ export function harrisonIntent(w: World, t: number, dt: number, memo: ScriptMemo
     memo.chargeS = KICKOFF_CHARGE.from + memo.rng() * KICKOFF_CHARGE.spread;
     return { ...NO_INTENT, faceX: 1, shootHeld: true };
   }
-  return think(memo.brain, w, w.home, w.away, dt);
+  const intent = think(memo.brain, w, w.home, w.away, dt);
+  const canSteal = w.home.stealCooldownS === 0 && maxHasBall(w.away, w.ball) && ballIn(stealZone(w.home), w.ball, BALL_R);
+  return canSteal ? { ...intent, steal: true } : intent;
 }
 
 export interface MaxMatch {
@@ -82,8 +87,9 @@ export interface MaxMatch {
 
 /** Plays a whole match against Max on rung `rung` headlessly, and reports it from Harrison's side. */
 export function maxMatch(d: Difficulty, seed: number, rung = LADDER_MATCHES): MaxMatch {
-  const w = createWorld(harrisonStats(rung), maxStats(rung), seed, { home: HUMAN_AIM_ERROR_DEG, away: DIFFICULTY[d].aimErrorDeg });
-  const brain = createBrain(DIFFICULTY[d]);
+  const profile = DIFFICULTY[d];
+  const w = createWorld(harrisonStats(rung), maxStats(rung), seed, { home: HUMAN_AIM_ERROR_DEG, away: profile.aimErrorDeg }, null, null, profile);
+  const brain = createBrain(profile);
   const memo = scriptMemo(seed);
   let [t, stillS, longestStillS] = [0, 0, 0];
   for (let i = 0; i < MAX_TICKS && w.match.result === null; i++) {

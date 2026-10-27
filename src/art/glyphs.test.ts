@@ -2,8 +2,8 @@ import { describe, expect, it } from 'vitest';
 import { M } from './colors';
 import { buttonGlyph, type ButtonName } from './glyphs';
 
-const BUTTONS: readonly Exclude<ButtonName, 'Y'>[] = ['A', 'B', 'X', 'RT', 'START'];
-const FACE: Record<Exclude<ButtonName, 'Y'>, number> = { A: M.grassLight, B: M.red, X: M.blue, RT: M.slate, START: M.slate };
+const BUTTONS: readonly Exclude<ButtonName, 'Y'>[] = ['A', 'B', 'X', 'LB', 'RT', 'START'];
+const FACE: Record<Exclude<ButtonName, 'Y'>, number> = { A: M.grassLight, B: M.red, X: M.blue, LB: M.slate, RT: M.slate, START: M.slate };
 
 describe('buttonGlyph', () => {
   it('glyphs are distinct and round', () => {

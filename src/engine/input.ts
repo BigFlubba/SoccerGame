@@ -1,4 +1,4 @@
-export type Action = 'left' | 'right' | 'up' | 'down' | 'jump' | 'shoot' | 'chip' | 'power' | 'sprint' | 'pause' | 'confirm' | 'back';
+export type Action = 'left' | 'right' | 'up' | 'down' | 'jump' | 'shoot' | 'chip' | 'power' | 'steal' | 'sprint' | 'pause' | 'confirm' | 'back';
 
 export interface InputFrame {
   /** -1..1: deadzoned stick, D-pad or arrows. Up is -1. */
@@ -33,6 +33,7 @@ const PAD_BUTTONS: Readonly<Record<number, readonly Action[]>> = {
   1: ['chip', 'back'], // B
   2: ['shoot'], // X
   3: ['power'], // Y
+  4: ['steal'], // LB
   9: ['pause'], // Start
   12: ['up'],
   13: ['down'],
@@ -50,6 +51,7 @@ const KEYS: Readonly<Record<string, readonly Action[]>> = {
   KeyX: ['shoot'],
   KeyC: ['chip', 'back'],
   KeyV: ['power'],
+  KeyA: ['steal'],
   ShiftLeft: ['sprint'],
   ShiftRight: ['sprint'],
   Enter: ['pause', 'confirm'],

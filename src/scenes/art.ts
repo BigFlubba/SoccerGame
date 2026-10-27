@@ -83,7 +83,7 @@ function goalCanvases(g: GoalArt, palette: ResolvedPalette): GoalCanvases {
   return { farNet: toCanvas(g.farNet, palette), nearNet: toCanvas(g.nearNet, palette), nearPost: toCanvas(g.nearPost, palette), farPost: toCanvas(g.farPost, palette), origin: g.origin };
 }
 
-const BUTTONS: readonly ButtonName[] = ['A', 'B', 'X', 'Y', 'RT', 'START'];
+const BUTTONS: readonly ButtonName[] = ['A', 'B', 'X', 'Y', 'LB', 'RT', 'START'];
 const EXPRESSIONS: readonly Expression[] = ['neutral', 'celebrate', 'determined', 'disappointed'];
 
 /** Bakes and resolves every image the match needs, once, at boot. */

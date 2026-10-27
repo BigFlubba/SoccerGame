@@ -20,6 +20,7 @@ export const HELP_PAGES: readonly { title: string; lines: readonly string[] }[] 
       'X: SHOOT. TAP IT, OR HOLD TO CHARGE. KEY X',
       'B: CHIP WITH THE BALL, SLIDE TACKLE WITHOUT. KEY C',
       'Y: POWER UP WITH A FULL POWER METER. KEY V',
+      'LB: STEAL THE BALL OFF MAX. KEY A',
       'RT: SPRINT. KEY SHIFT',
       'START: PAUSE. KEY ENTER OR ESC',
       'MENUS: UP/DOWN TO CHOOSE, A TO PICK, B TO GO BACK',
@@ -49,6 +50,7 @@ export const HELP_PAGES: readonly { title: string; lines: readonly string[] }[] 
       'FAR POST AND DOWN AT THE NEAR POST.',
       'B WITH THE BALL CHIPS IT UP AND OVER.',
       'B WITHOUT IT IS A SLIDE TACKLE TO WIN IT BACK.',
+      'LB WHEN MAX HAS IT CLOSE STEALS IT. MISS AND YOU STUMBLE.',
       'JUMP INTO A HIGH BALL FOR A HEADER. IN THE AIR,',
       'X HITS A VOLLEY.',
       'RT SPRINTS, BUT IT USES STAMINA: THE BAR AT THE',
@@ -79,7 +81,7 @@ const BUTTON_GAP = 4;
 /** The picture sits this far above the text's top, so their middles line up. */
 const BUTTON_RAISE = 2;
 const FOOTER_Y = BASE_H - 18;
-const BUTTON_LINE = /^(A|B|X|Y|RT|START): (.*)$/;
+const BUTTON_LINE = /^(A|B|X|Y|LB|RT|START): (.*)$/;
 
 /** CONTROLS, THE MATCH, MOVES: left/right flip the pages (wrapping); B, Backspace, C, Esc or Start goes back. */
 export function createHelpScene(ctx: GameContext, back: () => Scene): HelpScene {
