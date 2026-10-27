@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { DOG_DIFFICULTY } from '../game/dog';
 import { BASE_STATS } from '../game/stats';
 import { createWorld } from '../game/world';
-import type { GameArt } from './art';
+import type { GameArt, SpriteSet } from './art';
 import { depthSorted } from './depthSort';
 import { arrowX, banner, calloutLine, drawLayers, homeClip, pitchDrawables, takeFlash, type MatchHud } from './matchView';
 import { POWER_METER_X0 } from './powerView';
@@ -156,6 +156,7 @@ describe('calloutLine', () => {
       bonusCallout: null,
       awayName: 'MAX',
       venue: 'backyard' as const,
+      awaySprites: {} as SpriteSet,
     });
     expect(calloutLine(hud(0.3))).toBeNull();
     expect(calloutLine(hud(0.7))).toBe('HEADER!');
@@ -166,7 +167,7 @@ describe('calloutLine', () => {
 
 describe('takeFlash', () => {
   it('a flash owed while impact frames run waits for them to finish', () => {
-    const hud: MatchHud = { perfect: null, moment: null, callout: null, trail: [], flash: true, shake: null, impactFrames: 1, goldenCelebration: false, bonusCallout: null, awayName: 'MAX', venue: 'backyard' };
+    const hud: MatchHud = { perfect: null, moment: null, callout: null, trail: [], flash: true, shake: null, impactFrames: 1, goldenCelebration: false, bonusCallout: null, awayName: 'MAX', venue: 'backyard', awaySprites: {} as SpriteSet };
     expect(takeFlash(hud)).toBe(false);
     expect(hud.flash).toBe(true);
     hud.impactFrames = 0;
@@ -174,7 +175,7 @@ describe('takeFlash', () => {
   });
 
   it('takeFlash is true once, then false', () => {
-    const hud: MatchHud = { perfect: null, moment: null, callout: null, trail: [], flash: true, shake: null, impactFrames: 0, goldenCelebration: false, bonusCallout: null, awayName: 'MAX', venue: 'backyard' };
+    const hud: MatchHud = { perfect: null, moment: null, callout: null, trail: [], flash: true, shake: null, impactFrames: 0, goldenCelebration: false, bonusCallout: null, awayName: 'MAX', venue: 'backyard', awaySprites: {} as SpriteSet };
     expect(takeFlash(hud)).toBe(true);
     expect(takeFlash(hud)).toBe(false);
   });

@@ -1,9 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { BOSS_ID, matchById } from '../meta/career';
+import { BACKYARD, BOSS_ID, PARK, PARK_BOSS_ID, matchById } from '../meta/career';
 import { newProfile } from '../meta/profile';
+import { fakeArt, recordingContext } from './testDraw';
 import { testContext } from './testContext';
 import { frame } from './testInput';
-import { createVenueScene, panelLines, type VenueScene } from './venueScene';
+import { createVenueScene, nodeX, panelLines, type VenueScene } from './venueScene';
 import type { VsScene } from './vsScene';
 
 const STEP = 1 / 60;
@@ -90,5 +91,32 @@ describe('the venue screen', () => {
       expect(createVenueScene(ctx, 'backyard').update(frame(press), STEP)?.kind).toBe('roadMap');
       expect(ctx.audio.played).toContain('menuBack');
     }
+  });
+});
+
+describe('the Park on the venue screen', () => {
+  const parkOpen = (stars: Record<string, number> = {}) => testContext({ art: fakeArt(), profile: { ...newProfile(), ladderWins: 10, career: { stars: { [BOSS_ID]: 1, ...stars }, milestonesPaid: 0, lossStreaks: {} } } });
+
+  it("a crew match's panel: the match and kid, the blurb, the bonus", () => {
+    expect(panelLines(matchById('park-2')!)).toEqual(['MATCH 2 - BOOMER LEO', 'HE SHOOTS FROM ANYWHERE.', 'BONUS: KEEP A CLEAN SHEET']);
+    expect(panelLines(matchById(PARK_BOSS_ID)!)).toEqual(['SPEEDY SAM', 'THE FASTEST KID IN THE PARK. HIS SHOT IS WEAK.', "BONUS: DON'T LET SAM SCORE"]);
+    for (const m of PARK.matches) for (const l of panelLines(m)) expect(l).toMatch(CHARSET);
+  });
+
+  it("four nodes spread evenly in a row; the Backyard's ten keep their places", () => {
+    const xs = PARK.matches.filter(m => m.kind === 'match').map(m => nodeX(m));
+    const gaps = xs.slice(1).map((x, i) => x - xs[i]!);
+    expect(new Set(gaps).size).toBe(1);
+    expect(gaps[0]).toBeGreaterThan(24);
+    expect(BACKYARD.matches.filter(m => m.kind === 'rung').map(m => nodeX(m))).toEqual([...Array(10)].map((_, i) => 16 + 24 * i));
+  });
+
+  it("the panel shows the kid's face, and the boss node Sam's", () => {
+    const { g, drawn } = recordingContext();
+    createVenueScene(parkOpen({ 'park-1': 1, 'park-2': 2, 'park-3': 1, 'park-4': 1 }), 'park', 'park-2').draw(g, 0);
+    expect(drawn).toContain('art.opponents.leo.face');
+    expect(drawn).toContain('art.opponents.sam.face');
+    expect(drawn).toContain('art.venues.park.layers.far');
+    expect(drawn.filter(n => n.startsWith('art.biscuit'))).toEqual([]);
   });
 });

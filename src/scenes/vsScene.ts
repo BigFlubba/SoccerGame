@@ -88,11 +88,11 @@ export function createVsScene(ctx: GameContext, match: CareerMatch, back: () => 
         g.drawImage(text, Math.round(BASE_W / 2 - text.width / 2), LINE_YS[i] ?? HINT_Y);
       });
       g.drawImage(art.home.right.idle[0]!, HOME_X - ANCHOR.x, PITCH_Y - ANCHOR.y);
-      if (boss) {
+      if (match.opponent === 'biscuit') {
         // He faces Harrison: left, so the anchor column mirrors.
         const dog = art.biscuit.idle.left[0]!;
         g.drawImage(dog, AWAY_X - (dog.width - 1 - BISCUIT_ANCHOR.x), PITCH_Y - BISCUIT_ANCHOR.y);
-      } else g.drawImage(art.opponents.max.sprites.left.idle[0]!, AWAY_X - ANCHOR.x, PITCH_Y - ANCHOR.y);
+      } else g.drawImage(art.opponents[match.opponent].sprites.left.idle[0]!, AWAY_X - ANCHOR.x, PITCH_Y - ANCHOR.y);
       drawButtonHint(g, art, art.buttons.A, 'KICK OFF', BASE_W / 2, HINT_Y);
     },
   };

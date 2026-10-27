@@ -1,8 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { BOSS_ID, matchById } from '../meta/career';
+import { BOSS_ID, PARK_BOSS_ID, matchById } from '../meta/career';
 import { newProfile } from '../meta/profile';
 import { createHubScene } from './hubScene';
 import type { MatchScene } from './matchScene';
+import { fakeArt, recordingContext } from './testDraw';
 import { testContext } from './testContext';
 import { frame } from './testInput';
 import { VS_AUTO_S, createVsScene, vsLines } from './vsScene';
@@ -66,5 +67,31 @@ describe("Biscuit's card", () => {
     const rung = testContext();
     createVsScene(rung, matchById('backyard-2')!, () => createHubScene(rung));
     expect(rung.audio.played).not.toContain('bossSting');
+  });
+});
+
+describe('the Park on the VS card', () => {
+  const back = () => createHubScene(testContext());
+
+  it("a crew match is MATCH n, against the kid, drawn in their own sprites over the Park", () => {
+    expect(vsLines(matchById('park-1')!, newProfile())).toEqual(['MATCH 1', 'HARRISON VS BIG BRICK', 'BONUS: SCORE FROM A CHIP']);
+    const ctx = testContext({ art: fakeArt() });
+    const { g, drawn } = recordingContext();
+    createVsScene(ctx, matchById('park-1')!, back).draw(g, 0);
+    expect(drawn).toContain('art.opponents.brick.sprites.left.idle.0');
+    expect(drawn).toContain('art.venues.park.layers.far');
+    expect(drawn.some(n => n.startsWith('art.biscuit'))).toBe(false);
+  });
+
+  it("Sam's card is THE PARK BOSS with the boss sting, and his tip after a loss", () => {
+    const ctx = testContext({ art: fakeArt() });
+    createVsScene(ctx, matchById(PARK_BOSS_ID)!, back);
+    expect(ctx.audio.played).toContain('bossSting');
+    expect(vsLines(matchById(PARK_BOSS_ID)!, newProfile())).toEqual(['THE PARK BOSS', 'HARRISON VS SPEEDY SAM', "BONUS: DON'T LET SAM SCORE"]);
+    const lost = { ...newProfile(), career: { ...newProfile().career, lossStreaks: { [PARK_BOSS_ID]: 1 } } };
+    expect(vsLines(matchById(PARK_BOSS_ID)!, lost).at(-1)).toBe("TIP: DON'T RACE HIM. MAKE HIM OVERSHOOT");
+    const { g, drawn } = recordingContext();
+    createVsScene(ctx, matchById(PARK_BOSS_ID)!, back).draw(g, 0);
+    expect(drawn).toContain('art.opponents.sam.sprites.left.idle.0');
   });
 });

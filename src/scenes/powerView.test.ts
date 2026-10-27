@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { BASE_STATS } from '../game/stats';
 import { createWorld, type World } from '../game/world';
 import { POWERED_S } from '../game/power';
+import type { SpriteSet } from './art';
 import type { MatchHud } from './matchView';
 import { auraStrength, homeSprites, powerPrompt, shakeFor } from './powerView';
 
@@ -17,6 +18,7 @@ const hudWith = (h: Partial<MatchHud> = {}): MatchHud => ({
   bonusCallout: null,
   awayName: 'MAX',
   venue: 'backyard',
+  awaySprites: {} as SpriteSet,
   ...h,
 });
 

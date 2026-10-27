@@ -1,7 +1,7 @@
 import { MASTER, type MasterColor } from '../art/colors';
 import { BASE_W } from '../engine/viewport';
 import { VENUES, matchById, matchState, nextCareerMatch, starsAt, venueMaxStars, venueStars, type CareerMatch, type MatchState, type VenueId } from '../meta/career';
-import { trainingLine } from '../meta/ladder';
+import { LADDER_MATCHES, trainingLine } from '../meta/ladder';
 import { BONUSES } from '../meta/objectives';
 import { drawBackdrop } from './backdrop';
 import type { GameContext } from './context';
@@ -25,6 +25,8 @@ const TITLE_Y = 4;
 const STARS_LINE_Y = 19;
 const NODES = { x: 8, y: 32, w: 304, h: 56 };
 const NODE = { w: 20, h: 16, x0: 16, step: 24, y: 44 };
+/** The numbered nodes spread evenly over the span the Backyard's ten rungs fill. */
+const NODE_SPAN = NODE.step * (LADDER_MATCHES - 1);
 const NEXT_Y = 35;
 const NODE_STARS_Y = 63;
 const BOSS_NODE = { x: 268, y: 38, size: 28 };
@@ -45,6 +47,15 @@ const NODE_LOOK: Record<MatchState, { fill: MasterColor; border: MasterColor; nu
   next: { fill: 'ink', border: 'energyGold', number: 'energyGold' },
   locked: { fill: 'charcoal', border: 'outline', number: 'gray' },
 };
+
+/** A numbered match node's left edge: its venue's numbered matches spread evenly along the row. */
+export function nodeX(m: CareerMatch): number {
+  const n = VENUES.find(v => v.id === m.venue)!.matches.filter(o => o.kind !== 'boss').length;
+  return NODE.x0 + (n > 1 ? Math.round((NODE_SPAN * (m.rung - 1)) / (n - 1)) : 0);
+}
+
+/** An opponent's face, front on: Biscuit's own, or a human opponent's. */
+const faceOf = (art: GameContext['art'], m: CareerMatch): HTMLCanvasElement => (m.opponent === 'biscuit' ? art.biscuitFace : art.opponents[m.opponent].face);
 
 /** The match panel's lines: the match, its blurb (a rung's is its training line, none for rung 1), and its bonus. */
 export function panelLines(match: CareerMatch): string[] {
@@ -121,8 +132,8 @@ export function createVenueScene(ctx: GameContext, venue: VenueId, cursorId?: st
         const selected = i === index;
         if (m.kind === 'boss') {
           drawNode(g, BOSS_NODE.x, BOSS_NODE.y, BOSS_NODE.size, BOSS_NODE.size, 'charcoal', look.border, selected);
-          // Biscuit's face, a dark silhouette until he's unlocked.
-          const face = state === 'locked' ? silhouette(art.biscuitFace) : art.biscuitFace;
+          // The boss's face, a dark silhouette until he's unlocked.
+          const face = state === 'locked' ? silhouette(faceOf(art, m)) : faceOf(art, m);
           const size = face.width * BOSS_FACE_SCALE;
           const at = Math.round(BOSS_NODE.size / 2 - size / 2);
           g.drawImage(face, BOSS_NODE.x + at, BOSS_NODE.y + at, size, size);
@@ -130,7 +141,7 @@ export function createVenueScene(ctx: GameContext, venue: VenueId, cursorId?: st
           g.drawImage(label, Math.round(BOSS_NODE.x + BOSS_NODE.size / 2 - label.width / 2), BOSS_LABEL_Y);
           return;
         }
-        const x = NODE.x0 + NODE.step * (m.rung - 1);
+        const x = nodeX(m);
         drawNode(g, x, NODE.y, NODE.w, NODE.h, look.fill, look.border, selected);
         const num = art.text(`${m.rung}`, 1, look.number, 'outline');
         g.drawImage(num, Math.round(x + NODE.w / 2 - num.width / 2), Math.round(NODE.y + NODE.h / 2 - num.height / 2));
@@ -143,8 +154,9 @@ export function createVenueScene(ctx: GameContext, venue: VenueId, cursorId?: st
 
       drawPanel(g, PANEL.x, PANEL.y, PANEL.w, PANEL.h);
       const chosen = cursor();
-      const bossFace = matchState(p, chosen) === 'locked' ? silhouette(art.biscuitFace) : art.biscuitFace;
-      g.drawImage(chosen.kind === 'boss' ? bossFace : art.opponents.max.face, FACE_AT.x, FACE_AT.y);
+      // A locked boss stays a silhouette in the panel too.
+      const face = chosen.kind === 'boss' && matchState(p, chosen) === 'locked' ? silhouette(faceOf(art, chosen)) : faceOf(art, chosen);
+      g.drawImage(face, FACE_AT.x, FACE_AT.y);
       panelLines(cursor()).forEach((line, i) => {
         const last = i === panelLines(cursor()).length - 1;
         const colour: MasterColor = i === 0 ? 'energyGold' : last ? 'white' : 'silver';

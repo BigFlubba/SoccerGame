@@ -1,0 +1,46 @@
+import type { GameArt } from './art';
+
+/** Every canvas of `fakeArt` is named by the path it was reached by, e.g. `opponents.brick.sprites.left.idle.0`. */
+export interface Named {
+  readonly name: string;
+}
+
+const SIZE = 10;
+
+/**
+ * Stand-in art for draw tests: every property is more art, every call
+ * (art.text) returns more, every image is SIZE px square, and every
+ * list has one entry.
+ */
+export function fakeArt(path = 'art'): GameArt {
+  const target = () => undefined;
+  return new Proxy(target, {
+    get(_, prop) {
+      if (prop === 'name') return path;
+      if (prop === 'width' || prop === 'height') return SIZE;
+      if (prop === 'length') return 1;
+      if (typeof prop === 'symbol') return undefined;
+      return fakeArt(`${path}.${prop}`);
+    },
+    apply() {
+      return fakeArt(`${path}()`);
+    },
+  }) as unknown as GameArt;
+}
+
+/** A 2D context that does nothing but record the images drawn, by name, in order. */
+export function recordingContext(): { g: CanvasRenderingContext2D; drawn: string[] } {
+  const drawn: string[] = [];
+  const g = new Proxy(
+    {},
+    {
+      get(_, prop) {
+        if (prop === 'canvas') return { width: 320, height: 180 };
+        if (prop === 'drawImage') return (img: Named) => void drawn.push(img.name);
+        return () => undefined;
+      },
+      set: () => true,
+    },
+  ) as CanvasRenderingContext2D;
+  return { g, drawn };
+}

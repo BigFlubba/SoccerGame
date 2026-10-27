@@ -3,6 +3,9 @@ import { recordingAudio } from '../audio/testAudio';
 import { recordingRumble } from '../engine/testRumble';
 import type { GameContext } from './context';
 import { DIFFICULTY } from '../game/ai';
+import { BALL_REST_Y } from '../game/ball';
+import { CREW_PROFILES, CREW_STATS } from '../game/crew';
+import { seeded } from '../engine/random';
 import { DOG_DIFFICULTY } from '../game/dog';
 import { GOAL_PAUSE_S } from '../game/match';
 import { BASE_STATS } from '../game/stats';
@@ -13,6 +16,7 @@ import { newProfile } from '../meta/profile';
 import { DEFAULT_SETTINGS } from '../meta/settings';
 import { BONUS_CALLOUT, BONUS_SHOW_S, PAUSE_ITEMS, createMatchScene, type MatchScene } from './matchScene';
 import type { Scene } from './scene';
+import { fakeArt, type Named } from './testDraw';
 import { testContext } from './testContext';
 import { frame } from './testInput';
 
@@ -767,5 +771,119 @@ describe('match scene: the Energy Wave', () => {
     let n = 0;
     while (!s.moment && n++ < 60) s.update(frame(), STEP);
     expect(s.goldenCelebration).toBe(false);
+  });
+});
+
+describe('match scene: the Park crew', () => {
+  const PARK_OPEN = { ...newProfile(), ladderWins: 10, career: { stars: { 'backyard-boss': 1, 'park-1': 1, 'park-2': 1 }, milestonesPaid: 0, lossStreaks: {} } };
+  const crewMatch = (id: string, ctx = testContext({ profile: PARK_OPEN })) => {
+    const s = createMatchScene(ctx, 1, matchById(id)!);
+    s.world.match.phase = 'playing';
+    return { s, ctx };
+  };
+
+  it("a Park match builds the kid's world: their stats, profile, name, venue and sprites", () => {
+    const { s } = crewMatch('park-2');
+    expect(s.world.away.stats).toEqual(CREW_STATS.leo);
+    expect(s.world.maxProfile).toBe(CREW_PROFILES.leo.normal);
+    expect(s.world.dog).toBeNull();
+    expect(s.hud.awayName).toBe('LEO');
+    expect(s.hud.venue).toBe('park');
+  });
+
+  it("the HUD carries the kid's own sprites", () => {
+    const art = fakeArt();
+    const s = createMatchScene(testContext({ art, profile: PARK_OPEN }), 1, matchById('park-2')!);
+    expect((s.hud.awaySprites as unknown as Named).name).toBe('art.opponents.leo.sprites');
+    const rung = createMatchScene(testContext({ art }), 1, matchById('backyard-3')!);
+    expect((rung.hud.awaySprites as unknown as Named).name).toBe('art.opponents.max.sprites');
+  });
+
+  it("changing difficulty mid-match sets the kid's own profile for it, not Max's", () => {
+    const { s, ctx } = crewMatch('park-2');
+    s.update(frame(['pause']), STEP);
+    for (let i = 0; i < PAUSE_ITEMS.indexOf('OPTIONS'); i++) s.update(frame(['down']), STEP);
+    const options = s.update(frame(['confirm']), STEP)!;
+    options.update(frame(['right']), STEP);
+    options.update(frame(['back']), STEP);
+    expect(ctx.settings.difficulty).toBe('hard');
+    expect(s.world.maxProfile).toBe(CREW_PROFILES.leo.hard);
+    expect(s.world.aimErrorDeg.away).toBe(CREW_PROFILES.leo.hard.aimErrorDeg);
+  });
+
+  it('a rung still builds Max at the rung, with his difficulty', () => {
+    const s = createMatchScene(testContext(), 1, matchById('backyard-4')!);
+    expect(s.world.away.stats).toEqual(maxStats(4));
+    expect(s.world.maxProfile).toBe(DIFFICULTY.normal);
+  });
+
+  describe('the steals bonus', () => {
+    /** Tia dribbling left at x 300 on her feet, Harrison right behind her, his steal ready. */
+    function place(s: MatchScene): void {
+      const z = s.world.field.depth / 2;
+      Object.assign(s.world.away, { x: 300, y: 0, z, vx: -150, vy: 0, vz: 0, facing: -1, state: 'ground', touchCooldown: 0 });
+      Object.assign(s.world.home, { x: 310, y: 0, z, vx: -150, vy: 0, vz: 0, facing: -1, state: 'ground', stealCooldownS: 0, stumbleS: 0 });
+      Object.assign(s.world.ball, { x: 292, y: BALL_REST_Y, z, vx: -150, vy: 0, vz: 0 });
+    }
+
+    /** Places them there for a moment first, so she has decided to dribble on, not to chase whatever she was chasing. */
+    function stageTia(s: MatchScene): void {
+      for (let i = 0; i < 20; i++) {
+        place(s);
+        s.update(frame(), STEP);
+      }
+      place(s);
+    }
+
+    /** Taps steal on Tia's ball with the odds forced clean or not, checks the outcome, then plays on a moment. */
+    function stealOnce(s: MatchScene, clean = true): void {
+      stageTia(s);
+      s.world.rng = () => (clean ? 0 : 0.999);
+      s.update(frame(['steal']), STEP);
+      expect(s.world.events.steal).toBe(clean ? 'stole' : 'poked');
+      s.world.rng = seeded(7);
+      run(s, 0.6);
+    }
+
+    it('three clean steals off Tia show BONUS DONE! at once, with no goal moment, and the star cue once', () => {
+      const { s, ctx } = crewMatch('park-3', testContext({ profile: { ...PARK_OPEN, career: { ...PARK_OPEN.career, stars: { ...PARK_OPEN.career.stars, 'park-3': 0 } } } }));
+      expect(s.match.bonus).toBe('steals3');
+      stealOnce(s);
+      stealOnce(s);
+      expect(s.bonusCallout).toBeNull();
+      stageTia(s);
+      s.world.rng = () => 0;
+      s.update(frame(['steal']), STEP);
+      expect(s.world.events.steal).toBe('stole');
+      expect(s.moment).toBeNull();
+      expect(s.bonusCallout).toBe(BONUS_CALLOUT);
+      expect(ctx.audio.played.filter(c => c === 'star')).toHaveLength(1);
+      expect(s.steals).toBe(3);
+    });
+
+    it('pokes and trapped loose balls never count', () => {
+      const { s } = crewMatch('park-3');
+      for (let i = 0; i < 3; i++) stealOnce(s, false);
+      expect(s.steals).toBe(0);
+      const z = s.world.field.depth / 2;
+      Object.assign(s.world.away, { x: 400, z: 5 });
+      Object.assign(s.world.home, { x: 300, y: 0, z, vx: 0, vy: 0, facing: 1, state: 'ground', stealCooldownS: 0, stumbleS: 0 });
+      Object.assign(s.world.ball, { x: 308, y: BALL_REST_Y, z, vx: 0, vy: 0, vz: 0 });
+      s.update(frame(['steal']), STEP);
+      expect(s.world.events.steal).toBe('trapped');
+      expect(s.steals).toBe(0);
+      expect(s.bonusCallout).toBeNull();
+    });
+
+    it('the summary at full time carries his clean steals', () => {
+      const { s } = crewMatch('park-3');
+      for (let i = 0; i < 3; i++) stealOnce(s);
+      // One up, so full time isn't golden goal.
+      s.world.match.score = { home: 1, away: 0 };
+      s.world.match.clockS = 89.99;
+      run(s, 3);
+      expect(s.world.match.phase).toBe('fullTime');
+      expect(s.reward!.summary.steals).toBe(3);
+    });
   });
 });

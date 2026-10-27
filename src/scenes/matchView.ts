@@ -54,6 +54,8 @@ export interface MatchHud {
   awayName: string;
   /** Where the match is played: its scenery. */
   venue: VenueId;
+  /** The away player's sprites: Max, or the Park kid playing. Unused against Biscuit. */
+  readonly awaySprites: SpriteSet;
 }
 
 /**
@@ -156,10 +158,10 @@ function drawPlayer(g: CanvasRenderingContext2D, cam: Camera, p: Player, art: Ga
   g.drawImage(flat ? silhouette(frame) : frame, s.x - ANCHOR.x, s.y - ANCHOR.y - hop);
 }
 
-/** The away side: Max, or Biscuit when he's the opponent. */
-function drawAway(g: CanvasRenderingContext2D, cam: Camera, w: World, art: GameArt, nowS: number, flat = false): void {
+/** The away side: a human opponent in `set` (Max's when not given), or Biscuit when he's the opponent. */
+function drawAway(g: CanvasRenderingContext2D, cam: Camera, w: World, art: GameArt, nowS: number, set?: SpriteSet, flat = false): void {
   if (w.dog) drawDog(g, cam, w, art, nowS, flat);
-  else drawPlayer(g, cam, w.away, art, w.away.anim, undefined, flat);
+  else drawPlayer(g, cam, w.away, art, w.away.anim, set, flat);
 }
 
 /**
@@ -221,6 +223,7 @@ export function pitchDrawables(
   art: GameArt,
   home: Clip = w.home.anim,
   look: HomeLook = { set: 'home', aura: 0, nowS: 0 },
+  away?: SpriteSet,
 ): Drawable[] {
   const goals = w.field.goals.flatMap(goal => {
     const part = (z: number, which: 'farNet' | 'nearNet' | 'nearPost' | 'farPost'): Drawable => ({
@@ -249,7 +252,7 @@ export function pitchDrawables(
     ...goals,
     ...aura,
     { z: w.home.z, draw: g => drawPlayer(g, cam, w.home, art, home, art[look.set]) },
-    { z: w.away.z, draw: g => drawAway(g, cam, w, art, look.nowS) },
+    { z: w.away.z, draw: g => drawAway(g, cam, w, art, look.nowS, away) },
     // Last among equals: at his feet, the ball is drawn over his boots.
     ...(w.dog?.carrying ? [] : [{ z: w.ball.z, draw: (g: CanvasRenderingContext2D) => drawBall(g, w, cam, art) }]),
   ];
@@ -343,10 +346,10 @@ function pitchShake(w: World, hud: MatchHud, nowS: number): { dx: number; dy: nu
 }
 
 /** An impact frame: the pitch in white, with the players and ball as dark silhouettes. */
-function drawImpact(g: CanvasRenderingContext2D, w: World, cam: Camera, art: GameArt, home: Clip, look: HomeLook): void {
+function drawImpact(g: CanvasRenderingContext2D, w: World, cam: Camera, art: GameArt, home: Clip, look: HomeLook, away: SpriteSet): void {
   ink(g, 'white');
   g.fillRect(-8, -8, VIEW_W + 16, BASE_H + 16);
-  drawAway(g, cam, w, art, look.nowS, true);
+  drawAway(g, cam, w, art, look.nowS, away, true);
   drawPlayer(g, cam, w.home, art, home, art[look.set], true);
   if (!w.dog?.carrying) drawBall(g, w, cam, art, true);
 }
@@ -373,14 +376,14 @@ export function drawMatch(g: CanvasRenderingContext2D, w: World, cam: Camera, ar
   drawShadow(g, cam, w.home.x, w.home.z);
   drawSkid(g, cam, w.away);
   drawTrail(g, cam, hud.trail);
-  for (const d of depthSorted(pitchDrawables(w, cam, art, home, look))) d.draw(g);
+  for (const d of depthSorted(pitchDrawables(w, cam, art, home, look, hud.awaySprites))) d.draw(g);
   if (w.wave) {
     drawBeam(g, cam, w.wave, nowS);
     // Braced, he stands in front of the beam's broken end.
-    if (w.wave.outcome === 'braced' && w.away.state === 'bracing') drawAway(g, cam, w, art, nowS);
+    if (w.wave.outcome === 'braced' && w.away.state === 'bracing') drawAway(g, cam, w, art, nowS, hud.awaySprites);
   }
   if (hud.impactFrames > 0) {
-    drawImpact(g, w, cam, art, home, look);
+    drawImpact(g, w, cam, art, home, look, hud.awaySprites);
     hud.impactFrames--;
   }
   drawChargeBar(g, cam, w.away, nowS);

@@ -1,20 +1,20 @@
 import { matchFeedback } from '../audio/matchFeedback';
 import type { InputFrame } from '../engine/input';
 import { BASE_W } from '../engine/viewport';
-import { DIFFICULTY, createBrain, think, type Difficulty } from '../game/ai';
+import { createBrain, think, type Difficulty } from '../game/ai';
 import { updateCamera, type Camera } from '../game/camera';
 import { DOG_DIFFICULTY, type DogState } from '../game/dog';
 import { createDogBrain, dogThink } from '../game/dogAi';
 import { HUMAN_AIM_ERROR_DEG, type Aim } from '../game/kick';
 import { cancelCharge, type PlayerIntent } from '../game/player';
 import { endPower } from '../game/power';
+import { opponentProfile, opponentStats, type HumanOpponentId } from '../game/opponents';
 import { createWorld, stepWorld, type World } from '../game/world';
 import { BASE_STATS } from '../game/stats';
 import { clockMinute, endGoalPause } from '../game/match';
 import { nextCareerMatch, type CareerMatch } from '../meta/career';
 import { powerKit } from '../meta/catalog';
 import type { GoalRecord, StyleKind } from '../meta/economy';
-import { maxStats } from '../meta/ladder';
 import { BONUSES } from '../meta/objectives';
 import { applyMatch, type MatchReward } from '../meta/progress';
 import type { GameContext } from './context';
@@ -35,8 +35,12 @@ export interface MatchScene extends Scene {
   readonly paused: boolean;
   /** The opponent's difficulty right now: a change in Options mid-match applies at once. */
   readonly difficulty: Difficulty;
-  /** Biscuit, in the boss match; null against Max. */
+  /** Biscuit, in his boss match; null against every human opponent. */
   readonly dog: DogState | null;
+  /** The HUD's state: names, venue and the away side's sprites. */
+  readonly hud: Readonly<MatchHud>;
+  /** Harrison's clean steals so far, for the steals bonus. */
+  readonly steals: number;
   /** Harrison's goal moment, while it runs. */
   readonly moment: GoalMoment | null;
   /** The line under GOAL!!! naming his goal (HEADER!, HAT-TRICK!...), while the moment runs. */
@@ -96,27 +100,28 @@ function harrisonIntent(input: InputFrame): PlayerIntent {
 
 /**
  * A 90-second career match, by default the next one: Harrison with his
- * bought stats against Max at the rung's, or against Biscuit the Dog, who
- * has his own body and brain and no stats of a player's. It pays out on the
- * tick it reaches full time, then hands over to Results after the FULL TIME
- * banner.
+ * bought stats against the match's opponent (Max at the rung's stats, a
+ * Park kid at their own), or against Biscuit the Dog, who has his own body
+ * and brain and no stats of a player's. It pays out on the tick it reaches
+ * full time, then hands over to Results after the FULL TIME banner.
  */
 export function createMatchScene(ctx: GameContext, seed: number, match: CareerMatch = nextCareerMatch(ctx.profile)): MatchScene {
   const { art } = ctx;
   let difficulty = ctx.settings.difficulty;
-  const thinking = DIFFICULTY[difficulty];
-  const boss = match.kind === 'boss';
+  const dog = match.opponent === 'biscuit';
+  const human: HumanOpponentId = match.opponent === 'biscuit' ? 'max' : match.opponent;
+  const thinking = opponentProfile(human, difficulty);
   const world = createWorld(
     { ...ctx.profile.stats },
-    boss ? { ...BASE_STATS } : maxStats(match.rung),
+    dog ? { ...BASE_STATS } : opponentStats(human, match.rung),
     seed,
     { home: HUMAN_AIM_ERROR_DEG, away: thinking.aimErrorDeg },
     powerKit(ctx.profile),
-    boss ? DOG_DIFFICULTY[difficulty] : null,
-    boss ? null : thinking,
+    dog ? DOG_DIFFICULTY[difficulty] : null,
+    dog ? null : thinking,
   );
   const brain = createBrain(thinking);
-  const dogBrain = boss ? createDogBrain(DOG_DIFFICULTY[difficulty]) : null;
+  const dogBrain = dog ? createDogBrain(DOG_DIFFICULTY[difficulty]) : null;
   const awayIntent = (dt: number): PlayerIntent => (dogBrain ? dogThink(dogBrain, world, dt) : think(brain, world, world.away, world.home, dt));
   const cam: Camera = { x: world.ball.x - BASE_W / 2 };
   const hud: MatchHud = {
@@ -131,6 +136,10 @@ export function createMatchScene(ctx: GameContext, seed: number, match: CareerMa
     bonusCallout: null,
     awayName: match.hudName,
     venue: match.venue,
+    // Read when drawn, so a scene made without art (in tests) never touches it.
+    get awaySprites() {
+      return art.opponents[human].sprites;
+    },
   };
   let lastKick: LastKick | null = null;
   /** Harrison's header, volley, chip and Energy Wave goals, for the style bonus. */
@@ -138,7 +147,9 @@ export function createMatchScene(ctx: GameContext, seed: number, match: CareerMa
   /** Every goal of his, for the bonus objective and the stars. */
   const goals: GoalRecord[] = [];
   const bonus = BONUSES[match.bonus];
-  /** The in-play bonus has been done: the callout is owed once the goal moment ends. */
+  /** His clean steals with the steal button. */
+  let steals = 0;
+  /** The in-play bonus has been done: the callout is owed, shown as soon as no goal moment is running. */
   let bonusOwed = false;
   let bonusShown = false;
   let bonusUntilS = 0;
@@ -168,21 +179,34 @@ export function createMatchScene(ctx: GameContext, seed: number, match: CareerMa
   /** Saved at once, so closing the tab during the FULL TIME banner loses nothing. Called once, on the full-time tick. */
   const award = (result: NonNullable<World['match']['result']>) => {
     const { home, away } = world.match.score;
-    const done = applyMatch(ctx.profile, { result, goalsFor: home, goalsAgainst: away, styleGoals: [...styleGoals], goals: [...goals], steals: 0 }, match, ctx.today());
+    const done = applyMatch(ctx.profile, { result, goalsFor: home, goalsAgainst: away, styleGoals: [...styleGoals], goals: [...goals], steals }, match, ctx.today());
     ctx.saveProfile(done.profile);
     reward = done.reward;
   };
-  /** Notes one of his goals, and whether it has just settled an in-play bonus. */
-  const recordGoal = () => {
-    goals.push({ minute: clockMinute(world.match), kind: lastKick?.kind ?? null, perfect: lastKick?.perfect ?? false });
+  /** Whether play (a goal or a steal) has just settled an in-play bonus; if so, its callout is owed. */
+  const checkBonus = () => {
     if (bonusShown || bonusOwed || !bonus.inPlay) return;
     const { home, away } = world.match.score;
-    bonusOwed = bonus.done({ goalsFor: home, goalsAgainst: away, goals, result: null, steals: 0 });
+    bonusOwed = bonus.done({ goalsFor: home, goalsAgainst: away, goals, result: null, steals });
   };
-  /** Help and Options come back to this match, still paused, with any new difficulty applied to Max or the dog. */
+  /** Notes one of his goals. */
+  const recordGoal = () => {
+    goals.push({ minute: clockMinute(world.match), kind: lastKick?.kind ?? null, perfect: lastKick?.perfect ?? false });
+    checkBonus();
+  };
+  /** Shows an owed bonus callout, unless a goal moment is running: it waits behind one, so it never covers it. */
+  const showOwedBonus = () => {
+    if (!bonusOwed || hud.moment) return;
+    bonusOwed = false;
+    bonusShown = true;
+    hud.bonusCallout = BONUS_CALLOUT;
+    bonusUntilS = t + BONUS_SHOW_S;
+    ctx.audio.play('star');
+  };
+  /** Help and Options come back to this match, still paused, with any new difficulty applied to the opponent. */
   const backHere = (): Scene => {
     difficulty = ctx.settings.difficulty;
-    brain.profile = DIFFICULTY[difficulty];
+    brain.profile = opponentProfile(human, difficulty);
     world.aimErrorDeg.away = brain.profile.aimErrorDeg;
     if (world.maxProfile) world.maxProfile = brain.profile;
     if (dogBrain && world.dog) dogBrain.profile = world.dog.profile = DOG_DIFFICULTY[difficulty];
@@ -199,6 +223,10 @@ export function createMatchScene(ctx: GameContext, seed: number, match: CareerMa
       return difficulty;
     },
     dog: world.dog,
+    hud,
+    get steals() {
+      return steals;
+    },
     get moment() {
       return hud.moment;
     },
@@ -269,6 +297,10 @@ export function createMatchScene(ctx: GameContext, seed: number, match: CareerMa
           hud.shake = { px: WAVE_SHAKE.px, untilS: t + WAVE_SHAKE.s };
         }
         if (world.events.power.braced) hud.shake = { px: BRACE_SHAKE.px, untilS: t + BRACE_SHAKE.s };
+        if (world.events.steal === 'stole') {
+          steals++;
+          checkBonus();
+        }
         updateCamera(cam, world.ball, simDt, world.field);
         stepTrail(hud.trail, world.ball);
         lastKick = noteKick(lastKick, world);
@@ -298,16 +330,9 @@ export function createMatchScene(ctx: GameContext, seed: number, match: CareerMa
           hud.callout = null;
           hud.goldenCelebration = false;
           ctx.audio.setCrowd('match');
-          // The bonus callout waits behind the goal moment, so it never covers one.
-          if (bonusOwed) {
-            bonusOwed = false;
-            bonusShown = true;
-            hud.bonusCallout = BONUS_CALLOUT;
-            bonusUntilS = t + BONUS_SHOW_S;
-            ctx.audio.play('star');
-          }
         }
       }
+      showOwedBonus();
       if (hud.bonusCallout && t >= bonusUntilS) hud.bonusCallout = null;
       if (world.match.phase !== 'fullTime' || !world.match.result) return null;
       if (!reward) award(world.match.result);

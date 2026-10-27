@@ -10,6 +10,9 @@ import { REACH_Z } from './zones';
 
 export type Difficulty = 'easy' | 'normal' | 'hard';
 
+/** How an opponent plays, beyond its numbers: Max all round, and each of the Park crew's personalities. */
+export type Style = 'allRound' | 'blocker' | 'shooter' | 'dribbler' | 'presser';
+
 export interface AiProfile {
   /** Seconds between decisions. */
   reactionS: number;
@@ -35,12 +38,13 @@ export interface AiProfile {
   kickoffRush: boolean;
   /** Scales its run and sprint while it plays the ball (not backing off from a powered-up Harrison). */
   paceFactor: number;
+  style: Style;
 }
 
 export const DIFFICULTY: Record<Difficulty, AiProfile> = {
-  easy: { reactionS: 0.22, aimErrorDeg: 8, aggression: 0.3, shootRange: 150, braceSense: 0.5, backOffS: 0.32, cleanSteal: 0.9, wrongFootedS: 0.35, kickoffSpot: { back: 110, off: 20 }, kickoffRush: true, paceFactor: 1 },
-  normal: { reactionS: 0.16, aimErrorDeg: 6, aggression: 0.55, shootRange: 180, braceSense: 0.75, backOffS: 0.18, cleanSteal: 0.75, wrongFootedS: 0.35, kickoffSpot: { back: 110, off: 24 }, kickoffRush: true, paceFactor: 1.03 },
-  hard: { reactionS: 0.1, aimErrorDeg: 2, aggression: 0.8, shootRange: 210, braceSense: 0.9, backOffS: 0.1, cleanSteal: 0.55, wrongFootedS: 0.2, kickoffSpot: { back: 70, off: 0 }, kickoffRush: false, paceFactor: 1.1 },
+  easy: { reactionS: 0.22, aimErrorDeg: 8, aggression: 0.3, shootRange: 150, braceSense: 0.5, backOffS: 0.32, cleanSteal: 0.9, wrongFootedS: 0.35, kickoffSpot: { back: 110, off: 20 }, kickoffRush: true, paceFactor: 1, style: 'allRound' },
+  normal: { reactionS: 0.16, aimErrorDeg: 6, aggression: 0.55, shootRange: 180, braceSense: 0.75, backOffS: 0.18, cleanSteal: 0.75, wrongFootedS: 0.35, kickoffSpot: { back: 110, off: 24 }, kickoffRush: true, paceFactor: 1.03, style: 'allRound' },
+  hard: { reactionS: 0.1, aimErrorDeg: 2, aggression: 0.8, shootRange: 210, braceSense: 0.9, backOffS: 0.1, cleanSteal: 0.55, wrongFootedS: 0.2, kickoffSpot: { back: 70, off: 0 }, kickoffRush: false, paceFactor: 1.1, style: 'allRound' },
 };
 
 export interface AiBrain {
