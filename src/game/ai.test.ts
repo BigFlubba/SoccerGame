@@ -7,7 +7,7 @@ import { NO_INTENT, PLAYER_R, type Player, type PlayerIntent } from './player';
 import type { Aim } from './kick';
 import { METER_MIN_REFILL_S, WAVE_READY_S, canStartPower } from './power';
 import { BASE_STATS, STAT_NAMES, type StatName, type Stats } from './stats';
-import { defendSpot } from './styles';
+import { FAKE, defendSpot } from './styles';
 import { CREW_PROFILES, CREW_STATS } from './crew';
 import { maxHasBall } from './steal';
 import { BRACE_DISTANCE } from './wave';
@@ -743,5 +743,77 @@ describe('Boomer Leo', () => {
       stepWorld(w, NO_INTENT, think(brain, w, w.away, w.home, STEP), STEP);
       expect(w.events.kicks[1]?.kicked ?? null, `tick ${i}`).toBeNull();
     }
+  });
+});
+
+describe('Tricky Tia', () => {
+  /** Tia dribbling left at goal at x 300 on the middle line, Harrison standing `gap` px ahead in her lane. */
+  function dribbling(gap: number | null, profile: AiProfile = CREW_PROFILES.tia.normal): { w: World; brain: AiBrain } {
+    const w = createWorld(BASE_STATS, CREW_STATS.tia, 1, { home: 0, away: 0 }, null, null, profile);
+    w.match.phase = 'playing';
+    const z = w.field.depth / 2;
+    Object.assign(w.away, { x: 300, z, vx: -60, facing: -1 });
+    Object.assign(w.ball, { x: 292, y: BALL_REST_Y, z, vx: -60, vy: 0, vz: 0 });
+    Object.assign(w.home, gap === null ? { x: 500, z: 5, facing: -1 } : { x: 300 - gap, z, vx: 0, facing: 1 });
+    return { w, brain: createBrain(profile) };
+  }
+  /** Steps the world with Tia's brain for `s` seconds and Harrison doing `home` each tick. */
+  function play(w: World, brain: AiBrain, s: number, home: (i: number) => PlayerIntent = () => NO_INTENT): void {
+    for (let i = 0; i < Math.round(s / STEP); i++) stepWorld(w, home(i), think(brain, w, w.away, w.home, STEP), STEP);
+  }
+
+  /** Steps until her fake starts; it must within her reaction time. */
+  function untilFake(w: World, brain: AiBrain): void {
+    let t = 0;
+    while (!brain.fake && t <= brain.profile.reactionS) {
+      play(w, brain, STEP);
+      t += STEP;
+    }
+    expect(brain.fake).not.toBeNull();
+  }
+
+  it('with Harrison standing in her path she fakes one way, then cuts the other way past him with the ball', () => {
+    const { w, brain } = dribbling(24);
+    const startZ = w.away.z;
+    untilFake(w, brain);
+    expect(brain.fakes).toBe(1);
+    const side = brain.fake!.side;
+    play(w, brain, FAKE.leanS - 2 * STEP);
+    expect((w.away.z - startZ) * side).toBeGreaterThan(2);
+    play(w, brain, FAKE.cutS);
+    expect((w.away.z - startZ) * side).toBeLessThan(-8);
+    play(w, brain, 0.4);
+    expect(w.away.x).toBeLessThan(w.home.x);
+    expect(maxHasBall(w.away, w.ball)).toBe(true);
+  });
+
+  it("a slide at the line she leaned onto, launched as her cut begins, misses: she isn't there any more", () => {
+    const { w, brain } = dribbling(24);
+    let t = 0;
+    while (!(brain.fake && brain.fake.t >= FAKE.leanS) && t++ < 120) play(w, brain, STEP);
+    Object.assign(w.home, { z: w.away.z, facing: 1 });
+    play(w, brain, 0.6, i => (i === 0 ? { ...NO_INTENT, chipHeld: true } : NO_INTENT));
+    expect(maxHasBall(w.away, w.ball)).toBe(true);
+  });
+
+  it('with nobody ahead she never fakes, and one fake waits out its cooldown before the next', () => {
+    const alone = dribbling(null);
+    play(alone.w, alone.brain, 1);
+    expect(alone.brain.fakes).toBe(0);
+    const { w, brain } = dribbling(24);
+    untilFake(w, brain);
+    expect(brain.fakes).toBe(1);
+    play(w, brain, FAKE.leanS + FAKE.cutS);
+    expect(brain.fake).toBeNull();
+    expect(brain.fakeReadyS).toBeGreaterThan(FAKE.cooldownS - 0.05);
+    Object.assign(w.home, { x: w.away.x - 24, z: w.away.z, vx: 0, facing: 1 });
+    play(w, brain, 0.3);
+    expect(brain.fakes).toBe(1);
+  });
+
+  it('Max never fakes', () => {
+    const { w, brain } = dribbling(24, DIFFICULTY.normal);
+    play(w, brain, 1);
+    expect(brain.fakes).toBe(0);
   });
 });

@@ -41,6 +41,11 @@ export const CREW_PROFILES: Record<CrewId, Record<Difficulty, AiProfile>> = {
     normal: { shootRange: 360, cleanSteal: 0.65, reactionS: 0.14, paceFactor: 1.06 },
     hard: { shootRange: 380, cleanSteal: 0.45, paceFactor: 1.15, reactionS: 0.08 },
   }),
-  tia: crewProfiles('tia', { easy: {}, normal: {}, hard: {} }),
+  // Tricky Tia: fakes anyone standing in her path, shoots only from close in. Measured E 0.766, N 0.594, H 0.016; 5.6 fakes a match.
+  tia: crewProfiles('tia', {
+    easy: { shootRange: 100, aggression: 0.25 },
+    normal: { shootRange: 110, aggression: 0.5 },
+    hard: { shootRange: 120, aggression: 0.75 },
+  }),
   pete: crewProfiles('pete', { easy: {}, normal: {}, hard: {} }),
 };

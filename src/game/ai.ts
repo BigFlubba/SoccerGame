@@ -4,7 +4,7 @@ import { GRAVITY } from './constants';
 import { inGoalBox, type Goal } from './field';
 import type { Aim } from './kick';
 import { NO_INTENT, PLAYER_R, type Player, type PlayerIntent } from './player';
-import { DEFEND_COVER, POSSESSION_RANGE, attackDir, chargeHold, defendSpot, goalCentreZ, theirBall } from './styles';
+import { DEFEND_COVER, FAKE, POSSESSION_RANGE, attackDir, chargeHold, defendSpot, fakeMove, goalCentreZ, theirBall } from './styles';
 import type { Wave } from './wave';
 import type { World } from './world';
 import { REACH_Z } from './zones';
@@ -67,6 +67,12 @@ export interface AiBrain {
   wrongFootedS: number;
   /** How long it has held its spot at Harrison's kickoff; null once the ball is played or the hold is over. */
   kickoffHoldS: number | null;
+  /** The dribbler's fake under way: side +1 deeper, −1 nearer, the way she leans first; t, how far into it. */
+  fake: null | { side: 1 | -1; t: number };
+  /** Time until she may fake again. */
+  fakeReadyS: number;
+  /** Fakes started this match, for the personality check. */
+  fakes: number;
 }
 
 const BALL_LOW = 6;
@@ -121,7 +127,7 @@ const AIM_ODDS: readonly (readonly [Aim, number])[] = [
 ];
 
 export function createBrain(profile: AiProfile): AiBrain {
-  return { profile, nextDecisionS: 0, intent: { ...NO_INTENT }, plan: 'chase', chargeLeftS: 0, slideReadyS: 0, backOff: null, wrongFootedS: 0, kickoffHoldS: null };
+  return { profile, nextDecisionS: 0, intent: { ...NO_INTENT }, plan: 'chase', chargeLeftS: 0, slideReadyS: 0, backOff: null, wrongFootedS: 0, kickoffHoldS: null, fake: null, fakeReadyS: 0, fakes: 0 };
 }
 
 
@@ -333,6 +339,14 @@ function decide(brain: AiBrain, w: World, me: Player, them: Player): void {
       return;
     }
     brain.plan = 'dribble';
+    // The dribbler fakes an opponent standing just ahead in her lane: she leans first toward the tighter side, so the cut takes the room.
+    const [themAhead, themSide] = [(them.x - me.x) * dir, them.z - me.z];
+    if (profile.style === 'dribbler' && brain.fakeReadyS === 0 && themAhead > 0 && themAhead <= FAKE.trigger && Math.abs(themSide) <= FAKE.lane) {
+      brain.fake = { side: -roomySide(w, them.z, me.z) as 1 | -1, t: 0 };
+      brain.fakes++;
+      fakeTick(brain, w, me, dir);
+      return;
+    }
     // Behind the line it attacks, the ball is in a pocket beside the goal with no room to get round it:
     // run into it, so it is touched or popped back out toward the pitch.
     const behindLine = (attacking.lineX - ball.x) * dir < 0;
@@ -383,6 +397,26 @@ function decide(brain: AiBrain, w: World, me: Player, them: Player): void {
   brain.intent = moveTo(behindX, z, at.z);
 }
 
+/** One tick of her fake: her move, with the ball kept at her feet; ends it when it's over. */
+function fakeTick(brain: AiBrain, w: World, me: Player, dir: 1 | -1): boolean {
+  const move = brain.fake && fakeMove(brain.fake, dir);
+  if (!move) {
+    brain.fake = null;
+    brain.fakeReadyS = FAKE.cooldownS;
+    return false;
+  }
+  brain.plan = 'dribble';
+  // She keeps facing the goal she attacks, so the ball stays in front of her as she eases back.
+  brain.intent = { ...NO_INTENT, ...move, faceX: dir, carry: true };
+  return true;
+}
+
+/** The ball at its feet: low, just ahead of it, on its line. */
+function atFeet(w: World, me: Player): boolean {
+  const ahead = (w.ball.x - me.x) * attackDir(me);
+  return w.ball.y <= BALL_LOW && ahead >= 0 && ahead <= POSSESSION_RANGE && Math.abs(w.ball.z - me.z) <= REACH_Z;
+}
+
 /**
  * At Harrison's kickoff Max holds his spot until Harrison plays the ball
  * (it leaves the centre spot), or, with `kickoffRush`, starts winding up a
@@ -412,12 +446,17 @@ function holdingKickoff(brain: AiBrain, w: World, them: Player, dt: number): boo
 export function think(brain: AiBrain, w: World, me: Player, them: Player, dt: number): PlayerIntent {
   brain.nextDecisionS -= dt;
   brain.slideReadyS = Math.max(0, brain.slideReadyS - dt);
+  brain.fakeReadyS = Math.max(0, brain.fakeReadyS - dt);
+  if (brain.fake) brain.fake.t += dt;
   // Robbed by Harrison's clean steal, Max is wrong-footed: whatever he meant to do is gone.
   if (me.team === 'away' && w.events.steal === 'stole') {
     brain.wrongFootedS = brain.profile.wrongFootedS;
     brain.intent = { ...NO_INTENT };
     brain.plan = 'chase';
+    brain.fake = null;
   }
+  // A fake ends early if she loses the ball, or play stops.
+  if (brain.fake && (!atFeet(w, me) || w.match.phase !== 'playing')) brain.fake = null;
   // Waiting for Harrison's kickoff, Max means to hold his spot once play starts.
   if (me.team === 'away' && w.match.phase === 'kickoff') brain.kickoffHoldS = w.match.kickoffTeam === them.team ? 0 : null;
   let released = false;
@@ -453,6 +492,9 @@ export function think(brain: AiBrain, w: World, me: Player, them: Player, dt: nu
     // Wrong-footed, he stands facing the ball, never sliding, then challenges again.
     brain.wrongFootedS = Math.max(0, brain.wrongFootedS - dt);
     brain.intent = { ...NO_INTENT, faceX: Math.sign(w.ball.x - me.x) >= 0 ? 1 : -1 };
+  } else if (brain.fake && fakeTick(brain, w, me, attackDir(me))) {
+    // Faking: she plays it out tick by tick, as the back-off does.
+    brain.nextDecisionS = brain.profile.reactionS;
   } else if (!released && brain.nextDecisionS <= 1e-9) {
     // A decision on the release tick could start a new charge and swallow the shot, so it waits a tick.
     decide(brain, w, me, them);

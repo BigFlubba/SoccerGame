@@ -160,7 +160,7 @@ export function playMatchup(m: Matchup, seed: number, harrison: Stats = harrison
       gapSum += Math.hypot(w.ball.x - w.away.x, w.ball.z - w.away.z);
     }
   }
-  const traits: Traits = { shotsFrom, slides, defendDepth: held ? depthSum / held : 0, pressGap: held ? gapSum / held : 0, fakes: 0 };
+  const traits: Traits = { shotsFrom, slides, defendDepth: held ? depthSum / held : 0, pressGap: held ? gapSum / held : 0, fakes: brain.fakes };
   return { result: w.match.result, score: { ...w.match.score }, longestStillS, traits };
 }
 

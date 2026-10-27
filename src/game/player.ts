@@ -24,6 +24,8 @@ export interface PlayerIntent {
   faceX?: 1 | -1;
   /** Scales his run and sprint on the ground (the computer's pace factor); 1 when absent. */
   pace?: number;
+  /** The computer's close control: a ball at its feet stays there this tick (the dribbler's fake). Absent for Harrison. */
+  carry?: boolean;
 }
 
 export const NO_INTENT: Readonly<PlayerIntent> = Object.freeze({

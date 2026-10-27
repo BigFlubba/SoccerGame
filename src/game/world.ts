@@ -25,7 +25,7 @@ import {
   type PowerState,
 } from './power';
 import type { Stats } from './stats';
-import { resolveSteal, stealZone, type StealOutcome } from './steal';
+import { maxHasBall, resolveSteal, stealZone, type StealOutcome } from './steal';
 import { fireWave, stepWave, type Wave } from './wave';
 import { ballAtFeet, ballIn } from './zones';
 
@@ -169,6 +169,14 @@ function carryInDepth(w: World, dz: number): void {
   if (dz !== 0 && canPlace(w.ball, w.ball.x, w.ball.z + dz, w.field)) w.ball.z += dz;
 }
 
+/** The away player's close control while it fakes: the ball at its feet moves with it, unless that would put it in a goal or a fence. */
+const CARRY_AHEAD = 8;
+function carryAtFeet(w: World, p: Player): void {
+  const [x, z] = [p.x + p.facing * CARRY_AHEAD, p.z];
+  if (!maxHasBall(p, w.ball) || !canPlace(w.ball, x, z, w.field)) return;
+  Object.assign(w.ball, { x, z, vx: p.vx, vz: p.vz });
+}
+
 /** The meter's gains from Harrison's part in this tick's contacts. */
 function creditMeter(power: PowerState, home: ContactEvents, w: World): void {
   if (home.touched) addMeter(power, 'touch');
@@ -250,6 +258,7 @@ export function stepWorld(w: World, homeIntent: PlayerIntent, awayIntent: Player
   const dogFrom = { x: w.away.x, z: w.away.z };
   const dog = dogBody ? stepDog(w, awayIntent, live, dt) : quietDog();
   if (!dogBody) stepOne(w.away, w.dog ? NO_INTENT : awayIntent, live, w, dt);
+  if (!w.dog && live && awayIntent.carry) carryAtFeet(w, w.away);
   if (w.power && home.powerArmed && canStartPower(w)) {
     home.powerArmed = false;
     w.power.activeS = POWERED_S;
