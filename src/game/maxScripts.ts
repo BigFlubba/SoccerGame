@@ -18,8 +18,24 @@ import { ballAtFeet, ballIn } from './zones';
  * whenever Max's ball is in his reach, so it sees the steal's odds.
  */
 
-/** The scripted Harrison's brain: reactionS is replaced per match (REACT). */
-export const HARRISON_SCRIPT: AiProfile = { ...DIFFICULTY.normal, aggression: 0.4, shootRange: 200 };
+/**
+ * The scripted Harrison's brain, written out so retuning Max can't move it:
+ * Normal's numbers as they were before this retune, with less sliding and a
+ * longer range. reactionS is replaced per match (REACT); the fields only
+ * Max uses do nothing for him.
+ */
+export const HARRISON_SCRIPT: AiProfile = {
+  reactionS: 0.18,
+  aimErrorDeg: 6,
+  aggression: 0.4,
+  shootRange: 200,
+  braceSense: 0.75,
+  backOffS: 0.18,
+  cleanSteal: 0.75,
+  wrongFootedS: 0.4,
+  kickoffSpot: { back: 110, off: 18 },
+  paceFactor: 1,
+};
 /** Each match's Harrison reacts at his own pace, drawn here, s, so a win rate is a smooth measure. */
 const REACT = { from: 0.3, spread: 0.16 };
 /** How long he holds the kickoff shot, s. */

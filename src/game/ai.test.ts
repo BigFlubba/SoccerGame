@@ -157,6 +157,20 @@ describe('think', () => {
     expect(think(nudged.brain, nudged.w, nudged.w.away, nudged.w.home, STEP).moveX).not.toBe(0);
   });
 
+  it('standing at his spot, Max sees Harrison play the kickoff ball and reacts after his reaction time', () => {
+    const w = createWorld(BASE_STATS, BASE_STATS, 3, { home: 4, away: 6 }, null, null, DIFFICULTY.normal);
+    const brain = brainFor({ reactionS: 0.2 });
+    think(brain, w, w.away, w.home, STEP);
+    w.match.phase = 'playing';
+    for (let i = 0; i < 30; i++) think(brain, w, w.away, w.home, STEP);
+    w.ball.x += 10;
+    for (let t = 0; t < 0.2 - 1e-9; t += STEP) {
+      const i = think(brain, w, w.away, w.home, STEP);
+      expect([i.moveX, i.moveZ], `at ${t.toFixed(3)} s`).toEqual([0, 0]);
+    }
+    expect(think(brain, w, w.away, w.home, STEP).moveX).not.toBe(0);
+  });
+
   it("Max doesn't hold at his own kickoff, and Harrison's brain never holds", () => {
     const w = createWorld(BASE_STATS, BASE_STATS, 3, { home: 4, away: 6 }, null, null, DIFFICULTY.normal);
     w.match.kickoffTeam = 'away';
@@ -170,11 +184,43 @@ describe('think', () => {
     expect(max.plan).not.toBe('chase');
   });
 
+  it("Max plays at his profile's pace, except backing off from a powered-up Harrison", () => {
+    const w = scene({ x: 400 }, 100, 500);
+    expect(think(brainFor({ paceFactor: 1.1 }), w, w.away, w.home, STEP).pace).toBe(1.1);
+    const powered = createWorld(BASE_STATS, BASE_STATS, 3, { home: 4, away: 6 }, { golden: false });
+    powered.match.phase = 'playing';
+    powered.power!.activeS = 1;
+    const brain = brainFor({ paceFactor: 1.1, braceSense: 1, backOffS: 0 });
+    let backing = { ...NO_INTENT };
+    for (let i = 0; i < 3; i++) backing = think(brain, powered, powered.away, powered.home, STEP);
+    expect(brain.plan).toBe('backOff');
+    expect(backing.pace ?? 1).toBe(1);
+  });
+
+  it("Max's back-off from a powered-up Harrison keeps its own reaction, whatever his reactions in play", () => {
+    const w = createWorld(BASE_STATS, BASE_STATS, 3, { home: 4, away: 6 }, { golden: false });
+    w.match.phase = 'playing';
+    w.power!.activeS = 1;
+    const brain = brainFor({ reactionS: 0.05, backOffS: 0.3, braceSense: 1 });
+    let t = 0;
+    for (; t < 1 && brain.plan !== 'backOff'; t += STEP) think(brain, w, w.away, w.home, STEP);
+    expect(t).toBeCloseTo(0.3, 1);
+  });
+
   it('difficulty profiles match the plan', () => {
-    expect(DIFFICULTY.easy).toEqual({ reactionS: 0.32, aimErrorDeg: 10, aggression: 0.3, shootRange: 150, braceSense: 0.5, cleanSteal: 0.9, wrongFootedS: 0.5, kickoffSpot: { back: 110, off: 18 } });
-    expect([DIFFICULTY.normal.cleanSteal, DIFFICULTY.normal.wrongFootedS]).toEqual([0.75, 0.4]);
-    expect(DIFFICULTY.normal.kickoffSpot).toEqual({ back: 110, off: 18 });
-    expect(DIFFICULTY.hard).toEqual({ reactionS: 0.1, aimErrorDeg: 3, aggression: 0.8, shootRange: 210, braceSense: 0.9, cleanSteal: 0.55, wrongFootedS: 0.3, kickoffSpot: { back: 70, off: 0 } });
+    const spot = { back: 110, off: 18 };
+    expect(DIFFICULTY.easy).toEqual({
+      reactionS: 0.2, aimErrorDeg: 8, aggression: 0.3, shootRange: 150, braceSense: 0.5, backOffS: 0.32,
+      cleanSteal: 0.9, wrongFootedS: 0.35, kickoffSpot: spot, paceFactor: 1,
+    });
+    expect(DIFFICULTY.normal).toEqual({
+      reactionS: 0.14, aimErrorDeg: 6, aggression: 0.55, shootRange: 180, braceSense: 0.75, backOffS: 0.18,
+      cleanSteal: 0.75, wrongFootedS: 0.3, kickoffSpot: spot, paceFactor: 1.03,
+    });
+    expect(DIFFICULTY.hard).toEqual({
+      reactionS: 0.1, aimErrorDeg: 2, aggression: 0.8, shootRange: 210, braceSense: 0.9, backOffS: 0.1,
+      cleanSteal: 0.55, wrongFootedS: 0.2, kickoffSpot: { back: 70, off: 0 }, paceFactor: 1.08,
+    });
   });
 
   it('a whole simulated match between two AIs finishes with a result and no exceptions', () => {

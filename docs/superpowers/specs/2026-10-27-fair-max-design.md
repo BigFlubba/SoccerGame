@@ -210,6 +210,37 @@ a later change can't quietly make it hard again.
   is 0.000. The script as first built (reactions from 0.2 s) won 0.578 on
   Easy, so his reactions were slowed to 0.30–0.46 s; lowering his
   `aggression` made him stronger, not weaker, so it stays at 0.4.
+- **As built (2026-10-27).** The new tools overshot every target before
+  the retune (64 seeds: Easy 0.938, Normal 0.891, Hard 0.141), so Max
+  was made *tougher* on all three. Hard's rise came from the kickoff hold
+  (without it Hard measured 0.047): no lever but pace moved it, so Hard
+  got a pace factor.
+
+  | | reaction | aim | slides | shoots from | back-off | clean steal | wrong-footed | kickoff spot | pace |
+  |---|---|---|---|---|---|---|---|---|---|
+  | Easy | 0.20 s | 8° | 0.3 | 150 | 0.32 s | 0.90 | 0.35 s | 110 back, 18 off | 1.00 |
+  | Normal | 0.14 s | 6° | 0.55 | 180 | 0.18 s | 0.75 | 0.30 s | 110 back, 18 off | 1.03 |
+  | Hard | 0.10 s | 2° | 0.8 | 210 | 0.10 s | 0.55 | 0.20 s | 70 back, on the line | 1.08 |
+
+  Was: Easy 0.32 s / 10°, Normal 0.18 s, Hard 3°; no wrong-footing, no
+  pace. "Back-off" (`backOffS`) is how fast he starts backing off from a
+  powered-up Harrison: his old reactions, kept so the Energy Wave plays as
+  it did. The pace factor scales his run and sprint while he plays the
+  ball, not while he backs off. Every Easy number is gentler than
+  Normal's, and every Normal number gentler than Hard's.
+- **Measured as built:** rung 10, 64 seeds: **Easy 0.797, Normal 0.641,
+  Hard 0.016**; 128 seeds: 0.820 / 0.648 / 0.016 (Hard's 128-seed
+  baseline was 0.016). Rung 1: 32 seeds 1.000 / 0.813 / 0.063, 128 seeds
+  0.914 / 0.789 / 0.047, so the first rung is the easier one. Average
+  scores at rung 10: Easy 5.5–3.7, Normal 5.7–5.0, Hard 1.2–5.8.
+- **Kickoff reaction (builder's ruling):** once Harrison plays the
+  kickoff ball, Max, who has been standing, reacts after his reaction
+  time. Without it his decision clock ran on through the hold and he
+  reacted the instant the ball was struck: kickoff shots then scored
+  53–62% at rung 10 but only 3–15% at rung 1, and the first rung was the
+  harder one. With it, 58–72% at both.
+- **Watch in the playtest:** on Easy and Normal the kickoff shot scores
+  about two times in three, so a goal for Max is often answered at once.
 - The ladder's stat table (`LADDER_STATS`) stays as it is.
 
 ### 6. In CI

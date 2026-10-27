@@ -20,6 +20,8 @@ export interface AiProfile {
   shootRange: number;
   /** Chance (0..1) that it backs off and squares up properly when Harrison powers up. */
   braceSense: number;
+  /** How long it takes to start backing off from a powered-up Harrison (its reactions before the fair-Max retune, kept so the wave plays as it did). */
+  backOffS: number;
   /** Chance (0..1), before Harrison's Control, that his steal tap takes the ball cleanly off it. */
   cleanSteal: number;
   /** Seconds it stands wrong-footed after Harrison steals the ball off it cleanly. */
@@ -29,12 +31,14 @@ export interface AiProfile {
    * `off` px off the ball's line in depth (deeper, away from the camera).
    */
   kickoffSpot: { back: number; off: number };
+  /** Scales its run and sprint while it plays the ball (not backing off from a powered-up Harrison). */
+  paceFactor: number;
 }
 
 export const DIFFICULTY: Record<Difficulty, AiProfile> = {
-  easy: { reactionS: 0.32, aimErrorDeg: 10, aggression: 0.3, shootRange: 150, braceSense: 0.5, cleanSteal: 0.9, wrongFootedS: 0.5, kickoffSpot: { back: 110, off: 18 } },
-  normal: { reactionS: 0.18, aimErrorDeg: 6, aggression: 0.55, shootRange: 180, braceSense: 0.75, cleanSteal: 0.75, wrongFootedS: 0.4, kickoffSpot: { back: 110, off: 18 } },
-  hard: { reactionS: 0.1, aimErrorDeg: 3, aggression: 0.8, shootRange: 210, braceSense: 0.9, cleanSteal: 0.55, wrongFootedS: 0.3, kickoffSpot: { back: 70, off: 0 } },
+  easy: { reactionS: 0.2, aimErrorDeg: 8, aggression: 0.3, shootRange: 150, braceSense: 0.5, backOffS: 0.32, cleanSteal: 0.9, wrongFootedS: 0.35, kickoffSpot: { back: 110, off: 18 }, paceFactor: 1 },
+  normal: { reactionS: 0.14, aimErrorDeg: 6, aggression: 0.55, shootRange: 180, braceSense: 0.75, backOffS: 0.18, cleanSteal: 0.75, wrongFootedS: 0.3, kickoffSpot: { back: 110, off: 18 }, paceFactor: 1.03 },
+  hard: { reactionS: 0.1, aimErrorDeg: 2, aggression: 0.8, shootRange: 210, braceSense: 0.9, backOffS: 0.1, cleanSteal: 0.55, wrongFootedS: 0.2, kickoffSpot: { back: 70, off: 0 }, paceFactor: 1.08 },
 };
 
 export interface AiBrain {
@@ -308,7 +312,7 @@ function decide(brain: AiBrain, w: World, me: Player, them: Player): void {
   const inLine = Math.abs(ball.z - me.z) <= REACH_Z;
   const dist = Math.hypot(ball.x - me.x, ball.z - me.z);
   const sprint = dist > SPRINT_DISTANCE && me.stamina > SPRINT_MIN_STAMINA;
-  const intent: PlayerIntent = { ...NO_INTENT, sprint };
+  const intent: PlayerIntent = { ...NO_INTENT, sprint, pace: profile.paceFactor };
   const attacking = w.field.goals.find(g => g.side === (dir > 0 ? 'right' : 'left'))!;
   const defending = w.field.goals.find(g => g !== attacking)!;
   const moveTo = (x: number, z: number, aimZ = z): PlayerIntent => {
@@ -385,17 +389,20 @@ function decide(brain: AiBrain, w: World, me: Player, them: Player): void {
 /**
  * At Harrison's kickoff Max holds his spot until Harrison plays the ball
  * (it leaves the centre spot), or for KICKOFF_HOLD_S if he never does: the
- * game's version of waiting outside the centre circle. Counts the hold.
+ * game's version of waiting outside the centre circle. Counts the hold; a
+ * played ball starts his reaction time.
  */
 function holdingKickoff(brain: AiBrain, w: World, dt: number): boolean {
   if (brain.kickoffHoldS === null || w.match.phase === 'kickoff') return false;
   const onSpot = Math.hypot(w.ball.x - w.field.width / 2, w.ball.z - w.field.depth / 2) <= ON_SPOT;
-  if (w.match.phase !== 'playing' || !onSpot || brain.kickoffHoldS >= KICKOFF_HOLD_S - 1e-9) {
-    brain.kickoffHoldS = null;
-    return false;
+  if (w.match.phase === 'playing' && onSpot && brain.kickoffHoldS < KICKOFF_HOLD_S - 1e-9) {
+    brain.kickoffHoldS += dt;
+    return true;
   }
-  brain.kickoffHoldS += dt;
-  return true;
+  // Standing at his spot, he sees Harrison play the ball and reacts at his own pace, not on the instant.
+  if (!onSpot && brain.kickoffHoldS > 0) brain.nextDecisionS = brain.profile.reactionS;
+  brain.kickoffHoldS = null;
+  return false;
 }
 
 /**
@@ -426,7 +433,7 @@ export function think(brain: AiBrain, w: World, me: Player, them: Player, dt: nu
   const wave = them.team === 'home' && w.wave?.live && w.wave.outcome === null ? w.wave : null;
   const powered = them.team === 'home' && (w.power?.activeS ?? 0) > 0;
   if (!powered) brain.backOff = null;
-  else if (brain.backOff === null) brain.backOff = rollBackOff(brain.profile, w.rng);
+  else if (brain.backOff === null) brain.backOff = rollBackOff({ reactionS: brain.profile.backOffS, braceSense: brain.profile.braceSense }, w.rng);
   const backing = brain.backOff !== null && brain.backOff !== 'stay' ? brain.backOff : null;
   if (backing) backing.inS -= dt;
   if (wave) {

@@ -22,6 +22,8 @@ export interface PlayerIntent {
   steal: boolean;
   /** Face this way whatever way he moves, as when backing off from someone. */
   faceX?: 1 | -1;
+  /** Scales his run and sprint on the ground (the computer's pace factor); 1 when absent. */
+  pace?: number;
 }
 
 export const NO_INTENT: Readonly<PlayerIntent> = Object.freeze({
@@ -412,7 +414,7 @@ export function stepPlayer(
   const target = intent.moveX * runSpeed(p.stats);
   // On the ground he runs the same speed in every direction, diagonals included.
   const moveLen = Math.max(1, Math.hypot(intent.moveX, intent.moveZ));
-  const runTarget = (runSpeed(p.stats) * (sprinting ? SPRINT_MULTIPLIER : 1)) / moveLen;
+  const runTarget = (runSpeed(p.stats) * (sprinting ? SPRINT_MULTIPLIER : 1) * (intent.pace ?? 1)) / moveLen;
   // He can turn while running, jumping, or still holding a shot or chip charge; not as he lets go, nor once a kick is swinging.
   const stillCharging = (p.state === 'charging' && intent.shootHeld) || (p.state === 'chipping' && !p.kick && intent.chipHeld);
   const canTurn = p.state === 'ground' || stillCharging || (p.state === 'air' && !p.kick);

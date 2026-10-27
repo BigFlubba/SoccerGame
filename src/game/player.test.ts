@@ -30,6 +30,15 @@ function tick(p: Player, i: Partial<PlayerIntent>, n = 1, ballAtFeet = false): v
 }
 
 describe('stepPlayer: moving', () => {
+  it("an intent's pace scales his run and sprint", () => {
+    const run = harrison();
+    tick(run, { moveX: 1, pace: 1.1 }, ticks(1));
+    expect(run.vx).toBeCloseTo(95 * 1.1);
+    const sprint = harrison();
+    tick(sprint, { moveX: 1, sprint: true, pace: 1.1 }, ticks(1));
+    expect(sprint.vx).toBeCloseTo(95 * SPRINT_MULTIPLIER * 1.1);
+  });
+
   it('accelerates to run speed and sprints faster', () => {
     const run = harrison();
     tick(run, { moveX: 1 }, ticks(1));
