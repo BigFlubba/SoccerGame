@@ -3,6 +3,7 @@ import { ANCHOR } from '../art/body/pose';
 import { MASTER } from '../art/colors';
 import { BASE_W } from '../engine/viewport';
 import { project, type Camera } from '../game/camera';
+import type { VenueId } from '../meta/career';
 import type { GameArt } from './art';
 import { drawLayers } from './matchView';
 
@@ -26,10 +27,10 @@ function shadow(g: CanvasRenderingContext2D, x: number, y: number): void {
   g.fillRect(Math.round(x) - 2, Math.round(y) + 1, 5, 1);
 }
 
-/** The Backyard with the camera drifting slowly along it, and Harrison juggling a ball. */
-export function drawBackdrop(g: CanvasRenderingContext2D, art: GameArt, nowS: number): void {
+/** A venue, the Backyard unless told, with the camera drifting slowly along it, and Harrison juggling a ball. */
+export function drawBackdrop(g: CanvasRenderingContext2D, art: GameArt, nowS: number, venue: VenueId = 'backyard'): void {
   const cam: Camera = { x: (DRIFT_PX / 2) * (1 - Math.cos((2 * Math.PI * nowS) / DRIFT_PERIOD_S)) };
-  drawLayers(g, cam, art);
+  drawLayers(g, cam, art, venue, nowS);
 
   const frame = Math.floor(nowS * JUGGLE_FPS) % JUGGLE_FRAMES;
   const feet = project(JUGGLER.x, 0, JUGGLER.z, cam.x);

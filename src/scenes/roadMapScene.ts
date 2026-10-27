@@ -117,7 +117,7 @@ export function createRoadMapScene(ctx: GameContext, index = 0): RoadMapScene {
           g.rect(x, stop.y, CARD.w, CARD.h);
           g.clip();
           g.translate(x - POSTCARD_FROM.x, stop.y - POSTCARD_FROM.y);
-          drawLayers(g, POSTCARD_CAM, art);
+          drawLayers(g, POSTCARD_CAM, art, venue.id);
           g.restore();
         } else {
           g.fillStyle = MASTER.charcoal;

@@ -130,6 +130,7 @@ export function createMatchScene(ctx: GameContext, seed: number, match: CareerMa
     goldenCelebration: false,
     bonusCallout: null,
     awayName: match.hudName,
+    venue: match.venue,
   };
   let lastKick: LastKick | null = null;
   /** Harrison's header, volley, chip and Energy Wave goals, for the style bonus. */

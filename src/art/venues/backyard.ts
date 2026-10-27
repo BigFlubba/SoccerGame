@@ -22,8 +22,8 @@ const FENCE_TOP = FAR_SY - FENCE_H;
 const STRIPE_W = 32;
 /** Wide enough for the camera's whole range plus the slant of the far touchline. */
 const GROUND_W = BACKYARD.width + Math.ceil(BACKYARD.depth * DEPTH_SHEAR);
-const MID_W = 496;
-const NEAR_W = 600;
+export const MID_W = 496;
+export const NEAR_W = 600;
 /** The end fences fill x 0–4 and 636–640; the ball bounces off their inner faces. */
 const END_FENCES = [
   [0, BACKYARD.fenceL],
@@ -133,13 +133,13 @@ function near(): IndexedImage {
 }
 
 /** Sets the pixel a world point projects to (camera at 0). */
-function plot(img: IndexedImage, x: number, y: number, z: number, id: number, dx = 0, dy = 0): void {
+export function plot(img: IndexedImage, x: number, y: number, z: number, id: number, dx = 0, dy = 0): void {
   const p = project(x, y, z, 0);
   img.set(Math.round(p.sx) - dx, Math.round(p.sy) - dy, id);
 }
 
 /** Visits world points along a segment, finely enough to touch every pixel it crosses. */
-function along(a: number, b: number, visit: (t: number) => void): void {
+export function along(a: number, b: number, visit: (t: number) => void): void {
   for (let t = Math.min(a, b); t <= Math.max(a, b) + 1e-9; t += RASTER_STEP) visit(t);
 }
 
@@ -157,8 +157,8 @@ function endFence(img: IndexedImage, x0: number, x1: number): void {
   along(0, depth, z => plot(img, x1, 4, z, M.hairShadow)); // rail
 }
 
-/** The pitch: slanted mowing stripes across the depth, the near board's line, and the end fences. */
-function ground(): IndexedImage {
+/** The pitch: slanted mowing stripes across the depth, the near board's line, and the venue's end fences in the end-fence footprint. */
+export function pitchGround(endFence: (img: IndexedImage, x0: number, x1: number) => void): IndexedImage {
   const img = new IndexedImage(GROUND_W, H);
   for (let y = FAR_SY; y < H; y++) {
     const z = NEAR_SY - y;
@@ -175,7 +175,7 @@ function ground(): IndexedImage {
 }
 
 export function backyardLayers(): VenueLayers {
-  return { far: far(), mid: mid(), near: near(), ground: ground() };
+  return { far: far(), mid: mid(), near: near(), ground: pitchGround(endFence) };
 }
 
 /**

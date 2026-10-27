@@ -16,6 +16,7 @@ const hudWith = (h: Partial<MatchHud> = {}): MatchHud => ({
   goldenCelebration: false,
   bonusCallout: null,
   awayName: 'MAX',
+  venue: 'backyard',
   ...h,
 });
 

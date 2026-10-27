@@ -4,11 +4,56 @@ import { BASE_STATS } from '../game/stats';
 import { createWorld } from '../game/world';
 import type { GameArt } from './art';
 import { depthSorted } from './depthSort';
-import { arrowX, banner, calloutLine, homeClip, pitchDrawables, takeFlash, type MatchHud } from './matchView';
+import { arrowX, banner, calloutLine, drawLayers, homeClip, pitchDrawables, takeFlash, type MatchHud } from './matchView';
 import { POWER_METER_X0 } from './powerView';
 
 /** Building the list never touches the art; only drawing does. */
 const NO_ART = {} as GameArt;
+
+/** Stand-in canvases that name themselves, and a context that records what it drew where. */
+const named = (name: string, width = 320) => ({ name, width, height: 180 }) as unknown as HTMLCanvasElement;
+const venueArt = (v: string) => ({
+  layers: { far: named(`${v}/far`), mid: named(`${v}/mid`, 496), near: named(`${v}/near`, 600), ground: named(`${v}/ground`, 680) },
+  joggers: [[named(`${v}/jogger0a`, 7), named(`${v}/jogger0b`, 7)]],
+});
+function recorder() {
+  const drawn: { name: string; x: number; y: number }[] = [];
+  const g = { drawImage: (img: { name: string }, x: number, y: number) => void drawn.push({ name: img.name, x, y }) } as unknown as CanvasRenderingContext2D;
+  return { g, drawn };
+}
+const VENUE_ART = { venues: { backyard: venueArt('backyard'), park: venueArt('park') } } as unknown as GameArt;
+
+describe('drawLayers', () => {
+  it("draws the venue's own layers, far to ground", () => {
+    const { g, drawn } = recorder();
+    drawLayers(g, { x: 0 }, VENUE_ART, 'park');
+    const names = drawn.map(d => d.name);
+    expect(names).toContain('park/far');
+    expect(names.filter(n => n.startsWith('backyard'))).toEqual([]);
+    expect(names.indexOf('park/mid')).toBeLessThan(names.indexOf('park/near'));
+    expect(names.indexOf('park/near')).toBeLessThan(names.indexOf('park/ground'));
+  });
+
+  it('a venue with no art falls back to the Backyard', () => {
+    const { g, drawn } = recorder();
+    drawLayers(g, { x: 0 }, VENUE_ART, 'school');
+    expect(drawn.map(d => d.name)).toContain('backyard/far');
+  });
+
+  it('joggers run on the mid layer, between it and the near layer, and move with time', () => {
+    const at = (nowS: number) => {
+      const { g, drawn } = recorder();
+      drawLayers(g, { x: 0 }, VENUE_ART, 'park', nowS);
+      const names = drawn.map(d => d.name);
+      const i = names.findIndex(n => n.startsWith('park/jogger0'));
+      expect(i).toBeGreaterThan(names.indexOf('park/mid'));
+      expect(i).toBeLessThan(names.indexOf('park/near'));
+      return drawn[i]!;
+    };
+    expect(at(2).x).not.toBe(at(0).x);
+    expect(at(0).name).not.toBe(at(1 / 8).name);
+  });
+});
 
 describe('pitchDrawables', () => {
   it('puts both players and the ball at their depths, and every post at its own', () => {
@@ -110,6 +155,7 @@ describe('calloutLine', () => {
       goldenCelebration: false,
       bonusCallout: null,
       awayName: 'MAX',
+      venue: 'backyard' as const,
     });
     expect(calloutLine(hud(0.3))).toBeNull();
     expect(calloutLine(hud(0.7))).toBe('HEADER!');
@@ -120,7 +166,7 @@ describe('calloutLine', () => {
 
 describe('takeFlash', () => {
   it('a flash owed while impact frames run waits for them to finish', () => {
-    const hud: MatchHud = { perfect: null, moment: null, callout: null, trail: [], flash: true, shake: null, impactFrames: 1, goldenCelebration: false, bonusCallout: null, awayName: 'MAX' };
+    const hud: MatchHud = { perfect: null, moment: null, callout: null, trail: [], flash: true, shake: null, impactFrames: 1, goldenCelebration: false, bonusCallout: null, awayName: 'MAX', venue: 'backyard' };
     expect(takeFlash(hud)).toBe(false);
     expect(hud.flash).toBe(true);
     hud.impactFrames = 0;
@@ -128,7 +174,7 @@ describe('takeFlash', () => {
   });
 
   it('takeFlash is true once, then false', () => {
-    const hud: MatchHud = { perfect: null, moment: null, callout: null, trail: [], flash: true, shake: null, impactFrames: 0, goldenCelebration: false, bonusCallout: null, awayName: 'MAX' };
+    const hud: MatchHud = { perfect: null, moment: null, callout: null, trail: [], flash: true, shake: null, impactFrames: 0, goldenCelebration: false, bonusCallout: null, awayName: 'MAX', venue: 'backyard' };
     expect(takeFlash(hud)).toBe(true);
     expect(takeFlash(hud)).toBe(false);
   });

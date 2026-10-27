@@ -2,6 +2,7 @@ import { CLIPS, type AnimName } from '../art/body/animations';
 import { ANCHOR } from '../art/body/pose';
 import { MASTER, type MasterColor } from '../art/colors';
 import { PARALLAX } from '../art/venues/backyard';
+import { JOGGERS, PATH_Y } from '../art/venues/park';
 import { BASE_H } from '../engine/viewport';
 import { VIEW_W, offscreenArrow, project, type Camera } from '../game/camera';
 import { SWEET_SPOT } from '../game/kick';
@@ -9,6 +10,7 @@ import { clockMinute, type Team } from '../game/match';
 import type { Player } from '../game/player';
 import { powerHint } from '../game/power';
 import type { World } from '../game/world';
+import type { VenueId } from '../meta/career';
 import type { GameArt, SpriteSet } from './art';
 import { depthSorted, type Drawable } from './depthSort';
 import { drawDog } from './dogView';
@@ -50,6 +52,8 @@ export interface MatchHud {
   bonusCallout: string | null;
   /** The away side's name on the HUD and its goal banner. */
   awayName: string;
+  /** Where the match is played: its scenery. */
+  venue: VenueId;
 }
 
 /**
@@ -100,13 +104,28 @@ function screen(cam: Camera, x: number, y: number, z: number): { x: number; y: n
   return { x: Math.round(p.sx), y: Math.round(p.sy) };
 }
 
-export function drawLayers(g: CanvasRenderingContext2D, cam: Camera, art: GameArt): void {
+/** The joggers' two-frame run, frames per second. */
+const JOGGER_FPS = 8;
+
+/** A venue's scenery, far to near, with its joggers on the mid layer at time `nowS`. A venue with no art of its own shows the Backyard. */
+export function drawLayers(g: CanvasRenderingContext2D, cam: Camera, art: GameArt, venue: VenueId = 'backyard', nowS = 0): void {
+  const v = art.venues[venue] ?? art.venues.backyard!;
   // The far sky is narrower than its scroll range, so it tiles.
-  const far = art.layers.far;
+  const far = v.layers.far;
   const farX = -(Math.round(cam.x * PARALLAX.far) % far.width);
   g.drawImage(far, farX, 0);
   g.drawImage(far, farX + far.width, 0);
-  for (const name of ['mid', 'near', 'ground'] as const) g.drawImage(art.layers[name], -Math.round(cam.x * PARALLAX[name]), 0);
+  const midX = -Math.round(cam.x * PARALLAX.mid);
+  g.drawImage(v.layers.mid, midX, 0);
+  const midW = v.layers.mid.width;
+  const step = Math.floor(nowS * JOGGER_FPS) % 2;
+  v.joggers.forEach((frames, i) => {
+    const j = JOGGERS[i]!;
+    const x = (((j.startX + j.dir * j.speed * nowS) % midW) + midW) % midW;
+    const frame = frames[step]!;
+    g.drawImage(frame, Math.round(midX + x), PATH_Y - frame.height + 1);
+  });
+  for (const name of ['near', 'ground'] as const) g.drawImage(v.layers[name], -Math.round(cam.x * PARALLAX[name]), 0);
 }
 
 /** Where a goal's sprites go: they all share one origin from its goal line. */
@@ -348,7 +367,7 @@ export function drawMatch(g: CanvasRenderingContext2D, w: World, cam: Camera, ar
   const look: HomeLook = { set: homeSprites(w, hud), aura: auraStrength(w, hud, nowS), nowS };
   g.save();
   g.translate(shake.dx, shake.dy);
-  drawLayers(g, cam, art);
+  drawLayers(g, cam, art, hud.venue, nowS);
   if (!w.dog?.carrying) drawShadow(g, cam, w.ball.x, w.ball.z);
   drawShadow(g, cam, w.away.x, w.away.z, w.dog ? DOG_SHADOW_W : SHADOW_W);
   drawShadow(g, cam, w.home.x, w.home.z);

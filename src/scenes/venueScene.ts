@@ -101,7 +101,7 @@ export function createVenueScene(ctx: GameContext, venue: VenueId, cursorId?: st
     },
     draw(g, nowS) {
       const p = ctx.profile;
-      drawBackdrop(g, art, nowS);
+      drawBackdrop(g, art, nowS, venue);
       g.save();
       g.globalAlpha = HEADER.dim;
       g.fillStyle = MASTER.ink;

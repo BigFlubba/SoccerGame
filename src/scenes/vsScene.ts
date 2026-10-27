@@ -76,8 +76,8 @@ export function createVsScene(ctx: GameContext, match: CareerMatch, back: () => 
       t += dt;
       return t >= VS_AUTO_S - 1e-9 ? kickOff() : null;
     },
-    draw(g) {
-      drawLayers(g, CAM, art);
+    draw(g, nowS) {
+      drawLayers(g, CAM, art, match.venue, nowS);
       g.save();
       g.globalAlpha = HEADER.dim;
       g.fillStyle = MASTER.ink;

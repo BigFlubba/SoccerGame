@@ -10,11 +10,13 @@ import { buttonGlyph, type ButtonName } from '../art/glyphs';
 import { HARRISON_HEADS, HARRISON_POWER_HEADS } from '../art/harrison/head';
 import { harrisonLook } from '../art/harrison/look';
 import { harrisonPortrait, type Expression } from '../art/harrison/portrait';
-import { IndexedImage, blit } from '../art/indexedImage';
+import { IndexedImage, blit, flipX } from '../art/indexedImage';
 import { BISCUIT_FACE, BISCUIT_FRAMES, type DogAnim } from '../art/opponents/biscuit';
 import { MAX_HEADS, maxLook } from '../art/opponents/max';
 import { addOutline } from '../art/raster';
 import { backyardLayers, goalSprites, type GoalArt, type VenueLayers } from '../art/venues/backyard';
+import { JOGGERS, joggerFrames, parkLayers } from '../art/venues/park';
+import type { VenueId } from '../meta/career';
 import { toCanvas } from '../engine/bitmaps';
 import { SpriteCache, type FacingFrames } from '../engine/sprites';
 
@@ -35,8 +37,15 @@ export interface GoalCanvases {
   origin: { x: number; y: number };
 }
 
-export interface GameArt {
+/** A venue's four layers, and its joggers' two run frames each, already facing the way each runs (none in the Backyard). */
+export interface VenueCanvases {
   layers: Record<keyof VenueLayers, HTMLCanvasElement>;
+  joggers: readonly (readonly [HTMLCanvasElement, HTMLCanvasElement])[];
+}
+
+export interface GameArt {
+  /** Every venue with its own art; drawLayers falls back to the Backyard for the rest. */
+  venues: Partial<Record<VenueId, VenueCanvases>>;
   goal: Record<'left' | 'right', GoalCanvases>;
   ball: HTMLCanvasElement[];
   /** Controller button pictures, for Help. */
@@ -83,6 +92,13 @@ function goalCanvases(g: GoalArt, palette: ResolvedPalette): GoalCanvases {
   return { farNet: toCanvas(g.farNet, palette), nearNet: toCanvas(g.nearNet, palette), nearPost: toCanvas(g.nearPost, palette), farPost: toCanvas(g.farPost, palette), origin: g.origin };
 }
 
+function venueCanvases(L: VenueLayers, joggers: readonly (readonly [IndexedImage, IndexedImage])[], palette: ResolvedPalette): VenueCanvases {
+  return {
+    layers: { far: toCanvas(L.far, palette), mid: toCanvas(L.mid, palette), near: toCanvas(L.near, palette), ground: toCanvas(L.ground, palette) },
+    joggers: joggers.map(([a, b]) => [toCanvas(a, palette), toCanvas(b, palette)] as const),
+  };
+}
+
 const BUTTONS: readonly ButtonName[] = ['A', 'B', 'X', 'Y', 'LB', 'RT', 'START'];
 const EXPRESSIONS: readonly Expression[] = ['neutral', 'celebrate', 'determined', 'disappointed'];
 
@@ -90,10 +106,13 @@ const EXPRESSIONS: readonly Expression[] = ['neutral', 'celebrate', 'determined'
 export function loadGameArt(): GameArt {
   const master = masterPalette();
   const cache = new SpriteCache();
-  const L = backyardLayers();
+  const parkJoggers = JOGGERS.map(j => {
+    const [a, b] = joggerFrames(j.shirt, j.hair);
+    return j.dir === 1 ? ([a, b] as const) : ([flipX(a), flipX(b)] as const);
+  });
   const texts = new Map<string, HTMLCanvasElement>();
   return {
-    layers: { far: toCanvas(L.far, master), mid: toCanvas(L.mid, master), near: toCanvas(L.near, master), ground: toCanvas(L.ground, master) },
+    venues: { backyard: venueCanvases(backyardLayers(), [], master), park: venueCanvases(parkLayers(), parkJoggers, master) },
     goal: { left: goalCanvases(goalSprites('left'), master), right: goalCanvases(goalSprites('right'), master) },
     ball: ballFrames().map(f => toCanvas(f, master)),
     buttons: Object.fromEntries(BUTTONS.map(b => [b, toCanvas(buttonGlyph(b), master)])) as Record<ButtonName, HTMLCanvasElement>,

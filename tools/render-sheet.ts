@@ -13,7 +13,8 @@ import { harrisonLook, type PowerForm } from '../src/art/harrison/look';
 import { BALL_R, ballFrames } from '../src/art/ball';
 import { ANCHOR } from '../src/art/body/pose';
 import { renderText, textPalette } from '../src/art/font';
-import { PARALLAX, backyardLayers, goalSprites } from '../src/art/venues/backyard';
+import { PARALLAX, backyardLayers, goalSprites, type VenueLayers } from '../src/art/venues/backyard';
+import { JOGGERS, PATH_Y, joggerFrames, parkLayers } from '../src/art/venues/park';
 import { harrisonPortrait } from '../src/art/harrison/portrait';
 import { IndexedImage, blit, flipX } from '../src/art/indexedImage';
 import { MAX_HEADS, maxLook } from '../src/art/opponents/max';
@@ -34,6 +35,7 @@ const OUT_DIR = 'preview';
 const OUT_FILE = `${OUT_DIR}/character-sheet.png`;
 /** The Backyard composites on their own, for reviewing the venue layout. */
 const VENUE_FILE = `${OUT_DIR}/backyard.png`;
+const PARK_FILE = `${OUT_DIR}/park.png`;
 const VENUE_SCALE = 3;
 /** Biscuit galloping the ball at the left goal, one Backyard view per frame in a strip, for slicing into a GIF. */
 const CARRY_FILE = `${OUT_DIR}/biscuit-carry.png`;
@@ -99,15 +101,27 @@ interface Actor {
   shadow?: boolean;
 }
 
-/** The Backyard as the camera at `cam` sees it: layers, goals, then everything on the pitch, far to near. */
-function backyardView(cam: number, actors: readonly Actor[]): SheetItem {
+/** The joggers on the Park's mid layer at time `nowS`, as the match draws them. */
+function paintJoggers(view: Uint8ClampedArray, cam: number, midW: number, nowS: number): void {
+  const midX = -Math.round(cam * PARALLAX.mid);
+  for (const j of JOGGERS) {
+    const frames = joggerFrames(j.shirt, j.hair);
+    const img = frames[Math.floor(nowS * 8) % 2]!;
+    const x = (((j.startX + j.dir * j.speed * nowS) % midW) + midW) % midW;
+    paint(view, j.dir === 1 ? img : flipX(img), masterPalette(), Math.round(midX + x), PATH_Y - img.height + 1);
+  }
+}
+
+/** A venue as the camera at `cam` sees it: layers, goals, then everything on the pitch, far to near. */
+function venueView(L: VenueLayers, cam: number, actors: readonly Actor[], nowS: number | null = null): SheetItem {
   const view = new Uint8ClampedArray(VIEW_W * VIEW_H * 4);
   const pal = masterPalette();
-  const L = backyardLayers();
   const farX = -Math.round(cam * PARALLAX.far);
   paint(view, L.far, pal, farX, 0);
   paint(view, L.far, pal, farX + L.far.width, 0);
-  for (const name of ['mid', 'near', 'ground'] as const) paint(view, L[name], pal, -Math.round(cam * PARALLAX[name]), 0);
+  paint(view, L.mid, pal, -Math.round(cam * PARALLAX.mid), 0);
+  if (nowS !== null) paintJoggers(view, cam, L.mid.width, nowS);
+  for (const name of ['near', 'ground'] as const) paint(view, L[name], pal, -Math.round(cam * PARALLAX[name]), 0);
   const posts: Actor[] = [];
   for (const goal of BACKYARD.goals) {
     const art = goalSprites(goal.side);
@@ -136,6 +150,9 @@ function backyardView(cam: number, actors: readonly Actor[]): SheetItem {
   }
   return { width: VIEW_W, height: VIEW_H, rgba: view };
 }
+
+const backyardView = (cam: number, actors: readonly Actor[]) => venueView(backyardLayers(), cam, actors);
+const parkView = (cam: number, actors: readonly Actor[], nowS = 3) => venueView(parkLayers(), cam, actors, nowS);
 
 const harrisonAt = (x: number, z: number, clip: AnimName, frame: number, facing: 1 | -1 = 1): Actor => {
   const img = baked[clip].frames[frame]!;
@@ -174,6 +191,10 @@ const rightEndView = () => {
   const cam = BACKYARD.width + BACKYARD.depth * DEPTH_SHEAR - VIEW_W;
   return backyardView(cam, [withShadow(maxAt(560, 24, 'run', 1)), withShadow(harrisonAt(540, 46, 'run', 3)), ballAt(620, BALL_R, 32, 2)]);
 };
+
+/** The Park at the left end: Harrison dribbling at the left goal's far side, the away player closing him down. */
+const parkMatchView = (nowS = 3) =>
+  parkView(24, [withShadow(harrisonAt(200, 28, 'run', 2)), ballAt(212, BALL_R, 28), withShadow(maxAt(150, 34, 'run', 5, -1))], nowS);
 
 /** Camera at the left end: Biscuit galloping the ball at the left goal, Harrison squared up in his way. */
 const bossView = (x = 150, frame = 0) => backyardView(0, [biscuitAt(x, 30, 'carry', frame % 4), withShadow(harrisonAt(96, 32, 'idle', 0, 1))]);
@@ -223,6 +244,11 @@ console.log(`wrote ${OUT_FILE} (${sheet.width}×${sheet.height})`);
 const venue = composeSheet([[leftEndView()], [rightEndView()]], { scale: VENUE_SCALE, gap: GAP, background: BACKGROUND });
 writeFileSync(VENUE_FILE, encodePNG(venue.width, venue.height, venue.rgba));
 console.log(`wrote ${VENUE_FILE} (${venue.width}×${venue.height})`);
+
+const parkEndView = () => parkView(0, [withShadow(harrisonAt(80, 20, 'idle', 0, 1)), ballAt(90, BALL_R, 20)], 7);
+const park = composeSheet([[parkMatchView()], [parkEndView()]], { scale: VENUE_SCALE, gap: GAP, background: BACKGROUND });
+writeFileSync(PARK_FILE, encodePNG(park.width, park.height, park.rgba));
+console.log(`wrote ${PARK_FILE} (${park.width}×${park.height})`);
 
 const carry = composeSheet([Array.from({ length: CARRY_FRAMES }, (_, i) => bossView(236 - i * CARRY_STEP, i))], { scale: 1, gap: 0, background: BACKGROUND });
 writeFileSync(CARRY_FILE, encodePNG(carry.width, carry.height, carry.rgba));
