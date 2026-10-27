@@ -4,9 +4,9 @@ import { DIFFICULTY, createBrain, think, type AiProfile } from './ai';
 import { BALL_REST_Y } from './ball';
 import { DOG_DIFFICULTY, JINK_S, TUNING_STATS } from './dog';
 import { SIDE_CLEAR } from './contact';
-import { NO_INTENT, createPlayer, stepPlayer, type Player } from './player';
+import { NO_INTENT, NORMAL_HANDLING, createPlayer, stepPlayer, type Player } from './player';
 import { BACKYARD } from './field';
-import { NEAR_MISS, STEAL_COOLDOWN_S, STEAL_ROUND_MAX, STUMBLE_S, resolveSteal } from './steal';
+import { NEAR_MISS, STEAL_COOLDOWN_S, STEAL_ROUND_MAX, STUMBLE_S, maxHasBall, resolveSteal } from './steal';
 import { BASE_STATS } from './stats';
 import { createWorld, stepWorld, type World } from './world';
 import { ballAtFeet, ballInBody } from './zones';
@@ -210,5 +210,23 @@ describe('the steal button', () => {
     stepPlayer(p, { ...NO_INTENT, moveX: 1, shootHeld: true, jump: true }, STEP, BACKYARD, true);
     expect(p.state).toBe('ground');
     expect(p.vx).toBeLessThan(100);
+  });
+});
+
+describe('maxHasBall and how far ahead his ball runs', () => {
+  const LONG = { ...NORMAL_HANDLING, ballAhead: 48 };
+  const runner = (handling = NORMAL_HANDLING) => Object.assign(createPlayer('away', BASE_STATS, 300, 1), { handling });
+  const ballAt = (ahead: number, touchedBy?: 'home' | 'away') => ({ x: 300 + ahead, y: BALL_REST_Y, z: BACKYARD.depth / 2, vx: 0, vy: 0, vz: 0, spin: 0, spinAngle: 0, touchedBy });
+
+  it('a ball he knocked 40 px on is still his with a long reach, and not with a normal one', () => {
+    expect(maxHasBall(runner(LONG), ballAt(40, 'away'))).toBe(true);
+    expect(maxHasBall(runner(), ballAt(40, 'away'))).toBe(false);
+    expect(maxHasBall(runner(LONG), ballAt(50, 'away'))).toBe(false);
+  });
+
+  it("past the normal reach, a ball Harrison played last is never his: it's Harrison's at his feet", () => {
+    expect(maxHasBall(runner(LONG), ballAt(40, 'home'))).toBe(false);
+    expect(maxHasBall(runner(LONG), ballAt(40))).toBe(false);
+    expect(maxHasBall(runner(LONG), ballAt(12, 'home'))).toBe(true);
   });
 });

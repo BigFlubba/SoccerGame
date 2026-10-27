@@ -42,10 +42,10 @@ const TOUCH_RADIUS = 7;
 /** A ball that crossed into his body this recently came in from where it crossed. */
 const FRESH_ENTRY_S = 0.02;
 
-function hit(ball: Ball, k: { vx: number; vy: number; vz: number; spin: number }): void {
-  ball.vx = k.vx;
-  ball.vy = k.vy;
-  ball.vz = k.vz;
+function hit(ball: Ball, k: { vx: number; vy: number; vz: number; spin: number }, scale = 1): void {
+  ball.vx = k.vx * scale;
+  ball.vy = k.vy * scale;
+  ball.vz = k.vz * scale;
   ball.spin = k.spin;
 }
 
@@ -75,19 +75,20 @@ function slide(p: Player, opponent: Player, ball: Ball, ev: ContactEvents, trips
   }
 }
 
-/** Shots, chips and volleys: the swing connects once if the ball is in reach of his foot. */
+/** Shots, chips and volleys: the swing connects once if the ball is in reach of his foot, at his handling's pace. */
 function strike(p: Player, ball: Ball, aimErrorDeg: number, rng: Rng, field: Field, ev: ContactEvents): void {
   const k = p.kick;
   if (!k?.active || k.kind === 'wave' || !ballIn(footZone(p), ball, BALL_R)) return;
   const line = aimLine(ball, p.facing, k.aim, field);
+  const pace = p.handling.shotScale;
   if (k.kind === 'shot' && p.state === 'kicking') {
     const result = shot(p.stats, k.charge, k.overchargeS, line, aimErrorDeg, rng);
-    hit(ball, result);
+    hit(ball, result, pace);
     ev.perfect = result.perfect;
   } else if (k.kind === 'chip' && p.state === 'chipping') {
-    hit(ball, chip(p.stats, k.charge, line));
+    hit(ball, chip(p.stats, k.charge, line), pace);
   } else if (k.kind === 'volley' && p.state === 'air') {
-    hit(ball, volley(p.stats, line));
+    hit(ball, volley(p.stats, line), pace);
   } else {
     return;
   }
@@ -134,7 +135,7 @@ function dribble(p: Player, ball: Ball, ev: ContactEvents, keepOut: boolean, fie
     return;
   }
   const speed = Math.hypot(p.vx, p.vz);
-  const push = touchPush(p.stats) / speed;
+  const push = (touchPush(p.stats) * p.handling.touchScale) / speed;
   ball.vx = p.vx * (1 + push);
   ball.vz = p.vz * (1 + push);
   p.touchCooldown = TOUCH_COOLDOWN_S;

@@ -8,7 +8,7 @@ import { checkPinned, createDog, dropBall, parkBall, quietDog, resetDog, stepDog
 import { BACKYARD, goalScored, type Field } from './field';
 import { startDragBack, stepDragBack } from './dragBack';
 import { createMatch, stepMatch, type MatchState, type Team } from './match';
-import { NO_INTENT, createPlayer, stepPlayer, type Player, type PlayerIntent } from './player';
+import { NO_INTENT, NORMAL_HANDLING, createPlayer, stepPlayer, type Handling, type Player, type PlayerIntent } from './player';
 import {
   POWERED_S,
   addMeter,
@@ -97,6 +97,8 @@ const STYLE_KINDS: ReadonlySet<PowerState['lastKind']> = new Set(['header', 'vol
 /**
  * `kit` gives Harrison his super meter; without one the match plays exactly
  * as it always has. `dog` makes the away body Biscuit, with that profile.
+ * `awayHandling` is the away player's brakes, touch and shot (Speedy Sam's
+ * are his own; everyone else's are normal).
  */
 export function createWorld(
   homeStats: Stats,
@@ -106,6 +108,7 @@ export function createWorld(
   kit: PowerKit | null = null,
   dog: DogProfile | null = null,
   maxProfile: AiProfile | null = null,
+  awayHandling: Handling = NORMAL_HANDLING,
 ): World {
   const centre = BACKYARD.width / 2;
   const w: World = {
@@ -123,14 +126,15 @@ export function createWorld(
     maxProfile,
     tick: 0,
   };
+  w.away.handling = awayHandling;
   placeForKickoff(w);
   return w;
 }
 
-/** Puts a player back on his feet at (x, z), keeping his stamina and held buttons. */
+/** Puts a player back on his feet at (x, z), standing still, keeping his stamina, held buttons and handling. */
 function reset(p: Player, x: number, z: number): void {
-  const { stamina, held, exhausted } = p;
-  Object.assign(p, createPlayer(p.team, p.stats, x, attackDir(p.team), z), { stamina, held, exhausted });
+  const { stamina, held, exhausted, handling } = p;
+  Object.assign(p, createPlayer(p.team, p.stats, x, attackDir(p.team), z), { stamina, held, exhausted, handling });
 }
 
 /**
@@ -142,6 +146,7 @@ export function placeForKickoff(w: World): void {
   const centre = w.field.width / 2;
   const mid = w.field.depth / 2;
   Object.assign(w.ball, { x: centre, y: BALL_REST_Y, z: mid, vx: 0, vy: 0, vz: 0, spin: 0 });
+  delete w.ball.touchedBy;
   const spot = w.match.kickoffTeam === 'home' && w.dog === null && w.maxProfile ? w.maxProfile.kickoffSpot : { back: KICKOFF_DEFENDER_DEPTH, off: 0 };
   for (const p of [w.home, w.away]) {
     const dir = attackDir(p.team);
@@ -249,7 +254,7 @@ export function stepWorld(w: World, homeIntent: PlayerIntent, awayIntent: Player
   if (wasReadying && w.power && waveReady(w.power)) power.ready = true;
   // Powered up, X only ever fires the wave: until it can (ready, with the ball, a clean line), the press does nothing.
   const waveDir = live && canFireWave(w) ? maxGoalDir(w) : live && (w.power?.activeS ?? 0) > 0 ? 'wait' : null;
-  startDragBack(w, homeIntent);
+  if (startDragBack(w, homeIntent)) w.ball.touchedBy = 'home';
   // Winding up with the ball at his feet, he rolls it along with him in depth.
   const carryFromZ = ballAtFeet(home, w.ball) ? home.z : null;
   stepOne(home, homeIntent, live, w, dt, waveDir);
@@ -274,6 +279,7 @@ export function stepWorld(w: World, homeIntent: PlayerIntent, awayIntent: Player
   if (dogBody && live && checkPinned(w, awayIntent, Math.hypot(w.away.x - dogFrom.x, w.away.z - dogFrom.z), dt)) dog.dropped = true;
   if (carryFromZ !== null && windingUp(home)) carryInDepth(w, home.z - carryFromZ);
   const steal = resolveSteal(w, homeIntent);
+  if (steal === 'stole' || steal === 'poked' || steal === 'trapped') w.ball.touchedBy = 'home';
   stepDragBack(w, dt);
 
   const { braced, blown } = stepWave(w, dt);
@@ -284,8 +290,12 @@ export function stepWorld(w: World, homeIntent: PlayerIntent, awayIntent: Player
   // A ball just trapped at his feet isn't a 50/50 this tick, so the squirt can't undo the trap at once.
   const squeeze = steal !== 'stole' && steal !== 'trapped';
   // In a drag-back his sole has the ball: only the other player's contacts can take it.
-  const contact = (p: Player, other: Player) =>
-    w.wave?.live || (p === home && home.turnS > 0) ? quietContact() : resolveContacts(p, other, w.ball, w.aimErrorDeg[p.team], w.rng, w.field, { trips: true, squeeze, clearUpfield: p === home, keepOut: p === home });
+  const contact = (p: Player, other: Player) => {
+    if (w.wave?.live || (p === home && home.turnS > 0)) return quietContact();
+    const ev = resolveContacts(p, other, w.ball, w.aimErrorDeg[p.team], w.rng, w.field, { trips: true, squeeze, clearUpfield: p === home, keepOut: p === home });
+    if (ev.touched || ev.kicked || ev.tackledBall) w.ball.touchedBy = p.team;
+    return ev;
+  };
   const homeFirst = w.tick % 2 === 0;
   let kicks: ContactEvents[];
   if (w.dog) kicks = dogContacts(w, w.dog, dog, live && homeIntent.steal);

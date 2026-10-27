@@ -32,6 +32,8 @@ export interface Ball {
   spin: number;
   /** Rolling animation angle, radians. */
   spinAngle: number;
+  /** Who played it last: a touch, a kick, a tackle or a steal. Unset after a kickoff. */
+  touchedBy?: 'home' | 'away';
 }
 
 export interface BallEvents {

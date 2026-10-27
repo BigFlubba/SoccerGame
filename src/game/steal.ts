@@ -2,7 +2,7 @@ import { BALL_R } from '../art/ball';
 import { DIFFICULTY } from './ai';
 import { BALL_REST_Y, type Ball } from './ball';
 import { SIDE_CLEAR, TOUCH_COOLDOWN_S, TRAP_KEEP, canPlace, keepingOut } from './contact';
-import { PLAYER_R, cancelCharge, type Player, type PlayerIntent } from './player';
+import { NORMAL_HANDLING, PLAYER_R, cancelCharge, type Player, type PlayerIntent } from './player';
 import { touchPush } from './stats';
 import type { World } from './world';
 import { REACH_Z, ballIn, footZone, type Rect } from './zones';
@@ -17,8 +17,6 @@ import { REACH_Z, ballIn, footZone, type Rect } from './zones';
 
 export type StealOutcome = 'stole' | 'poked' | 'trapped' | 'missed' | 'whiff';
 
-/** A ball this far ahead of Max along his facing, low and on his line, is his: his own possession test. */
-const MAX_BALL_AHEAD = 16;
 const BALL_LOW = BALL_REST_Y + 3;
 /** The steal reaches from this far behind him to this far ahead, and this far either side in depth... */
 const STEAL_BEHIND = 2;
@@ -40,11 +38,17 @@ export const STEAL_COOLDOWN_S = 0.4;
 /** A trapped ball beside Max sits this far clear of his body, px. */
 const BODY_CLEARANCE = 0.5;
 
-/** Whether the ball is at Max's feet: low, just ahead of him, on his line, and him on his feet. */
+/**
+ * Whether the ball is at Max's feet: low, just ahead of him, on his line,
+ * and him on his feet. A long touch (his handling's ballAhead) stays his
+ * further on only while he was the last to play it, so a ball at
+ * Harrison's feet is never his from across the gap.
+ */
 export function maxHasBall(max: Player, ball: Ball): boolean {
   const upright = max.y === 0 && max.state !== 'fallen' && max.state !== 'blown' && max.state !== 'bracing';
   const ahead = (ball.x - max.x) * max.facing;
-  return upright && ball.y <= BALL_LOW && ahead >= 0 && ahead <= MAX_BALL_AHEAD && Math.abs(ball.z - max.z) <= REACH_Z;
+  const reach = ball.touchedBy === max.team ? max.handling.ballAhead : NORMAL_HANDLING.ballAhead;
+  return upright && ball.y <= BALL_LOW && ahead >= 0 && ahead <= reach && Math.abs(ball.z - max.z) <= REACH_Z;
 }
 
 /** The steal's reach: his foot and a little more (`ahead`), low to the ground. */

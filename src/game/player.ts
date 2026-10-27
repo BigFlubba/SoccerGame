@@ -1,4 +1,4 @@
-import { CLIPS, SHOOT_CHARGE_FRAME, SHOOT_STRIKE_FRAME, SLIDE_HOLD_FRAME, type AnimName } from '../art/body/animations';
+import { CLIPS, SHOOT_CHARGE_FRAME, SHOOT_STRIKE_FRAME, SKID_FRAME_HOLD, SLIDE_HOLD_FRAME, type AnimName } from '../art/body/animations';
 import { GRAVITY } from './constants';
 import { BACKYARD, playerSpan, type Field } from './field';
 import { TAP_CHARGE, type Aim } from './kick';
@@ -61,9 +61,22 @@ export interface Kick {
   active: boolean;
 }
 
+/** How a player handles: his brakes, his touch, his shot, and how far ahead his ball can run and still be his. */
+export interface Handling {
+  /** px/s² when slowing or turning on the ground. */
+  decel: number;
+  /** Scales his dribble touch's push (touchPush). */
+  touchScale: number;
+  /** Scales his kicks' speed. */
+  shotScale: number;
+  /** A ball he played last, this far ahead of him, on his line, low, is still his (between touches), px. */
+  ballAhead: number;
+}
+
 export interface Player {
   team: 'home' | 'away';
   stats: Stats;
+  handling: Handling;
   /** Feet position: x along the pitch, z in depth, y the height of the soles. */
   x: number;
   y: number;
@@ -115,7 +128,11 @@ export const FALL_TIME = 0.9;
 const START_Z = BACKYARD.depth / 2;
 
 export const ACCEL = 900;
-const DECEL = 1200;
+export const DECEL = 1200;
+/** Everyone's handling but Speedy Sam's: today's brakes, touch and shot. */
+export const NORMAL_HANDLING: Readonly<Handling> = Object.freeze({ decel: DECEL, touchScale: 1, shotScale: 1, ballAhead: 16 });
+/** Above this speed, soft brakes skid: from flat out that's most of the stop, about 0.3 s. */
+const SKID_SPEED = 60;
 const AIR_ACCEL = 400;
 const CHARGE_MOVE_FACTOR = 0.5;
 /** A release below this charge is a tap and uses TAP_CHARGE. */
@@ -153,6 +170,7 @@ export function createPlayer(team: 'home' | 'away', stats: Stats, x: number, fac
   return {
     team,
     stats,
+    handling: NORMAL_HANDLING,
     x,
     y: 0,
     z,
@@ -287,13 +305,20 @@ export function cancelCharge(p: Player): void {
   p.overchargeS = 0;
 }
 
+/** Braking hard on the ground with soft brakes: still fast and slowing or turning against his run. */
+export function skidding(p: Player, intent: PlayerIntent): boolean {
+  if (p.state !== 'ground' || p.handling.decel >= DECEL || Math.hypot(p.vx, p.vz) <= SKID_SPEED) return false;
+  const released = intent.moveX === 0 && intent.moveZ === 0;
+  return released || intent.moveX * p.vx + intent.moveZ * p.vz < 0;
+}
+
 function updateStamina(p: Player, sprinting: boolean, dt: number): void {
   p.stamina = Math.min(1, Math.max(0, p.stamina + (sprinting ? -STAMINA_DRAIN : STAMINA_REGEN) * dt));
   if (p.stamina === 0) p.exhausted = true;
   else if (p.exhausted && p.stamina >= EXHAUSTION_RECOVERY) p.exhausted = false;
 }
 
-function chooseAnim(p: Player, sprinting: boolean): { name: AnimName; frame: number } {
+function chooseAnim(p: Player, sprinting: boolean, skid: boolean): { name: AnimName; frame: number } {
   const t = p.stateT;
   const clipFrame = (name: AnimName, from: number, time: number) =>
     Math.min(CLIPS[name].frameCount - 1, from + Math.floor(time * CLIPS[name].fps));
@@ -330,6 +355,8 @@ function chooseAnim(p: Player, sprinting: boolean): { name: AnimName; frame: num
       if (p.stumbleS > 0) return { name: 'shoot', frame: SHOOT_STRIKE_FRAME };
       // A drag-back: planted, his sole on the ball.
       if (p.turnS > 0) return { name: 'shoot', frame: SHOOT_CHARGE_FRAME };
+      // Soft brakes: the brakes go on, then he sits back on his planted foot until he's slowed.
+      if (skid) return { name: 'skid', frame: Math.min(SKID_FRAME_HOLD, Math.floor((p.anim.name === 'skid' ? p.animT : 0) * CLIPS.skid.fps)) };
       const name: AnimName = Math.hypot(p.vx, p.vz) < IDLE_SPEED ? 'idle' : sprinting ? 'sprint' : 'run';
       const time = name === p.anim.name ? p.animT : 0;
       return { name, frame: Math.floor(time * CLIPS[name].fps) % CLIPS[name].frameCount };
@@ -427,7 +454,7 @@ export function stepPlayer(
 
   switch (p.state) {
     case 'ground':
-      approach2(p, intent.moveX * runTarget, intent.moveZ * runTarget, dt, ACCEL, DECEL);
+      approach2(p, intent.moveX * runTarget, intent.moveZ * runTarget, dt, ACCEL, p.handling.decel);
       break;
     case 'air': {
       if (shootPressed && !p.kick) {
@@ -454,11 +481,11 @@ export function stepPlayer(
         release(p, 'shot', intent.aim);
       } else {
         addCharge(p, dt, true);
-        approach2(p, intent.moveX * windUp, intent.moveZ * windUp, dt, ACCEL, DECEL);
+        approach2(p, intent.moveX * windUp, intent.moveZ * windUp, dt, ACCEL, p.handling.decel);
       }
       break;
     case 'kicking':
-      approach2(p, 0, 0, dt, ACCEL, DECEL);
+      approach2(p, 0, 0, dt, ACCEL, p.handling.decel);
       strike(p, SHOT_TIMING);
       break;
     case 'chipping':
@@ -466,9 +493,9 @@ export function stepPlayer(
         release(p, 'chip', intent.aim);
       } else if (!p.kick) {
         addCharge(p, dt, false);
-        approach2(p, intent.moveX * windUp, intent.moveZ * windUp, dt, ACCEL, DECEL);
+        approach2(p, intent.moveX * windUp, intent.moveZ * windUp, dt, ACCEL, p.handling.decel);
       } else {
-        approach2(p, 0, 0, dt, ACCEL, DECEL);
+        approach2(p, 0, 0, dt, ACCEL, p.handling.decel);
         strike(p, CHIP_TIMING);
       }
       break;
@@ -489,7 +516,7 @@ export function stepPlayer(
       break;
     case 'unleashing':
       // The world fires the wave as he enters this state (and clears kick.active); he just follows through.
-      approach2(p, 0, 0, dt, ACCEL, DECEL);
+      approach2(p, 0, 0, dt, ACCEL, p.handling.decel);
       if (p.stateT >= SHOT_TIMING.doneS) {
         p.kick = null;
         enter(p, 'ground');
@@ -512,7 +539,7 @@ export function stepPlayer(
   p.z = Math.min(Math.max(p.z + p.vz * dt, PLAYER_R), field.depth - PLAYER_R);
   updateStamina(p, sprinting, dt);
 
-  const anim = chooseAnim(p, sprinting);
+  const anim = chooseAnim(p, sprinting, skidding(p, intent));
   p.animT = anim.name === p.anim.name ? p.animT + dt : 0;
   p.anim = anim;
 }

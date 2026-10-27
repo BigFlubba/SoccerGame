@@ -4,8 +4,10 @@ import { describe, expect, it } from 'vitest';
 import { DIFFICULTY, KICKOFF_HOLD_S, createBrain, think } from './ai';
 import { DOG_DIFFICULTY } from './dog';
 import type { Aim } from './kick';
-import { inGoalBox } from './field';
-import { NO_INTENT, PLAYER_R, type PlayerIntent } from './player';
+import { goalScored, inGoalBox } from './field';
+import { maxStats } from '../meta/ladder';
+import { maxHasBall } from './steal';
+import { NO_INTENT, NORMAL_HANDLING, PLAYER_R, type Handling, type PlayerIntent } from './player';
 import { BASE_STATS, chargeTime, type Stats } from './stats';
 import { BALL_REST_Y } from './ball';
 import { POWERED_S, WAVE_READY_S } from './power';
@@ -460,5 +462,134 @@ describe('world: the power-up', () => {
     w.power!.meter = 0;
     for (let i = 0; i < ticks(3); i++) stepWorld(w, move(1), NO_INTENT, STEP);
     expect(w.power?.meter).toBeGreaterThan(0);
+  });
+});
+
+describe('world: handling', () => {
+  /** Sam-like: soft brakes, a long touch, a weak shot, a long reach for his own ball. */
+  const SOFT: Handling = { decel: 500, touchScale: 1.9, shotScale: 0.55, ballAhead: 48 };
+  const FAST: Stats = { speed: 10, power: 1, jump: 3, control: 3 };
+  const TUNING: Stats = { speed: 5, power: 5, jump: 3, control: 5 };
+  /** Flat out: a sprint at the pace that makes 212 px/s at Speed 10. */
+  const FLAT_OUT = 212 / (135 * 1.45);
+  const run = (moveX: number, moveZ = 0): PlayerIntent => ({ ...NO_INTENT, moveX, moveZ, sprint: true, pace: FLAT_OUT });
+
+  /** Snapshots taken from the code before handling existed: a normal player plays exactly as he did. */
+  describe('normal handling plays exactly as before', () => {
+    const world = () => {
+      const w = createWorld(TUNING, maxStats(10), 7, { home: 0, away: 4 }, null, null, DIFFICULTY.normal);
+      w.match.phase = 'playing';
+      return w;
+    };
+    const snap = (w: World) => [w.home.x, w.home.z, w.home.vx, w.home.vz, w.away.x, w.away.z, w.away.vx, w.away.vz, w.ball.x, w.ball.y, w.ball.z, w.ball.vx, w.ball.vy, w.ball.vz];
+
+    it('a sprint and a hard turn', () => {
+      const w = world();
+      Object.assign(w.home, { x: 100, z: 10 });
+      Object.assign(w.away, { x: 450, z: 60 });
+      for (let t = 0; t < 40; t++) stepWorld(w, NO_INTENT, { ...NO_INTENT, moveX: -1, sprint: true, pace: 1.05 }, STEP);
+      for (let t = 0; t < 40; t++) stepWorld(w, NO_INTENT, { ...NO_INTENT, moveX: 1, moveZ: -1 }, STEP);
+      expect(snap(w)).toEqual([100, 10, 0, 0, 379.6287988691378, 15.929956869217825, 76.60323462854264, -76.60323462854264, 320, 3, 32, 0, 0, 0]);
+    });
+
+    it('a dribble', () => {
+      const w = world();
+      Object.assign(w.home, { x: 100, z: 20 });
+      Object.assign(w.away, { x: 300, z: 50, facing: 1 });
+      Object.assign(w.ball, { x: 310, y: BALL_REST_Y, z: 50, vx: 0, vy: 0, vz: 0 });
+      let touches = 0;
+      for (let t = 0; t < 60; t++) {
+        stepWorld(w, NO_INTENT, { ...NO_INTENT, moveX: 1, sprint: true }, STEP);
+        touches += w.events.kicks[1]!.touched ? 1 : 0;
+      }
+      expect(touches).toBe(4);
+      expect(snap(w)).toEqual([100, 20, 0, 0, 444.65277777777715, 50, 157.08333333333331, 0, 460.9531481481481, 3, 50, 198.6388888888888, 0, 0]);
+    });
+
+    it('a shot', () => {
+      const w = world();
+      let kicks = 0;
+      for (let t = 0; t < 40; t++) {
+        stepWorld(w, { ...NO_INTENT, shootHeld: t < 14 }, NO_INTENT, STEP);
+        kicks += w.events.kicks[0]!.kicked ? 1 : 0;
+      }
+      expect(kicks).toBe(2);
+      expect(snap(w)).toEqual([308, 32, 0, 0, 430, 56, 0, 0, 427.02427532795656, 3, 32, 224.9703836337584, 0, 0]);
+    });
+  });
+
+  it("createWorld gives the away player the handling it's asked for, and Harrison his own", () => {
+    const w = createWorld(TUNING, FAST, 1, ERR, null, null, DIFFICULTY.normal, SOFT);
+    expect(w.away.handling).toEqual(SOFT);
+    expect(w.home.handling).toEqual(NORMAL_HANDLING);
+    expect(createWorld(TUNING, FAST, 1, ERR).away.handling).toEqual(NORMAL_HANDLING);
+  });
+
+  /** Sam in play, flat out at (x, z) with the ball at his feet, Harrison parked out of the way. */
+  function samOnTheBall(x: number, z: number, facing: 1 | -1): World {
+    const w = createWorld(TUNING, FAST, 1, ERR, null, null, DIFFICULTY.normal, SOFT);
+    w.match.phase = 'playing';
+    Object.assign(w.home, { x: facing === 1 ? 60 : 580, z: 60 });
+    Object.assign(w.away, { x, z, facing, vx: facing * 212, vz: 0 });
+    Object.assign(w.ball, { x: x + facing * 10, y: BALL_REST_Y, z, vx: facing * 212, vy: 0, vz: 0 });
+    return w;
+  }
+
+  it('the ball remembers who played it last, and a kickoff forgets', () => {
+    const w = samOnTheBall(200, 32, 1);
+    for (let t = 0; t < 5; t++) stepWorld(w, NO_INTENT, run(1), STEP);
+    expect(w.ball.touchedBy).toBe('away');
+    placeForKickoff(w);
+    expect(w.ball.touchedBy).toBeUndefined();
+  });
+
+  it("his long touch runs 30 to 45 px ahead of him at its furthest, and it's his ball all the way", () => {
+    const w = samOnTheBall(100, 32, 1);
+    let furthest = 0;
+    let touches = 0;
+    for (let t = 0; t < 90; t++) {
+      stepWorld(w, NO_INTENT, run(1), STEP);
+      touches += w.events.kicks[1]!.touched ? 1 : 0;
+      if (touches === 0) continue;
+      furthest = Math.max(furthest, w.ball.x - w.away.x);
+      expect(maxHasBall(w.away, w.ball), `tick ${t}, ball ${(w.ball.x - w.away.x).toFixed(1)} px ahead`).toBe(true);
+    }
+    expect(touches).toBeGreaterThanOrEqual(2);
+    expect(furthest).toBeGreaterThanOrEqual(30);
+    expect(furthest).toBeLessThanOrEqual(45);
+  });
+
+  const ballLegal = (w: World): boolean =>
+    w.ball.x >= w.field.fenceL + BALL_R - 1e-9 &&
+    w.ball.x <= w.field.fenceR - BALL_R + 1e-9 &&
+    (goalScored(w.field, w.ball) !== null || !w.field.goals.some(g => inGoalBox(g, w.ball.x, w.ball.z, 0) && Math.abs(w.ball.x - g.lineX) > BALL_R));
+
+  it.each([
+    ['the near post', 540, 18],
+    ['the far post', 540, 46],
+    ['the end hedge', 560, 6],
+  ] as const)('skidding flat out at %s, he and the ball stay out of the goal and inside the hedges', (_, x, z) => {
+    const w = samOnTheBall(x, z, 1);
+    const post = w.field.goals[1].lineX;
+    let reversed = false;
+    for (let t = 0; t < 120; t++) {
+      reversed ||= w.away.x >= (z === 6 ? w.field.fenceR - PLAYER_R : post) - 20;
+      stepWorld(w, NO_INTENT, run(reversed ? -1 : 1), STEP);
+      for (const g of w.field.goals) expect(inGoalBox(g, w.away.x, w.away.z, PLAYER_R - 0.01), `tick ${t}`).toBe(false);
+      expect(w.away.x, `tick ${t}`).toBeLessThanOrEqual(w.field.fenceR - PLAYER_R);
+      expect(ballLegal(w), `tick ${t}: ball at (${w.ball.x.toFixed(1)}, ${w.ball.z.toFixed(1)})`).toBe(true);
+    }
+    expect(reversed).toBe(true);
+  });
+
+  it('a kickoff while he skids puts him on his spot standing still, still on his own brakes', () => {
+    const w = samOnTheBall(300, 32, 1);
+    for (let t = 0; t < 6; t++) stepWorld(w, NO_INTENT, run(-1), STEP);
+    expect(w.away.anim.name).toBe('skid');
+    placeForKickoff(w);
+    expect([w.away.vx, w.away.vz, w.away.state]).toEqual([0, 0, 'ground']);
+    expect(w.away.handling).toEqual(SOFT);
+    stepWorld(w, NO_INTENT, NO_INTENT, STEP);
+    expect([w.away.vx, w.away.vz]).toEqual([0, 0]);
   });
 });

@@ -1,8 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import { BACKYARD } from './field';
 import { TAP_CHARGE } from './kick';
+import { SKID_FRAME_HOLD } from '../art/body/animations';
 import {
   ACCEL,
+  NORMAL_HANDLING,
+  skidding,
+  type Handling,
   BLOWN_DOWN_S,
   BRACE_S,
   FALL_TIME,
@@ -540,5 +544,68 @@ describe('bracing and blown away', () => {
     expect(p.x).toBe(landedX);
     tick(p, {}, 2);
     expect(p.state).toBe('ground');
+  });
+});
+
+describe('handling: soft brakes and the skid', () => {
+  const SOFT: Handling = { ...NORMAL_HANDLING, decel: 500 };
+  const FAST = { speed: 10, power: 1, jump: 3, control: 3 };
+  /** A player flat out at 212 px/s to the right with `handling`. */
+  const flatOut = (handling: Handling): Player => Object.assign(createPlayer('away', FAST, 200, 1), { handling, vx: 212 });
+  /** Reverses the stick until he stops: how long it took, how far he went, and every pose he showed. */
+  function stop(handling: Handling) {
+    const p = flatOut(handling);
+    const from = p.x;
+    const anims = new Set<string>();
+    let [t, skidS] = [0, 0];
+    while (p.vx > 0 && t < 2) {
+      tick(p, { moveX: -1, sprint: true });
+      t += STEP;
+      anims.add(p.anim.name);
+      if (p.anim.name === 'skid') skidS += STEP;
+    }
+    return { t, dist: p.x - from, anims, skidS };
+  }
+
+  it('a new player has normal handling: brakes, touch, shot and reach as before', () => {
+    expect(harrison().handling).toEqual({ decel: 1200, touchScale: 1, shotScale: 1, ballAhead: 16 });
+    expect(harrison().handling).toEqual(NORMAL_HANDLING);
+  });
+
+  it('soft brakes: reversing flat out takes 0.35 to 0.5 s and 40 to 60 px to stop, skidding for 0.3 s or more of it', () => {
+    const { t, dist, skidS } = stop(SOFT);
+    expect(skidS).toBeGreaterThanOrEqual(0.3);
+    expect(t).toBeGreaterThanOrEqual(0.35);
+    expect(t).toBeLessThanOrEqual(0.5);
+    expect(dist).toBeGreaterThanOrEqual(40);
+    expect(dist).toBeLessThanOrEqual(60);
+  });
+
+  it('normal brakes stop him in under 0.2 s', () => {
+    expect(stop(NORMAL_HANDLING).t).toBeLessThan(0.2);
+  });
+
+  it('braking on soft brakes he skids, in the skid pose, holding its planted frame', () => {
+    const p = flatOut(SOFT);
+    tick(p, { moveX: -1 });
+    expect(skidding(p, intent({ moveX: -1 }))).toBe(true);
+    expect(p.anim).toEqual({ name: 'skid', frame: 0 });
+    tick(p, { moveX: -1 }, ticks(0.15));
+    expect(p.anim).toEqual({ name: 'skid', frame: SKID_FRAME_HOLD });
+    tick(p, { moveX: -1 }, ticks(0.1));
+    expect(p.anim).toEqual({ name: 'skid', frame: SKID_FRAME_HOLD });
+  });
+
+  it('letting go of the stick flat out is a skid too, but running on or slowed down is not', () => {
+    const p = flatOut(SOFT);
+    expect(skidding(p, NO_INTENT)).toBe(true);
+    expect(skidding(p, intent({ moveX: 1 }))).toBe(false);
+    p.vx = 50;
+    expect(skidding(p, intent({ moveX: -1 }))).toBe(false);
+  });
+
+  it('normal handling never skids', () => {
+    expect(stop(NORMAL_HANDLING).anims.has('skid')).toBe(false);
+    expect(skidding(flatOut(NORMAL_HANDLING), intent({ moveX: -1 }))).toBe(false);
   });
 });

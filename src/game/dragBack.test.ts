@@ -4,7 +4,7 @@ import { BACKYARD, inGoalBox } from './field';
 import { BALL_R } from '../art/ball';
 import { DIFFICULTY } from './ai';
 import { TURN_S, startDragBack } from './dragBack';
-import { NO_INTENT, type PlayerIntent } from './player';
+import { NO_INTENT, NORMAL_HANDLING, type PlayerIntent } from './player';
 import { BASE_STATS } from './stats';
 import { createWorld, stepWorld, type World } from './world';
 import { ballAtFeet } from './zones';
@@ -72,6 +72,13 @@ describe('the drag-back', () => {
     const w = stage({ x: 300, facing: 1, bx: 312, max: 320 });
     w.away.facing = -1;
     expect(startDragBack(w, run(-1))).toBe(false);
+  });
+
+  it("a fast opponent's long reach for his own ball doesn't take Harrison's ball off him: he can still drag it back", () => {
+    const w = stage({ x: 300, facing: 1, bx: 310, max: 335 });
+    Object.assign(w.away, { facing: -1, handling: { ...NORMAL_HANDLING, ballAhead: 48 } });
+    w.ball.touchedBy = 'home';
+    expect(startDragBack(w, run(-1))).toBe(true);
   });
 
   it('only a firm push back the other way starts it, on the ground, in play', () => {

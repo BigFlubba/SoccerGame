@@ -5,7 +5,7 @@ import { BALL_REST_Y, stepBall, type Ball } from './ball';
 import { KEEP_OUT_X, SIDE_CLEAR, TRAP_KEEP, resolveContacts } from './contact';
 import { BACKYARD, goalScored } from './field';
 import { POST_INSET, aimLine, header, shot } from './kick';
-import { NO_INTENT, PLAYER_R, createPlayer, stepPlayer, type Kick, type Player } from './player';
+import { NO_INTENT, NORMAL_HANDLING, PLAYER_R, createPlayer, stepPlayer, type Kick, type Player } from './player';
 import { BASE_STATS, touchPush } from './stats';
 import { REACH_Z, touchPoint } from './zones';
 
@@ -418,5 +418,31 @@ describe('resolveContacts: depth', () => {
       }
       expect((b.x - p.x) * incoming[0]! + (b.z - p.z) * incoming[1]!).toBeLessThan(0);
     }
+  });
+});
+
+describe('resolveContacts: handling', () => {
+  it("a long touch pushes the ball on by touchScale times his control's push", () => {
+    const { p, opp } = setup();
+    p.handling = { ...NORMAL_HANDLING, touchScale: 1.9 };
+    p.vx = 212;
+    const b = ball({ x: 307 });
+    contact(p, opp, b);
+    expect(b.vx).toBeCloseTo(212 + 1.9 * touchPush(BASE_STATS), 9);
+  });
+
+  it('a weak shot leaves at shotScale of the normal speed, on the same line', () => {
+    const strike = (shotScale: number) => {
+      const { p, opp } = setup();
+      p.handling = { ...NORMAL_HANDLING, shotScale };
+      p.state = 'kicking';
+      p.kick = kick({ charge: 1 });
+      const b = ball({ x: 308 });
+      contact(p, opp, b);
+      return b;
+    };
+    const [normal, weak] = [strike(1), strike(0.55)];
+    expect(Math.hypot(weak.vx, weak.vy, weak.vz)).toBeCloseTo(0.55 * Math.hypot(normal.vx, normal.vy, normal.vz), 9);
+    expect(weak.vy / weak.vx).toBeCloseTo(normal.vy / normal.vx, 9);
   });
 });
