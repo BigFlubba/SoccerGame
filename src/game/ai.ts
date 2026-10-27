@@ -22,12 +22,14 @@ export interface AiProfile {
   braceSense: number;
   /** Chance (0..1), before Harrison's Control, that his steal tap takes the ball cleanly off it. */
   cleanSteal: number;
+  /** Seconds it stands wrong-footed after Harrison steals the ball off it cleanly. */
+  wrongFootedS: number;
 }
 
 export const DIFFICULTY: Record<Difficulty, AiProfile> = {
-  easy: { reactionS: 0.32, aimErrorDeg: 10, aggression: 0.3, shootRange: 150, braceSense: 0.5, cleanSteal: 0.9 },
-  normal: { reactionS: 0.18, aimErrorDeg: 6, aggression: 0.55, shootRange: 180, braceSense: 0.75, cleanSteal: 0.75 },
-  hard: { reactionS: 0.1, aimErrorDeg: 3, aggression: 0.8, shootRange: 210, braceSense: 0.9, cleanSteal: 0.55 },
+  easy: { reactionS: 0.32, aimErrorDeg: 10, aggression: 0.3, shootRange: 150, braceSense: 0.5, cleanSteal: 0.9, wrongFootedS: 0.5 },
+  normal: { reactionS: 0.18, aimErrorDeg: 6, aggression: 0.55, shootRange: 180, braceSense: 0.75, cleanSteal: 0.75, wrongFootedS: 0.4 },
+  hard: { reactionS: 0.1, aimErrorDeg: 3, aggression: 0.8, shootRange: 210, braceSense: 0.9, cleanSteal: 0.55, wrongFootedS: 0.3 },
 };
 
 export interface AiBrain {
@@ -45,6 +47,8 @@ export interface AiBrain {
    * Null when he isn't powered up.
    */
   backOff: null | 'stay' | { gap: number; inS: number };
+  /** Time left standing wrong-footed after Harrison stole the ball off it. */
+  wrongFootedS: number;
 }
 
 /** The ball counts as at someone's feet within this distance, on the ground. */
@@ -103,7 +107,7 @@ const AIM_ODDS: readonly (readonly [Aim, number])[] = [
 ];
 
 export function createBrain(profile: AiProfile): AiBrain {
-  return { profile, nextDecisionS: 0, intent: { ...NO_INTENT }, plan: 'chase', chargeLeftS: 0, slideReadyS: 0, backOff: null };
+  return { profile, nextDecisionS: 0, intent: { ...NO_INTENT }, plan: 'chase', chargeLeftS: 0, slideReadyS: 0, backOff: null, wrongFootedS: 0 };
 }
 
 const attackDir = (me: Player): 1 | -1 => (me.team === 'home' ? 1 : -1);
@@ -375,6 +379,12 @@ function decide(brain: AiBrain, w: World, me: Player, them: Player): void {
 export function think(brain: AiBrain, w: World, me: Player, them: Player, dt: number): PlayerIntent {
   brain.nextDecisionS -= dt;
   brain.slideReadyS = Math.max(0, brain.slideReadyS - dt);
+  // Robbed by Harrison's clean steal, Max is wrong-footed: whatever he meant to do is gone.
+  if (me.team === 'away' && w.events.steal === 'stole') {
+    brain.wrongFootedS = brain.profile.wrongFootedS;
+    brain.intent = { ...NO_INTENT };
+    brain.plan = 'chase';
+  }
   let released = false;
   if (brain.plan === 'charge' && brain.intent.shootHeld) {
     brain.chargeLeftS -= dt;
@@ -402,6 +412,10 @@ export function think(brain: AiBrain, w: World, me: Player, them: Player, dt: nu
     brain.plan = 'hesitate';
     brain.intent = { ...NO_INTENT, faceX: Math.sign(w.ball.x - me.x) >= 0 ? 1 : -1 };
     brain.nextDecisionS = brain.profile.reactionS;
+  } else if (brain.wrongFootedS > 1e-9) {
+    // Wrong-footed, he stands facing the ball, never sliding, then challenges again.
+    brain.wrongFootedS = Math.max(0, brain.wrongFootedS - dt);
+    brain.intent = { ...NO_INTENT, faceX: Math.sign(w.ball.x - me.x) >= 0 ? 1 : -1 };
   } else if (!released && brain.nextDecisionS <= 1e-9) {
     // A decision on the release tick could start a new charge and swallow the shot, so it waits a tick.
     decide(brain, w, me, them);

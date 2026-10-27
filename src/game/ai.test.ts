@@ -108,10 +108,35 @@ describe('think', () => {
     expect(think(brainFor(), w, w.away, w.home, STEP).sprint).toBe(false);
   });
 
+  it('robbed by a steal, Max stands wrong-footed for his beat, never sliding, then challenges again', () => {
+    // Harrison has the ball close in front of Max: a Max that always slides would slide at once.
+    const w = scene({ x: 288 }, 280, 300);
+    w.away.facing = -1;
+    const brain = brainFor({ aggression: 1 });
+    w.events.steal = 'stole';
+    for (let t = 0; t < DIFFICULTY.normal.wrongFootedS - 1e-9; t += STEP) {
+      const i = think(brain, w, w.away, w.home, STEP);
+      expect([i.moveX, i.moveZ, i.chipHeld], `at ${t.toFixed(3)} s`).toEqual([0, 0, false]);
+      w.events.steal = null;
+    }
+    let challenged = false;
+    for (let k = 0; k < 30 && !challenged; k++) {
+      const i = think(brain, w, w.away, w.home, STEP);
+      challenged = i.chipHeld || i.moveX !== 0;
+    }
+    expect(challenged).toBe(true);
+  });
+
+  it("the brain playing Harrison isn't wrong-footed by his own steal", () => {
+    const w = scene({ x: 400 }, 100, 500);
+    w.events.steal = 'stole';
+    expect(think(brainFor(), w, w.home, w.away, STEP).moveX).toBeGreaterThan(0);
+  });
+
   it('difficulty profiles match the plan', () => {
-    expect(DIFFICULTY.easy).toEqual({ reactionS: 0.32, aimErrorDeg: 10, aggression: 0.3, shootRange: 150, braceSense: 0.5, cleanSteal: 0.9 });
-    expect(DIFFICULTY.normal.cleanSteal).toBe(0.75);
-    expect(DIFFICULTY.hard).toEqual({ reactionS: 0.1, aimErrorDeg: 3, aggression: 0.8, shootRange: 210, braceSense: 0.9, cleanSteal: 0.55 });
+    expect(DIFFICULTY.easy).toEqual({ reactionS: 0.32, aimErrorDeg: 10, aggression: 0.3, shootRange: 150, braceSense: 0.5, cleanSteal: 0.9, wrongFootedS: 0.5 });
+    expect([DIFFICULTY.normal.cleanSteal, DIFFICULTY.normal.wrongFootedS]).toEqual([0.75, 0.4]);
+    expect(DIFFICULTY.hard).toEqual({ reactionS: 0.1, aimErrorDeg: 3, aggression: 0.8, shootRange: 210, braceSense: 0.9, cleanSteal: 0.55, wrongFootedS: 0.3 });
   });
 
   it('a whole simulated match between two AIs finishes with a result and no exceptions', () => {

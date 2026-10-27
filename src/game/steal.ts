@@ -2,7 +2,7 @@ import { BALL_R } from '../art/ball';
 import { DIFFICULTY } from './ai';
 import { BALL_REST_Y, type Ball } from './ball';
 import { canPlace } from './contact';
-import { PLAYER_R, type Player, type PlayerIntent } from './player';
+import { PLAYER_R, cancelCharge, type Player, type PlayerIntent } from './player';
 import { touchPush } from './stats';
 import type { World } from './world';
 import { REACH_Z, ballIn, footZone, type Rect } from './zones';
@@ -90,6 +90,17 @@ function trap(w: World): void {
   Object.assign(ball, { vx: home.vx, vy: 0, vz: home.vz, spin: 0 });
 }
 
+/**
+ * Max, robbed cleanly, is wrong-footed: his wind-up or swing is lost, and
+ * for his beat his feet can't dribble the ball straight back (his brain
+ * stands him still for the same beat).
+ */
+function wrongFoot(max: Player, w: World): void {
+  cancelCharge(max);
+  if (max.kick) max.kick.active = false;
+  max.touchCooldown = (w.maxProfile ?? DIFFICULTY.normal).wrongFootedS;
+}
+
 /** A toe to it but no control: it squirts on along his run (along his facing if he's standing), as a hard touch would. */
 function poke(w: World): void {
   const { home, ball } = w;
@@ -121,6 +132,7 @@ export function resolveSteal(w: World, intent: PlayerIntent): StealOutcome | nul
   }
   if (w.rng() < cleanStealOdds(w)) {
     trap(w);
+    wrongFoot(w.away, w);
     return 'stole';
   }
   poke(w);

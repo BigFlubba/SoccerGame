@@ -1,3 +1,4 @@
+import { BALL_R } from '../art/ball';
 import { seeded, type Rng } from '../engine/random';
 import type { AiProfile } from './ai';
 import { BALL_REST_Y, stepBall, type Ball, type BallEvents } from './ball';
@@ -23,9 +24,9 @@ import {
   type PowerState,
 } from './power';
 import type { Stats } from './stats';
-import { resolveSteal, type StealOutcome } from './steal';
+import { resolveSteal, stealZone, type StealOutcome } from './steal';
 import { fireWave, stepWave, type Wave } from './wave';
-import { ballAtFeet } from './zones';
+import { ballAtFeet, ballIn } from './zones';
 
 /** What Harrison's power-up did this tick. All false without a power move. */
 export interface PowerEvents {
@@ -183,13 +184,16 @@ function powerEnds(w: World, live: boolean, [, away]: ContactEvents[]): boolean 
  * carried ball is out of play, except while the dog is slow (jinking) when
  * it is contested where it would land, at the muzzle on the ground: any
  * slide, touch or kick that reaches it knocks it out of his mouth. The dog's own grab reports as a touch.
+ * In his jink a steal tap with the ball in reach counts as a touch; otherwise it does nothing.
  */
-function dogContacts(w: World, dog: DogState, ev: DogEvents): ContactEvents[] {
+function dogContacts(w: World, dog: DogState, ev: DogEvents, steal: boolean): ContactEvents[] {
   let home = quietContact();
   const carried = dog.carrying;
   if (!w.wave?.live && (!carried || vulnerable(dog))) {
     if (carried) w.ball.y = BALL_REST_Y;
     home = resolveContacts(w.home, w.away, w.ball, w.aimErrorDeg.home, w.rng, w.field, { trips: false, squeeze: false });
+    const jab = steal && dog.jinkS > 0 && w.home.state === 'ground' && ballIn(stealZone(w.home), w.ball, BALL_R);
+    if (carried && jab) home.touched = true;
     if (carried && (home.tackledBall || home.touched || home.kicked)) {
       dropBall(w, true);
       ev.dropped = true;
@@ -253,7 +257,7 @@ export function stepWorld(w: World, homeIntent: PlayerIntent, awayIntent: Player
     w.wave?.live ? quietContact() : resolveContacts(p, other, w.ball, w.aimErrorDeg[p.team], w.rng, w.field, { trips: true, squeeze });
   const homeFirst = w.tick % 2 === 0;
   let kicks: ContactEvents[];
-  if (w.dog) kicks = dogContacts(w, w.dog, dog);
+  if (w.dog) kicks = dogContacts(w, w.dog, dog, live && homeIntent.steal);
   else {
     const first = homeFirst ? contact(home, w.away) : contact(w.away, home);
     const second = homeFirst ? contact(w.away, home) : contact(home, w.away);

@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { BALL_R } from '../art/ball';
-import { DIFFICULTY, type AiProfile } from './ai';
+import { DIFFICULTY, createBrain, think, type AiProfile } from './ai';
 import { BALL_REST_Y } from './ball';
+import { DOG_DIFFICULTY, JINK_S, TUNING_STATS } from './dog';
 import { NO_INTENT, createPlayer, stepPlayer, type Player } from './player';
 import { BACKYARD } from './field';
 import { STEAL_COOLDOWN_S, STUMBLE_S, resolveSteal } from './steal';
@@ -113,6 +114,46 @@ describe('the steal button', () => {
     expect(() => stepWorld(w, TAP, NO_INTENT, STEP)).not.toThrow();
     expect(w.events.steal).toBe('stole');
     expect(ballAtFeet(w.home, w.ball)).toBe(true);
+  });
+
+  it("a head-on clean steal sticks through Max's wrong-footed beat", () => {
+    // Max dribbling at a Harrison standing his ground.
+    const w = stage({ max: 300, ball: 292, home: 280, vx: -150, profile: DIFFICULTY.easy, seed: 3, homeVx: 1 });
+    w.home.vx = 0;
+    const brain = createBrain(DIFFICULTY.easy);
+    const maxPlayed = () => w.events.kicks[1]!.touched || w.events.kicks[1]!.kicked !== null || w.events.kicks[1]!.tackledBall;
+    stepWorld(w, TAP, think(brain, w, w.away, w.home, STEP), STEP);
+    expect(w.events.steal).toBe('stole');
+    expect(maxPlayed(), 'Max plays it on the steal tick').toBe(false);
+    for (let t = 0; t < DIFFICULTY.easy.wrongFootedS; t += STEP) {
+      stepWorld(w, NO_INTENT, think(brain, w, w.away, w.home, STEP), STEP);
+      expect(maxPlayed(), `Max plays it at ${t.toFixed(3)} s`).toBe(false);
+      expect(ballAtFeet(w.home, w.ball), `at ${t.toFixed(3)} s`).toBe(true);
+    }
+  });
+
+  it("a robbed Max loses the shot he was winding up", () => {
+    const w = fromBehind(DIFFICULTY.easy, 3);
+    Object.assign(w.away, { state: 'charging', charge: 0.5 });
+    expect(resolveSteal(w, TAP)).toBe('stole');
+    expect([w.away.state, w.away.charge]).toEqual(['ground', 0]);
+  });
+
+  it('against Biscuit a steal tap in his jink knocks the ball out, and outside it does nothing, with no stumble', () => {
+    for (const jinking of [true, false]) {
+      const w = createWorld({ ...TUNING_STATS }, BASE_STATS, 7, { home: 4, away: 0 }, null, DOG_DIFFICULTY.normal);
+      w.match.phase = 'playing';
+      Object.assign(w.away, { x: 300, facing: -1 });
+      Object.assign(w.home, { x: 272, facing: 1 });
+      Object.assign(w.ball, { x: 298, y: BALL_REST_Y, vx: 0, vy: 0, vz: 0 });
+      stepWorld(w, NO_INTENT, NO_INTENT, STEP);
+      expect(w.dog!.carrying).toBe(true);
+      if (jinking) w.dog!.jinkS = JINK_S;
+      stepWorld(w, TAP, NO_INTENT, STEP);
+      expect(w.events.dog.dropped, `jinking ${jinking}`).toBe(jinking);
+      expect(w.dog!.carrying).toBe(!jinking);
+      expect([w.home.stumbleS, w.home.stealCooldownS]).toEqual([0, 0]);
+    }
   });
 
   it('while stumbling he can neither move nor act', () => {
