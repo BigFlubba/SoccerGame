@@ -204,6 +204,12 @@ a later change can't quietly make it hard again.
   matches" on both): under half his matches on Easy, and fewer on
   Normal. If he's stronger than that, he's weakened first (slower
   reactions, more aim error), so the targets mean something.
+- **Baseline before any change (2026-10-27): Easy 0.438, Normal 0.156,
+  Hard 0.000 on 64 seeds** (100–163, rung 10; on 128 seeds Easy 0.492,
+  Normal 0.133, Hard 0.016; Hard's average score 1.7–9.8). Hard's target
+  is 0.000. The script as first built (reactions from 0.2 s) won 0.578 on
+  Easy, so his reactions were slowed to 0.30–0.46 s; lowering his
+  `aggression` made him stronger, not weaker, so it stays at 0.4.
 - The ladder's stat table (`LADDER_STATS`) stays as it is.
 
 ### 6. In CI
