@@ -10,5 +10,7 @@ export default defineConfig({
   },
   test: {
     include: ['src/**/*.test.ts', 'tools/**/*.test.ts'],
+    // The tuning suites (Max, Biscuit, the Park crew) each play hundreds of whole headless matches, sharing the CPU when files run in parallel.
+    testTimeout: 30_000,
   },
 });
