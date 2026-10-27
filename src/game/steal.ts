@@ -1,7 +1,7 @@
 import { BALL_R } from '../art/ball';
 import { DIFFICULTY } from './ai';
 import { BALL_REST_Y, type Ball } from './ball';
-import { TOUCH_COOLDOWN_S, canPlace } from './contact';
+import { SIDE_CLEAR, TOUCH_COOLDOWN_S, TRAP_KEEP, canPlace, keepingOut } from './contact';
 import { PLAYER_R, cancelCharge, type Player, type PlayerIntent } from './player';
 import { touchPush } from './stats';
 import type { World } from './world';
@@ -28,8 +28,6 @@ const STEAL_HIGH = 12;
 /** Each Control level above 1 adds this to the clean-steal odds, up to the cap. */
 export const STEAL_PER_CONTROL = 0.01;
 export const STEAL_ODDS_CAP = 0.98;
-/** A clean steal or a trap leaves him and the ball at this fraction of his speed: he checks his run. */
-export const TRAP_KEEP = 0.3;
 /** A trapped ball sits this far ahead of him. */
 export const FOOT_SPOT = 8;
 export const STUMBLE_S = 0.25;
@@ -80,14 +78,18 @@ function trapSpot(w: World): { x: number; z: number } | null {
   );
 }
 
-/** He traps the ball at his feet, and both slow to TRAP_KEEP of his speed; the trap is his touch, so his run doesn't knock it on at once. */
+/**
+ * He traps the ball at his feet, and both slow to TRAP_KEEP of his speed, or
+ * stop dead running at his own goal near it; the trap is his touch, so his
+ * run doesn't knock it on at once.
+ */
 function trap(w: World): void {
   const { home, ball } = w;
+  const keep = keepingOut(home, ball, w.field) ? 0 : TRAP_KEEP;
   const spot = trapSpot(w);
   if (spot) [ball.x, ball.z, ball.y] = [spot.x, spot.z, BALL_REST_Y];
   home.touchCooldown = TOUCH_COOLDOWN_S;
-  home.vx *= TRAP_KEEP;
-  home.vz *= TRAP_KEEP;
+  [home.vx, home.vz] = keep === 0 ? [0, 0] : [home.vx * keep, home.vz * keep];
   Object.assign(ball, { vx: home.vx, vy: 0, vz: home.vz, spin: 0 });
 }
 
@@ -102,9 +104,20 @@ function wrongFoot(max: Player, w: World): void {
   max.touchCooldown = (w.maxProfile ?? DIFFICULTY.normal).wrongFootedS;
 }
 
-/** A toe to it but no control: it squirts on along his run (along his facing if he's standing), as a hard touch would. */
+/**
+ * A toe to it but no control: it squirts on along his run (along his facing
+ * if he's standing), as a hard touch would; running at his own goal near it,
+ * out to the nearer board and a little upfield instead. It's his touch, so
+ * his run doesn't touch it again at once.
+ */
 function poke(w: World): void {
   const { home, ball } = w;
+  home.touchCooldown = TOUCH_COOLDOWN_S;
+  if (keepingOut(home, ball, w.field)) {
+    ball.vx = SIDE_CLEAR.vx;
+    ball.vz = (ball.z < w.field.depth / 2 ? -1 : 1) * SIDE_CLEAR.vz;
+    return;
+  }
   const speed = Math.hypot(home.vx, home.vz);
   const [ux, uz] = speed > 0 ? [home.vx / speed, home.vz / speed] : [home.facing, 0];
   const push = touchPush(home.stats);

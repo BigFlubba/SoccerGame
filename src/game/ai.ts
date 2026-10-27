@@ -31,14 +31,16 @@ export interface AiProfile {
    * `off` px off the ball's line in depth (deeper, away from the camera).
    */
   kickoffSpot: { back: number; off: number };
+  /** At Harrison's kickoff it comes as soon as he starts winding up a kick; otherwise only once he plays the ball. */
+  kickoffRush: boolean;
   /** Scales its run and sprint while it plays the ball (not backing off from a powered-up Harrison). */
   paceFactor: number;
 }
 
 export const DIFFICULTY: Record<Difficulty, AiProfile> = {
-  easy: { reactionS: 0.2, aimErrorDeg: 8, aggression: 0.3, shootRange: 150, braceSense: 0.5, backOffS: 0.32, cleanSteal: 0.9, wrongFootedS: 0.35, kickoffSpot: { back: 110, off: 18 }, paceFactor: 1 },
-  normal: { reactionS: 0.14, aimErrorDeg: 6, aggression: 0.55, shootRange: 180, braceSense: 0.75, backOffS: 0.18, cleanSteal: 0.75, wrongFootedS: 0.3, kickoffSpot: { back: 110, off: 18 }, paceFactor: 1.03 },
-  hard: { reactionS: 0.1, aimErrorDeg: 2, aggression: 0.8, shootRange: 210, braceSense: 0.9, backOffS: 0.1, cleanSteal: 0.55, wrongFootedS: 0.2, kickoffSpot: { back: 70, off: 0 }, paceFactor: 1.08 },
+  easy: { reactionS: 0.26, aimErrorDeg: 8, aggression: 0.3, shootRange: 150, braceSense: 0.5, backOffS: 0.32, cleanSteal: 0.9, wrongFootedS: 0.4, kickoffSpot: { back: 110, off: 20 }, kickoffRush: true, paceFactor: 1 },
+  normal: { reactionS: 0.16, aimErrorDeg: 6, aggression: 0.55, shootRange: 180, braceSense: 0.75, backOffS: 0.18, cleanSteal: 0.75, wrongFootedS: 0.35, kickoffSpot: { back: 110, off: 24 }, kickoffRush: true, paceFactor: 1.03 },
+  hard: { reactionS: 0.1, aimErrorDeg: 2, aggression: 0.8, shootRange: 210, braceSense: 0.9, backOffS: 0.1, cleanSteal: 0.55, wrongFootedS: 0.2, kickoffSpot: { back: 70, off: 0 }, kickoffRush: false, paceFactor: 1.1 },
 };
 
 export interface AiBrain {
@@ -388,19 +390,21 @@ function decide(brain: AiBrain, w: World, me: Player, them: Player): void {
 
 /**
  * At Harrison's kickoff Max holds his spot until Harrison plays the ball
- * (it leaves the centre spot), or for KICKOFF_HOLD_S if he never does: the
- * game's version of waiting outside the centre circle. Counts the hold; a
- * played ball starts his reaction time.
+ * (it leaves the centre spot), or, with `kickoffRush`, starts winding up a
+ * kick, or for KICKOFF_HOLD_S if he does neither: the game's version of
+ * waiting outside the centre circle. Counts the hold; what ends it early
+ * starts his reaction time.
  */
-function holdingKickoff(brain: AiBrain, w: World, dt: number): boolean {
+function holdingKickoff(brain: AiBrain, w: World, them: Player, dt: number): boolean {
   if (brain.kickoffHoldS === null || w.match.phase === 'kickoff') return false;
   const onSpot = Math.hypot(w.ball.x - w.field.width / 2, w.ball.z - w.field.depth / 2) <= ON_SPOT;
-  if (w.match.phase === 'playing' && onSpot && brain.kickoffHoldS < KICKOFF_HOLD_S - 1e-9) {
+  const windingUp = brain.profile.kickoffRush && (them.state === 'charging' || them.state === 'chipping' || them.state === 'kicking');
+  if (w.match.phase === 'playing' && onSpot && !windingUp && brain.kickoffHoldS < KICKOFF_HOLD_S - 1e-9) {
     brain.kickoffHoldS += dt;
     return true;
   }
-  // Standing at his spot, he sees Harrison play the ball and reacts at his own pace, not on the instant.
-  if (!onSpot && brain.kickoffHoldS > 0) brain.nextDecisionS = brain.profile.reactionS;
+  // Standing at his spot, he sees Harrison play the ball (or wind up) and reacts at his own pace, not on the instant.
+  if ((!onSpot || windingUp) && brain.kickoffHoldS > 0) brain.nextDecisionS = brain.profile.reactionS;
   brain.kickoffHoldS = null;
   return false;
 }
@@ -448,7 +452,7 @@ export function think(brain: AiBrain, w: World, me: Player, them: Player, dt: nu
     brain.plan = 'hesitate';
     brain.intent = { ...NO_INTENT, faceX: Math.sign(w.ball.x - me.x) >= 0 ? 1 : -1 };
     brain.nextDecisionS = brain.profile.reactionS;
-  } else if (holdingKickoff(brain, w, dt)) {
+  } else if (holdingKickoff(brain, w, them, dt)) {
     brain.intent = { ...NO_INTENT, faceX: Math.sign(w.ball.x - me.x) >= 0 ? 1 : -1 };
   } else if (brain.wrongFootedS > 1e-9) {
     // Wrong-footed, he stands facing the ball, never sliding, then challenges again.

@@ -25,6 +25,10 @@ const SLIDE_BALL_VX = 220;
 const SLIDE_BALL_VY = 80;
 /** Harrison's slide facing his own goal clears the ball to the nearer board and a little upfield, px/s. */
 export const SIDE_CLEAR = { vx: 60, vz: 200 };
+/** A ball this close to Harrison's own goal line is in his keep-out zone (about a quarter of the pitch), px. */
+export const KEEP_OUT_X = 150;
+/** Trapping or shielding the ball leaves him and it at this fraction of his speed: he checks his run. */
+export const TRAP_KEEP = 0.3;
 /** A ball hitting his body keeps this fraction of its speed, reversed. */
 const BODY_RESTITUTION = 0.4;
 const PINNED_POP_VY = 160;
@@ -53,7 +57,7 @@ function slide(p: Player, opponent: Player, ball: Ball, ev: ContactEvents, trips
   if (p.state !== 'sliding' || !p.kick?.active) return;
   const reach = slideZone(p);
   if (ballIn(reach, ball, BALL_R)) {
-    const upfield: 1 | -1 = p.team === 'home' ? 1 : -1;
+    const upfield = upfieldOf(p);
     const clearing = clearUpfield && p.facing !== upfield;
     const toBoard = ball.z < field.depth / 2 ? -1 : 1;
     hit(ball, clearing ? { vx: upfield * SIDE_CLEAR.vx, vy: SLIDE_BALL_VY, vz: toBoard * SIDE_CLEAR.vz, spin: 0 } : { vx: p.facing * SLIDE_BALL_VX, vy: SLIDE_BALL_VY, vz: 0, spin: 0 });
@@ -103,11 +107,31 @@ function headBall(p: Player, ball: Ball, field: Field, ev: ContactEvents): void 
   ev.kicked = 'header';
 }
 
-/** Running into a ball on the ground knocks it on along his run with a small touch. */
-function dribble(p: Player, ball: Ball, ev: ContactEvents): void {
+const upfieldOf = (p: Player): 1 | -1 => (p.team === 'home' ? 1 : -1);
+
+/** Whether he's running toward his own goal with the ball in his keep-out zone, where his touches never push it at the goal. */
+export function keepingOut(p: Player, ball: { x: number }, field: Field): boolean {
+  const up = upfieldOf(p);
+  const own = field.goals.find(g => g.side === (up > 0 ? 'left' : 'right'))!;
+  return p.vx * up < 0 && (ball.x - own.lineX) * up <= KEEP_OUT_X;
+}
+
+/**
+ * Running into a ball on the ground knocks it on along his run with a small
+ * touch; with `keepOut`, running at his own goal near it he shields it
+ * instead, checking his run with the ball at his feet.
+ */
+function dribble(p: Player, ball: Ball, ev: ContactEvents, keepOut: boolean, field: Field): void {
   const at = touchPoint(p);
   if (p.state !== 'ground' || !at || p.touchCooldown > 0 || ball.y > BALL_REST_Y) return;
   if (Math.hypot(ball.x - at.x, ball.z - at.z) > TOUCH_RADIUS) return;
+  if (keepOut && keepingOut(p, ball, field)) {
+    p.vx *= TRAP_KEEP;
+    p.vz *= TRAP_KEEP;
+    [ball.vx, ball.vz] = [p.vx, p.vz];
+    ev.touched = true;
+    return;
+  }
   const speed = Math.hypot(p.vx, p.vz);
   const push = touchPush(p.stats) / speed;
   ball.vx = p.vx * (1 + push);
@@ -244,7 +268,8 @@ function squirt(p: Player, opponent: Player, ball: Ball, rng: Rng, field: Field)
  * Everything player `p` does to the ball (and to the opponent's feet) this
  * tick. Against the dog, `trips` is off (nobody trips him) and so is
  * `squeeze`: he contests a ball by his muzzle's dwell, never a 50/50.
- * `clearUpfield` is Harrison's against Max: a slide facing his own goal clears sideways.
+ * `clearUpfield` and `keepOut` are Harrison's against Max: a slide facing his own goal clears sideways,
+ * and near it his running touches toward it shield the ball.
  */
 export function resolveContacts(
   p: Player,
@@ -253,7 +278,12 @@ export function resolveContacts(
   aimErrorDeg: number,
   rng: Rng,
   field: Field,
-  { trips, squeeze, clearUpfield = false }: { trips: boolean; squeeze: boolean; clearUpfield?: boolean } = { trips: true, squeeze: true },
+  {
+    trips,
+    squeeze,
+    clearUpfield = false,
+    keepOut = false,
+  }: { trips: boolean; squeeze: boolean; clearUpfield?: boolean; keepOut?: boolean } = { trips: true, squeeze: true },
 ): ContactEvents {
   const ev: ContactEvents = { touched: false, kicked: null, perfect: false, tackledBall: false, trippedOpponent: false };
   // Flying through the air after a wave, he can't block, dribble or head it.
@@ -263,7 +293,7 @@ export function resolveContacts(
   if (!ev.kicked) headBall(p, ball, field, ev);
   if (ev.kicked || ev.tackledBall || onRoof(ball, field)) return ev;
   if (!squeeze || !squeezed(p, opponent, ball)) {
-    dribble(p, ball, ev);
+    dribble(p, ball, ev, keepOut, field);
     block(p, ball, field);
   }
   // Also catches a block that pushed the ball out into the other player.

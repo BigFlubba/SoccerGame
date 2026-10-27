@@ -34,6 +34,7 @@ export const HARRISON_SCRIPT: AiProfile = {
   cleanSteal: 0.75,
   wrongFootedS: 0.4,
   kickoffSpot: { back: 110, off: 18 },
+  kickoffRush: true,
   paceFactor: 1,
 };
 /** Each match's Harrison reacts at his own pace, drawn here, s, so a win rate is a smooth measure. */

@@ -265,7 +265,7 @@ export function stepWorld(w: World, homeIntent: PlayerIntent, awayIntent: Player
   const squeeze = steal !== 'stole' && steal !== 'trapped';
   // In a drag-back his sole has the ball: only the other player's contacts can take it.
   const contact = (p: Player, other: Player) =>
-    w.wave?.live || (p === home && home.turnS > 0) ? quietContact() : resolveContacts(p, other, w.ball, w.aimErrorDeg[p.team], w.rng, w.field, { trips: true, squeeze, clearUpfield: p === home });
+    w.wave?.live || (p === home && home.turnS > 0) ? quietContact() : resolveContacts(p, other, w.ball, w.aimErrorDeg[p.team], w.rng, w.field, { trips: true, squeeze, clearUpfield: p === home, keepOut: p === home });
   const homeFirst = w.tick % 2 === 0;
   let kicks: ContactEvents[];
   if (w.dog) kicks = dogContacts(w, w.dog, dog, live && homeIntent.steal);

@@ -2,7 +2,7 @@ import { BALL_R } from '../art/ball';
 import { describe, expect, it } from 'vitest';
 import { seeded } from '../engine/random';
 import { BALL_REST_Y, stepBall, type Ball } from './ball';
-import { SIDE_CLEAR, resolveContacts } from './contact';
+import { KEEP_OUT_X, SIDE_CLEAR, TRAP_KEEP, resolveContacts } from './contact';
 import { BACKYARD, goalScored } from './field';
 import { POST_INSET, aimLine, header, shot } from './kick';
 import { NO_INTENT, PLAYER_R, createPlayer, stepPlayer, type Kick, type Player } from './player';
@@ -189,6 +189,32 @@ describe('resolveContacts: headers and tackles', () => {
     const back = ball({ x: 290 });
     contact(p, opp, back);
     expect([back.vx, back.vz]).toEqual([-220, 0]);
+  });
+
+  it('near his own goal, Harrison running at it shields the ball instead of knocking it on', () => {
+    const { p, opp } = setup(28 + KEEP_OUT_X - 20);
+    Object.assign(p, { vx: -120, facing: -1 });
+    const b = ball({ x: p.x - 7 });
+    const ev = resolveContacts(p, opp, b, 4, seeded(5), BACKYARD, { trips: true, squeeze: true, clearUpfield: true, keepOut: true });
+    expect(ev.touched).toBe(true);
+    expect(p.vx).toBeCloseTo(-120 * TRAP_KEEP);
+    expect(b.vx).toBeCloseTo(p.vx);
+  });
+
+  it('away from his goal, running away from it, or without keep-out, a running touch knocks it on as before', () => {
+    const cases = [
+      { x: 300, vx: -120, keepOut: true },
+      { x: 28 + KEEP_OUT_X - 20, vx: 120, keepOut: true },
+      { x: 28 + KEEP_OUT_X - 20, vx: -120, keepOut: false },
+    ];
+    for (const c of cases) {
+      const { p, opp } = setup(c.x);
+      Object.assign(p, { vx: c.vx, facing: Math.sign(c.vx) });
+      const b = ball({ x: p.x + Math.sign(c.vx) * 7 });
+      resolveContacts(p, opp, b, 4, seeded(5), BACKYARD, { trips: true, squeeze: true, keepOut: c.keepOut });
+      expect(p.vx, JSON.stringify(c)).toBe(c.vx);
+      expect(Math.abs(b.vx), JSON.stringify(c)).toBeGreaterThan(Math.abs(c.vx));
+    }
   });
 
   it('a slide tackle that misses the ball trips the opponent', () => {

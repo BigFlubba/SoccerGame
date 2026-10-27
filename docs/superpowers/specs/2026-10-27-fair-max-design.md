@@ -306,3 +306,51 @@ a later change can't quietly make it hard again.
 - The scripted Harrison's design, the seeds and how many, and the exact
   test bands.
 - Whether Control speeds the drag-back.
+
+## Amended after the parent's playtest (2026-10-27)
+
+The parent played the branch and found two things. Both changes were
+parent-approved in chat; this section supersedes the numbers above.
+
+1. **The kickoff was a little too easy on Easy and Normal** (a full
+   charge often scored straight from the spot). Now Max still holds his
+   spot, but on Easy and Normal he comes as soon as Harrison starts
+   winding up a kick (`kickoffRush`), at his own reaction pace. On its
+   own that overshot (Normal's kickoff shot fell to 5%), so he waits a
+   little further off the ball's line: Easy 110 back / 20 off, Normal
+   110 back / 24 off (Normal's quicker Max needs the extra room). The
+   kickoff shot now scores about 45% on Easy and 40% on Normal, down
+   from 69% / 62% (target was about one in three; the spot sweep was
+   noisy across rungs, so it stopped there). Hard is unchanged: on the
+   line, holding until the ball is played.
+2. **Own goals near his own goal.** A keep-out zone: within 150 px of
+   Harrison's own goal line (about a quarter of the pitch), while he is
+   running toward his own goal, against Max only (Biscuit unchanged):
+   - a running touch shields the ball instead of knocking it on: he and
+     the ball are checked to 0.3 of his speed, so he can only creep it
+     goalward and has to turn (the drag-back) or clear it;
+   - a clean steal or trap stops him and the ball dead;
+   - a poke squirts out to the nearer board and a little upfield (the
+     slide clear's numbers), never at the goal.
+   Everywhere else plays as before. A poke now also counts as his touch
+   (no same-tick re-touch), everywhere.
+
+**Retuned for the tougher kickoff and the safer box** (rung 10):
+
+| | reaction | wrong-footed | kickoff spot | pace |
+|---|---|---|---|---|
+| Easy | 0.26 s | 0.40 s | 110 back, 20 off, comes at the wind-up | 1.00 |
+| Normal | 0.16 s | 0.35 s | 110 back, 24 off, comes at the wind-up | 1.03 |
+| Hard | 0.10 s | 0.20 s | 70 back, on the line, waits for the kick | 1.10 |
+
+Other fields as in the table above (aim 8° / 6° / 2°, back-off
+0.32 / 0.18 / 0.10 s, clean steal 0.90 / 0.75 / 0.55).
+
+**Measured:** 64 seeds Easy 0.828, Normal 0.625, Hard 0.016; 128 seeds
+0.797 / 0.578 / 0.016 (Hard's baseline 0.016). Rung 1 (32 seeds)
+0.844 / 0.625 / 0.063. Own goals over rungs 1 and 10, 64 seeds each:
+Easy 89 → 42, Normal 138 → 74, Hard 155 → 74 (as a share of Max's
+goals: 26% → 18%, 28% → 18%, 21% → 10%). Left: about 3% of Normal
+kickoffs end with the shot blocked by the onrushing Max and rolling into
+Harrison's empty net, and own goals after Harrison's own kicks (a shot
+off Max's body, a header) are untouched by this change.

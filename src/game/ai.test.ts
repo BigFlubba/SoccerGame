@@ -171,6 +171,20 @@ describe('think', () => {
     expect(think(brain, w, w.away, w.home, STEP).moveX).not.toBe(0);
   });
 
+  it('on Easy and Normal Max comes as soon as Harrison winds up at his kickoff; on Hard he waits for the kick', () => {
+    for (const d of ['easy', 'normal', 'hard'] as const) {
+      const w = createWorld(BASE_STATS, BASE_STATS, 3, { home: 4, away: 6 }, null, null, DIFFICULTY[d]);
+      const brain = createBrain(DIFFICULTY[d]);
+      think(brain, w, w.away, w.home, STEP);
+      w.match.phase = 'playing';
+      for (let i = 0; i < 6; i++) think(brain, w, w.away, w.home, STEP);
+      w.home.state = 'charging';
+      let moved = false;
+      for (let t = 0; t < 0.5 && !moved; t += STEP) moved = think(brain, w, w.away, w.home, STEP).moveX !== 0;
+      expect(moved, d).toBe(d !== 'hard');
+    }
+  });
+
   it("Max doesn't hold at his own kickoff, and Harrison's brain never holds", () => {
     const w = createWorld(BASE_STATS, BASE_STATS, 3, { home: 4, away: 6 }, null, null, DIFFICULTY.normal);
     w.match.kickoffTeam = 'away';
@@ -208,18 +222,17 @@ describe('think', () => {
   });
 
   it('difficulty profiles match the plan', () => {
-    const spot = { back: 110, off: 18 };
     expect(DIFFICULTY.easy).toEqual({
-      reactionS: 0.2, aimErrorDeg: 8, aggression: 0.3, shootRange: 150, braceSense: 0.5, backOffS: 0.32,
-      cleanSteal: 0.9, wrongFootedS: 0.35, kickoffSpot: spot, paceFactor: 1,
+      reactionS: 0.26, aimErrorDeg: 8, aggression: 0.3, shootRange: 150, braceSense: 0.5, backOffS: 0.32,
+      cleanSteal: 0.9, wrongFootedS: 0.4, kickoffSpot: { back: 110, off: 20 }, kickoffRush: true, paceFactor: 1,
     });
     expect(DIFFICULTY.normal).toEqual({
-      reactionS: 0.14, aimErrorDeg: 6, aggression: 0.55, shootRange: 180, braceSense: 0.75, backOffS: 0.18,
-      cleanSteal: 0.75, wrongFootedS: 0.3, kickoffSpot: spot, paceFactor: 1.03,
+      reactionS: 0.16, aimErrorDeg: 6, aggression: 0.55, shootRange: 180, braceSense: 0.75, backOffS: 0.18,
+      cleanSteal: 0.75, wrongFootedS: 0.35, kickoffSpot: { back: 110, off: 24 }, kickoffRush: true, paceFactor: 1.03,
     });
     expect(DIFFICULTY.hard).toEqual({
       reactionS: 0.1, aimErrorDeg: 2, aggression: 0.8, shootRange: 210, braceSense: 0.9, backOffS: 0.1,
-      cleanSteal: 0.55, wrongFootedS: 0.2, kickoffSpot: { back: 70, off: 0 }, paceFactor: 1.08,
+      cleanSteal: 0.55, wrongFootedS: 0.2, kickoffSpot: { back: 70, off: 0 }, kickoffRush: false, paceFactor: 1.1,
     });
   });
 

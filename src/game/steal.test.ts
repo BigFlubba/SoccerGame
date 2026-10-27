@@ -3,6 +3,7 @@ import { BALL_R } from '../art/ball';
 import { DIFFICULTY, createBrain, think, type AiProfile } from './ai';
 import { BALL_REST_Y } from './ball';
 import { DOG_DIFFICULTY, JINK_S, TUNING_STATS } from './dog';
+import { SIDE_CLEAR } from './contact';
 import { NO_INTENT, createPlayer, stepPlayer, type Player } from './player';
 import { BACKYARD } from './field';
 import { STEAL_COOLDOWN_S, STUMBLE_S, resolveSteal } from './steal';
@@ -126,6 +127,17 @@ describe('the steal button', () => {
     expect(w.events.kicks[0]!.touched, 'his own touch knocks it on').toBe(false);
     expect(ballAtFeet(w.home, w.ball)).toBe(true);
     expect(Math.abs(w.ball.vx)).toBeLessThanOrEqual(Math.abs(w.home.vx) + 1);
+  });
+
+  it('near his own goal a clean steal stops the ball dead at his feet, and a poke squirts out to the side', () => {
+    const clean = stage({ max: 120, ball: 112, home: 130, vx: -150, profile: DIFFICULTY.easy, seed: 3 });
+    expect(resolveSteal(clean, TAP)).toBe('stole');
+    expect([clean.ball.vx, clean.ball.vz, clean.home.vx]).toEqual([0, 0, 0]);
+    expect(ballAtFeet(clean.home, clean.ball)).toBe(true);
+    const poked = stage({ max: 120, ball: 112, home: 130, vx: -150, profile: { ...DIFFICULTY.hard, cleanSteal: 0 }, seed: 3 });
+    expect(resolveSteal(poked, TAP)).toBe('poked');
+    expect(poked.ball.vx).toBe(SIDE_CLEAR.vx);
+    expect(Math.abs(poked.ball.vz)).toBe(SIDE_CLEAR.vz);
   });
 
   it("a head-on clean steal sticks through Max's wrong-footed beat", () => {

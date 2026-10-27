@@ -25,7 +25,7 @@ describe('world', () => {
   });
 
   it("at Harrison's kickoff on Easy and Normal Max waits off the line, on Hard on it", () => {
-    for (const [d, x, z] of [['easy', 430, 50], ['normal', 430, 50], ['hard', 390, 32]] as const) {
+    for (const [d, x, z] of [['easy', 430, 52], ['normal', 430, 56], ['hard', 390, 32]] as const) {
       const w = createWorld(BASE_STATS, BASE_STATS, 1, ERR, null, null, DIFFICULTY[d]);
       expect([w.away.x, w.away.z], d).toEqual([x, z]);
     }
