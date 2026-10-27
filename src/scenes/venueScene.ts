@@ -1,6 +1,6 @@
 import { MASTER, type MasterColor } from '../art/colors';
 import { BASE_W } from '../engine/viewport';
-import { VENUES, VENUE_STARS, matchById, matchState, nextCareerMatch, starsAt, venueStars, type CareerMatch, type MatchState, type VenueId } from '../meta/career';
+import { VENUES, matchById, matchState, nextCareerMatch, starsAt, venueMaxStars, venueStars, type CareerMatch, type MatchState, type VenueId } from '../meta/career';
 import { trainingLine } from '../meta/ladder';
 import { BONUSES } from '../meta/objectives';
 import { drawBackdrop } from './backdrop';
@@ -19,9 +19,6 @@ export interface VenueScene extends Scene {
   /** The match panel's lines for the cursor's match. */
   readonly panelLines: readonly string[];
 }
-
-/** Biscuit's blurb states the facts only; the first attempt is pure discovery. */
-const BOSS_BLURB = "HE CAN'T SHOOT. HE JUST RUNS IT IN.";
 
 const HEADER = { h: 30, dim: 0.45 };
 const TITLE_Y = 4;
@@ -49,10 +46,10 @@ const NODE_LOOK: Record<MatchState, { fill: MasterColor; border: MasterColor; nu
   locked: { fill: 'charcoal', border: 'outline', number: 'gray' },
 };
 
-/** The match panel's lines: the match, its blurb (none for rung 1), and its bonus. */
+/** The match panel's lines: the match, its blurb (a rung's is its training line, none for rung 1), and its bonus. */
 export function panelLines(match: CareerMatch): string[] {
   const title = match.kind === 'boss' ? match.name : `MATCH ${match.rung} - ${match.name}`;
-  const blurb = match.kind === 'boss' ? BOSS_BLURB : trainingLine(match.rung);
+  const blurb = match.blurb ?? trainingLine(match.rung);
   return [title, ...(blurb ? [blurb] : []), `BONUS: ${BONUSES[match.bonus].label}`];
 }
 
@@ -112,7 +109,7 @@ export function createVenueScene(ctx: GameContext, venue: VenueId, cursorId?: st
       g.restore();
       const centre = (img: HTMLCanvasElement, y: number) => g.drawImage(img, Math.round(BASE_W / 2 - img.width / 2), y);
       centre(art.text(VENUES.find(v => v.id === venue)!.name, 2, 'energyGold', 'outline'), TITLE_Y);
-      const total = art.text(`STARS ${venueStars(p, venue)}/${VENUE_STARS}`, 1, 'white', 'outline');
+      const total = art.text(`STARS ${venueStars(p, venue)}/${venueMaxStars(venue)}`, 1, 'white', 'outline');
       const totalX = Math.round(BASE_W / 2 - (STAR_W + STAR_GAP_PX + total.width) / 2);
       drawStar(g, totalX, STARS_LINE_Y + 1, true);
       g.drawImage(total, totalX + STAR_W + STAR_GAP_PX, STARS_LINE_Y);

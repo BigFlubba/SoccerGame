@@ -4,7 +4,7 @@ import { newProfile } from '../meta/profile';
 import { STOPS, createRoadMapScene } from './roadMapScene';
 import { testContext } from './testContext';
 import { frame } from './testInput';
-import { createVenueScene } from './venueScene';
+import { createVenueScene, type VenueScene } from './venueScene';
 
 const STEP = 1 / 60;
 
@@ -36,12 +36,16 @@ describe('the road map', () => {
     expect(STOPS).toHaveLength(5);
   });
 
-  it('the Park stays locked after Biscuit, though it says COMING SOON', () => {
+  it('the Park blips until Biscuit is beaten, then A enters it', () => {
+    const before = testContext({ profile: { ...newProfile(), ladderWins: 10 } });
+    expect(createRoadMapScene(before, 1).update(frame(['confirm']), STEP)).toBeNull();
+    expect(before.audio.played).toContain('nope');
     const ctx = testContext({ profile: { ...newProfile(), ladderWins: 10, career: { stars: { [BOSS_ID]: 1 }, milestonesPaid: 0, lossStreaks: {} } } });
     const s = createRoadMapScene(ctx, 1);
     expect(s.index).toBe(1);
-    expect(s.update(frame(['confirm']), STEP)).toBeNull();
-    expect(ctx.audio.played).toContain('nope');
+    const park = s.update(frame(['confirm']), STEP) as VenueScene;
+    expect(park.kind).toBe('venue');
+    expect(park.venue).toBe('park');
   });
 
   it('B goes to the Hub on CAREER', () => {

@@ -29,7 +29,6 @@ const HEADER = { h: 86, tipH: 98, dim: 0.45 };
 const LINE_YS = [30, 52, 74, 86] as const;
 const LINE_SCALES = [2, 2, 1, 1] as const;
 const LINE_COLOURS = ['energyGold', 'white', 'white', 'volt'] as const;
-export const BOSS_TIP = 'TIP: GET BETWEEN HIM AND YOUR GOAL';
 /** The two of them stand facing each other on the pitch line. */
 const PITCH_Y = 150;
 const HOME_X = 110;
@@ -44,7 +43,7 @@ export function vsLines(match: CareerMatch, p: Profile): string[] {
   const venue = VENUES.find(v => v.id === match.venue)!;
   const title = match.kind === 'boss' ? `${venue.name} BOSS` : `MATCH ${match.rung}`;
   const lines = [title, `HARRISON VS ${match.name}`, `BONUS: ${BONUSES[match.bonus].label}`];
-  if (match.kind === 'boss' && (p.career.lossStreaks[match.id] ?? 0) >= 1) lines.push(BOSS_TIP);
+  if (match.tip !== null && (p.career.lossStreaks[match.id] ?? 0) >= 1) lines.push(match.tip);
   return lines;
 }
 

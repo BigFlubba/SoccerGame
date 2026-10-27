@@ -256,7 +256,7 @@ describe('careerLine', () => {
     expect(footLines(paid, tallyAt(paid, Infinity), true)).toEqual(['BISCUIT TAKES THIS ONE. GO AGAIN!', '10 STARS! +300 COINS', 'UPGRADE READY IN THE SHOP!']);
   });
 
-  it('NEXT MATCH plays the next unbeaten match; TRY AGAIN replays this one; CAREER once all is beaten', () => {
+  it('NEXT MATCH plays the next unbeaten match; TRY AGAIN replays this one; Biscuit leads on to the Park', () => {
     const next = after(WIN_3_0, { ...newProfile(), ladderWins: 3 }, matchById('backyard-1')!);
     expect(resultsItems(next.reward)[0]).toBe('NEXT MATCH');
     const s = createResultsScene(next.ctx, next.reward, true);
@@ -264,9 +264,9 @@ describe('careerLine', () => {
     const lost = after(LOSS_0_2, { ...newProfile(), ladderWins: 10 }, boss);
     expect(resultsItems(lost.reward)[0]).toBe('TRY AGAIN');
     expect((createResultsScene(lost.ctx, lost.reward, true).update(frame(['confirm']), STEP) as VsScene).match.id).toBe('backyard-boss');
-    const done = after(WIN_3_0, { ...newProfile(), ladderWins: 10 }, boss);
-    expect(resultsItems(done.reward)).toEqual(['CAREER', 'SHOP', 'HUB']);
-    expect(createResultsScene(done.ctx, done.reward, true).update(frame(['confirm']), STEP)?.kind).toBe('roadMap');
+    const biscuit = after(WIN_3_0, { ...newProfile(), ladderWins: 10 }, boss);
+    expect(resultsItems(biscuit.reward)[0]).toBe('NEXT MATCH');
+    expect((createResultsScene(biscuit.ctx, biscuit.reward, true).update(frame(['confirm']), STEP) as VsScene).match.id).toBe('park-1');
   });
 });
 

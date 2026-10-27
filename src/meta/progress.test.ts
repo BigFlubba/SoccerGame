@@ -102,11 +102,20 @@ describe('applyMatch', () => {
     expect(profile.career.lossStreaks).toEqual({ [BOSS_ID]: 2 });
   });
 
-  it('the boss is beaten by its star, and then everything is beaten', () => {
+  it('the boss is beaten by its star, which opens the Park, so not everything is beaten', () => {
     const { profile, reward } = applyMatch({ ...newProfile(), ladderWins: 10 }, win30, boss, TODAY);
     expect(profile.career.stars[BOSS_ID]).toBe(3);
-    expect(reward.career).toMatchObject({ firstWin: true, allBeaten: true, champion: false, bonusDone: true });
+    expect(reward.career).toMatchObject({ firstWin: true, allBeaten: false, champion: false, bonusDone: true });
     expect(profile.ladderWins).toBe(10);
+  });
+
+  it('three clean steals at park-3 settle its bonus', () => {
+    const tia = matchById('park-3')!;
+    const start = { ...newProfile(), ladderWins: 10, career: { stars: { [BOSS_ID]: 1 }, milestonesPaid: 0, lossStreaks: {} } };
+    const won = { result: 'win', goalsFor: 2, goalsAgainst: 0, styleGoals: [], goals: [shot(10), shot(40)] } as const;
+    expect(applyMatch(start, { ...won, steals: 3 }, tia, TODAY).reward.career.bonusDone).toBe(true);
+    expect(applyMatch(start, { ...won, steals: 2 }, tia, TODAY).reward.career.bonusDone).toBe(false);
+    expect(applyMatch(start, { ...won, steals: 3 }, tia, TODAY).profile.career.stars['park-3']).toBe(3);
   });
 
   it("Harrison's champion save pays the 10-star milestone once, at the next Results", () => {

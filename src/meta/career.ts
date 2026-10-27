@@ -4,16 +4,25 @@ import type { Profile } from './profile';
 
 export type VenueId = 'backyard' | 'park' | 'school' | 'stadium' | 'worldCup';
 
+/** Who Harrison plays: Max, Biscuit, the Park crew, Speedy Sam. */
+export type OpponentId = 'max' | 'biscuit' | 'brick' | 'leo' | 'tia' | 'pete' | 'sam';
+
 export interface CareerMatch {
   id: string;
   venue: VenueId;
-  kind: 'rung' | 'boss';
-  /** 1–10 for a rung, 0 for a boss. */
+  /** 'rung' is beaten by ladderWins; 'match' and 'boss' by their stars. */
+  kind: 'rung' | 'match' | 'boss';
+  /** Its number in the venue: 1–10 for a rung, 1–4 for a match, 0 for a boss. */
   rung: number;
   /** On the venue screen and VS card. */
   name: string;
   /** On the HUD and Results. */
   hudName: string;
+  opponent: OpponentId;
+  /** The facts-only line under the name; null for rungs (theirs is the training line). */
+  blurb: string | null;
+  /** A boss's one-line nudge once he has beaten Harrison; null otherwise. */
+  tip: string | null;
   bonus: BonusId;
 }
 
@@ -27,34 +36,54 @@ export type MatchState = 'beaten' | 'next' | 'locked';
 
 export const rungId = (n: number): string => `backyard-${n}`;
 export const BOSS_ID = 'backyard-boss';
+export const PARK_BOSS_ID = 'park-boss';
 
 /** A match's stars at most. */
 const STARS_PER_MATCH = 3;
-/** The Backyard's rungs and boss can earn this many. */
-export const VENUE_STARS = (LADDER_MATCHES + 1) * STARS_PER_MATCH;
 /** Later venues: four matches and a boss. */
 const LATER_VENUE_MATCHES = 5;
 const LATER_VENUES = 4;
-export const TOTAL_STARS = VENUE_STARS + LATER_VENUES * LATER_VENUE_MATCHES * STARS_PER_MATCH;
+export const TOTAL_STARS = (LADDER_MATCHES + 1 + LATER_VENUES * LATER_VENUE_MATCHES) * STARS_PER_MATCH;
 
 const RUNG_BONUSES: readonly BonusId[] = ['score3', 'cleanSheet', 'header', 'chip', 'volley', 'perfect', 'early', 'winBy3', 'twoStyle', 'win3Nil'];
 
-const BOSS_NAME = 'BISCUIT THE DOG';
-const BOSS_HUD_NAME = 'BISCUIT';
-
-const rungMatch = (n: number): CareerMatch => ({ id: rungId(n), venue: 'backyard', kind: 'rung', rung: n, name: 'MAX', hudName: 'MAX', bonus: RUNG_BONUSES[n - 1]! });
-const BOSS: CareerMatch = { id: BOSS_ID, venue: 'backyard', kind: 'boss', rung: 0, name: BOSS_NAME, hudName: BOSS_HUD_NAME, bonus: 'noBossGoals' };
+const rungMatch = (n: number): CareerMatch => ({
+  id: rungId(n), venue: 'backyard', kind: 'rung', rung: n, name: 'MAX', hudName: 'MAX', opponent: 'max', blurb: null, tip: null, bonus: RUNG_BONUSES[n - 1]!,
+});
+const BISCUIT: CareerMatch = {
+  id: BOSS_ID, venue: 'backyard', kind: 'boss', rung: 0, name: 'BISCUIT THE DOG', hudName: 'BISCUIT', opponent: 'biscuit',
+  blurb: "HE CAN'T SHOOT. HE JUST RUNS IT IN.", tip: 'TIP: GET BETWEEN HIM AND YOUR GOAL', bonus: 'noBossGoals',
+};
 
 export const BACKYARD: Venue = {
   id: 'backyard',
   name: 'BACKYARD',
-  matches: [...Array(LADDER_MATCHES)].map((_, i) => rungMatch(i + 1)).concat(BOSS),
+  matches: [...Array(LADDER_MATCHES)].map((_, i) => rungMatch(i + 1)).concat(BISCUIT),
 };
 
-/** The venues in career order; only the Backyard has matches in 7a. */
+const parkMatch = (rung: number, name: string, hudName: string, opponent: OpponentId, blurb: string, bonus: BonusId): CareerMatch => ({
+  id: `park-${rung}`, venue: 'park', kind: 'match', rung, name, hudName, opponent, blurb, tip: null, bonus,
+});
+
+export const PARK: Venue = {
+  id: 'park',
+  name: 'THE PARK',
+  matches: [
+    parkMatch(1, 'BIG BRICK', 'BRICK', 'brick', 'HE NEVER DIVES IN.', 'chip'),
+    parkMatch(2, 'BOOMER LEO', 'LEO', 'leo', 'HE SHOOTS FROM ANYWHERE.', 'cleanSheet'),
+    parkMatch(3, 'TRICKY TIA', 'TIA', 'tia', 'SHE FAKES ONE WAY, THEN GOES THE OTHER.', 'steals3'),
+    parkMatch(4, 'PESKY PETE', 'PETE', 'pete', "HE'S ON YOU THE MOMENT YOU HAVE IT.", 'perfect'),
+    {
+      id: PARK_BOSS_ID, venue: 'park', kind: 'boss', rung: 0, name: 'SPEEDY SAM', hudName: 'SAM', opponent: 'sam',
+      blurb: 'THE FASTEST KID IN THE PARK. HIS SHOT IS WEAK.', tip: "TIP: DON'T RACE HIM. MAKE HIM OVERSHOOT", bonus: 'noSamGoals',
+    },
+  ],
+};
+
+/** The venues in career order; the School and beyond have no matches yet. */
 export const VENUES: readonly Venue[] = [
   BACKYARD,
-  { id: 'park', name: 'THE PARK', matches: [] },
+  PARK,
   { id: 'school', name: 'SCHOOL', matches: [] },
   { id: 'stadium', name: 'STADIUM', matches: [] },
   { id: 'worldCup', name: 'WORLD CUP', matches: [] },
@@ -70,7 +99,14 @@ export function matchById(id: string): CareerMatch | undefined {
   return BY_ID.get(id);
 }
 
-const venueById = (id: VenueId): Venue => VENUES.find(v => v.id === id)!;
+export const venueById = (id: VenueId): Venue => VENUES.find(v => v.id === id)!;
+const venueIndex = (id: VenueId): number => VENUES.findIndex(v => v.id === id);
+const bossOf = (venue: VenueId): CareerMatch | undefined => venueById(venue).matches.find(m => m.kind === 'boss');
+
+/** The most stars a venue's matches can earn. */
+export function venueMaxStars(venue: VenueId): number {
+  return venueById(venue).matches.length * STARS_PER_MATCH;
+}
 
 /** His best stars at a match; 0 when he has none there. */
 export function starsAt(p: Profile, id: string): number {
@@ -84,19 +120,40 @@ export function grantRungStars(p: Profile): Profile {
   return { ...p, career: { ...p.career, stars } };
 }
 
-/** A rung is beaten by the ladder wins; a boss by its star. */
+/** A rung is beaten by the ladder wins; any other match by its star. */
 export function isBeaten(p: Profile, m: CareerMatch): boolean {
   return m.kind === 'rung' ? p.ladderWins >= m.rung : starsAt(p, m.id) >= 1;
 }
 
-/** The first unbeaten Backyard match in order; the boss once every match is beaten, as a replay. */
+/** A venue is done when its boss is beaten. */
+export function venueDone(p: Profile, venue: VenueId): boolean {
+  const boss = bossOf(venue);
+  return boss !== undefined && isBeaten(p, boss);
+}
+
+/** The Backyard is always open; a later venue once it has matches and the one before it is done. */
+export function venueOpen(p: Profile, venue: VenueId): boolean {
+  const i = venueIndex(venue);
+  if (i === 0) return true;
+  return venueById(venue).matches.length > 0 && venueDone(p, VENUES[i - 1]!.id);
+}
+
+const openVenues = (p: Profile): readonly Venue[] => VENUES.filter(v => venueOpen(p, v.id));
+
+/** The first unbeaten match in the open venues, in order; the last open venue's boss once every one is beaten, as a replay. */
 export function nextCareerMatch(p: Profile): CareerMatch {
-  return BACKYARD.matches.find(m => !isBeaten(p, m)) ?? BOSS;
+  const open = openVenues(p);
+  for (const v of open) {
+    const m = v.matches.find(m => !isBeaten(p, m));
+    if (m) return m;
+  }
+  return bossOf(open[open.length - 1]!.id)!;
 }
 
 export function matchState(p: Profile, m: CareerMatch): MatchState {
+  if (!venueOpen(p, m.venue)) return 'locked';
   if (isBeaten(p, m)) return 'beaten';
-  if (m.kind === 'boss' && p.ladderWins < LADDER_MATCHES) return 'locked';
+  if (m.kind === 'boss' && venueById(m.venue).matches.some(o => o.kind !== 'boss' && !isBeaten(p, o))) return 'locked';
   return nextCareerMatch(p).id === m.id ? 'next' : 'locked';
 }
 
@@ -108,28 +165,29 @@ export function careerStars(p: Profile): number {
   return VENUES.reduce((sum, v) => sum + venueStars(p, v.id), 0);
 }
 
-/** A venue is done when its boss is beaten. */
-export function venueDone(p: Profile, venue: VenueId): boolean {
-  const boss = venueById(venue).matches.find(m => m.kind === 'boss');
-  return boss !== undefined && isBeaten(p, boss);
-}
-
 /** Every match in every open venue is beaten. */
 export function allBeaten(p: Profile): boolean {
-  return ALL_MATCHES.every(m => isBeaten(p, m));
+  return openVenues(p).every(v => v.matches.every(m => isBeaten(p, m)));
 }
 
 /** The line under a stop on the road map. */
 export function stopLabel(p: Profile, venue: VenueId): string {
-  if (venue === 'backyard') return `${venueStars(p, venue)}/${VENUE_STARS}`;
-  if (venue === 'park' && venueDone(p, 'backyard')) return 'COMING SOON';
+  if (venueOpen(p, venue)) return `${venueStars(p, venue)}/${venueMaxStars(venue)}`;
+  const i = venueIndex(venue);
+  if (venueById(venue).matches.length === 0 && i > 0 && venueDone(p, VENUES[i - 1]!.id)) return 'COMING SOON';
   return 'LOCKED';
 }
 
 /** The Hub card's two career lines; the second is null when there is nothing to add. */
 export function careerCardLines(p: Profile): { first: string; second: string | null } {
-  if (venueDone(p, 'backyard')) return { first: `BACKYARD DONE! STARS ${venueStars(p, 'backyard')}/${VENUE_STARS}`, second: 'THE PARK: COMING SOON' };
   const next = nextCareerMatch(p);
-  if (next.kind === 'boss') return { first: `NEXT: ${next.name}`, second: 'BACKYARD BOSS!' };
-  return { first: `NEXT: ${next.name} - MATCH ${next.rung}/${LADDER_MATCHES}`, second: trainingLine(next.rung) };
+  const venue = venueById(next.venue);
+  if (isBeaten(p, next)) {
+    const after = VENUES[venueIndex(venue.id) + 1];
+    return { first: `${venue.name} DONE! STARS ${venueStars(p, venue.id)}/${venueMaxStars(venue.id)}`, second: after ? `${after.name}: COMING SOON` : null };
+  }
+  if (next.kind === 'boss') return { first: `NEXT: ${next.name}`, second: `${venue.name} BOSS!` };
+  if (next.kind === 'rung') return { first: `NEXT: ${next.name} - MATCH ${next.rung}/${LADDER_MATCHES}`, second: trainingLine(next.rung) };
+  const numbered = venue.matches.filter(m => m.kind === 'match').length;
+  return { first: `NEXT: ${next.name} - ${venue.name} ${next.rung}/${numbered}`, second: next.blurb };
 }

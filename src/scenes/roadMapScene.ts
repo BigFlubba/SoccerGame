@@ -1,7 +1,7 @@
 import { MASTER } from '../art/colors';
 import { BASE_W } from '../engine/viewport';
 import type { Camera } from '../game/camera';
-import { TOTAL_STARS, VENUES, careerStars, stopLabel, type Venue } from '../meta/career';
+import { TOTAL_STARS, VENUES, careerStars, stopLabel, venueOpen, type Venue } from '../meta/career';
 import type { GameContext } from './context';
 import { createHubScene } from './hubScene';
 import { drawLayers } from './matchView';
@@ -41,8 +41,6 @@ const NAME_BELOW = 37;
 const LABEL_BELOW = 46;
 const HINT_Y = 168;
 
-/** A venue with matches is open to enter; the rest are stops on the road ahead. */
-const isOpen = (v: Venue) => v.matches.length > 0;
 
 /**
  * The road to the Cup: five stops climbing left to right across the dimmed
@@ -71,7 +69,7 @@ export function createRoadMapScene(ctx: GameContext, index = 0): RoadMapScene {
       if (at !== before) ctx.audio.play('menuMove');
       if (input.pressed.has('confirm') || input.pressed.has('pause')) {
         const venue = VENUES[at]!;
-        if (!isOpen(venue)) {
+        if (!venueOpen(ctx.profile, venue.id)) {
           ctx.audio.play('nope');
           return null;
         }
@@ -109,7 +107,7 @@ export function createRoadMapScene(ctx: GameContext, index = 0): RoadMapScene {
       VENUES.forEach((venue, i) => {
         const stop = STOPS[i]!;
         const x = stop.cx - CARD.w / 2;
-        const open = isOpen(venue);
+        const open = venueOpen(p, venue.id);
         const frame = i === at ? FRAME.thick : FRAME.thin;
         g.fillStyle = open ? MASTER.energyGold : MASTER.outline;
         g.fillRect(x - frame, stop.y - frame, CARD.w + 2 * frame, CARD.h + 2 * frame);
