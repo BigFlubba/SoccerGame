@@ -1,5 +1,5 @@
 import { inGoalBox, playerSpan, type Field } from './field';
-import { PLAYER_R, type Player } from './player';
+import { DECEL, PLAYER_R, type Player } from './player';
 
 /** Two players closer than this on the ground plane overlap. */
 const MIN_GAP = 2 * PLAYER_R;
@@ -108,12 +108,40 @@ function sidestep(a: Player, b: Player, field: Field): void {
   }
 }
 
+/** Above this speed a player on soft brakes can't stop for a body ahead. */
+const BRUSH_SPEED = 60;
+
+/**
+ * A player on soft brakes, running fast into a body ahead of him, can't stop
+ * for it: he brushes past its shoulder, stepping out square to his run on
+ * the side he's already on (the roomier side if dead on), keeping his speed.
+ * Returns whether he did.
+ */
+function brushPast(runner: Player, other: Player, field: Field): boolean {
+  const speed = Math.hypot(runner.vx, runner.vz);
+  if (runner.handling.decel >= DECEL || speed <= BRUSH_SPEED || !overlapping(runner, other)) return false;
+  const [ux, uz] = [runner.vx / speed, runner.vz / speed];
+  const [rx, rz] = [other.x - runner.x, other.z - runner.z];
+  const along = rx * ux + rz * uz;
+  if (along <= 0) return false;
+  const across = rx * -uz + rz * ux;
+  const away = across !== 0 ? -Math.sign(across) : Math.sign((field.depth / 2 - other.z) * ux) || 1;
+  const step = Math.sqrt(MIN_GAP * MIN_GAP - along * along) - Math.abs(across) + TOUCH_EPS;
+  const [x, z] = [runner.x, runner.z];
+  runner.x += -uz * away * step;
+  runner.z += ux * away * step;
+  if (!confine(runner, field) && !overlapping(runner, other)) return true;
+  [runner.x, runner.z] = [x, z];
+  return false;
+}
+
 /**
  * One tick's body resolution: players apart, on the pitch and out of the
  * goals. When a wall or goal stops one giving way, the other takes the rest
  * of the push, so nobody is left overlapping or wedged.
  */
 export function resolveBodies(a: Player, b: Player, field: Field): void {
+  if (brushPast(a, b, field) || brushPast(b, a, field)) return;
   for (let pass = 0; pass < SOLVE_PASSES; pass++) {
     separatePlayers(a, b);
     const pinnedA = confine(a, field);

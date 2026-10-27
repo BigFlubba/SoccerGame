@@ -8,7 +8,7 @@ import { createDogBrain, dogThink } from '../game/dogAi';
 import { HUMAN_AIM_ERROR_DEG, type Aim } from '../game/kick';
 import { cancelCharge, type PlayerIntent } from '../game/player';
 import { endPower } from '../game/power';
-import { opponentProfile, opponentStats, type HumanOpponentId } from '../game/opponents';
+import { opponentHandling, opponentProfile, opponentStats, type HumanOpponentId } from '../game/opponents';
 import { createWorld, stepWorld, type World } from '../game/world';
 import { BASE_STATS } from '../game/stats';
 import { clockMinute, endGoalPause } from '../game/match';
@@ -119,6 +119,7 @@ export function createMatchScene(ctx: GameContext, seed: number, match: CareerMa
     powerKit(ctx.profile),
     dog ? DOG_DIFFICULTY[difficulty] : null,
     dog ? null : thinking,
+    opponentHandling(human),
   );
   const brain = createBrain(thinking);
   const dogBrain = dog ? createDogBrain(DOG_DIFFICULTY[difficulty]) : null;

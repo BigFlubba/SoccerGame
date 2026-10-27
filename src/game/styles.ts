@@ -7,7 +7,7 @@ import { REACH_Z } from './zones';
 /**
  * What each opponent's style changes at the brain's decision points. Max
  * is allRound and plays exactly as before; each of the Park crew changes
- * one or two of these.
+ * one or two of these, and so does Speedy Sam, the speedster.
  */
 
 export const attackDir = (me: Player): 1 | -1 => (me.team === 'home' ? 1 : -1);
@@ -35,8 +35,8 @@ export function defendSpot(style: Style, w: World, me: Player, defending: Goal):
   const ball = w.ball;
   const dir = attackDir(me);
   const centre = goalCentreZ(defending);
-  // The presser comes straight at the ball, from his side of it.
-  if (style === 'presser') return { x: ball.x - dir * PRESS_OFFSET, z: ball.z };
+  // The presser and the speedster come straight at the ball, from their side of it.
+  if (style === 'presser' || style === 'speedster') return { x: ball.x - dir * PRESS_OFFSET, z: ball.z };
   if (style !== 'blocker') return { x: ball.x - dir * DEFEND_OFFSET, z: ball.z + (centre - ball.z) * DEFEND_COVER };
   // Distances measured from the ball back toward his own goal line.
   const toLine = (defending.lineX - ball.x) * -dir;
@@ -102,11 +102,19 @@ export function fakeMove(fake: { side: 1 | -1; t: number }, dir: 1 | -1): { move
   return null;
 }
 
-/** allRound sprints when the ball is further than this, with enough stamina; the presser sprints at any distance. */
+/** allRound sprints when the ball is further than this, with enough stamina; the presser and the speedster sprint at any distance. */
 export const SPRINT_DISTANCE = 120;
 export const SPRINT_MIN_STAMINA = 0.4;
 
 /** Whether it sprints this decision, `dist` px from the ball. */
 export function pressSprint(style: Style, dist: number, stamina: number): boolean {
-  return (style === 'presser' || dist > SPRINT_DISTANCE) && stamina > SPRINT_MIN_STAMINA;
+  return (style === 'presser' || style === 'speedster' || dist > SPRINT_DISTANCE) && stamina > SPRINT_MIN_STAMINA;
 }
+
+/**
+ * The speedster's range shot: on the ball within `from` px of goal, with
+ * the opponent standing up to `blockedAhead` px ahead and within `lane` px
+ * of his line, he's blocked, and may try his weak shot from there
+ * (AiProfile.rangeShot, rolled once per decision).
+ */
+export const RANGE_SHOT = { blockedAhead: 60, lane: 12, from: 320 };

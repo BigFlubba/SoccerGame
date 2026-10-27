@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { seeded } from '../engine/random';
 import { keepOutOfGoals, resolveBodies, separatePlayers } from './bodies';
 import { BACKYARD, inGoalBox } from './field';
-import { NO_INTENT, PLAYER_R, createPlayer, stepPlayer, type Player, type PlayerIntent } from './player';
+import { NO_INTENT, NORMAL_HANDLING, PLAYER_R, createPlayer, stepPlayer, type Player, type PlayerIntent } from './player';
 import { BASE_STATS } from './stats';
 import { createWorld, placeForKickoff } from './world';
 
@@ -209,6 +209,65 @@ describe('kickoff', () => {
       w.match.kickoffTeam = team;
       placeForKickoff(w);
       expect(gap(w.home, w.away)).toBeGreaterThanOrEqual(2 * PLAYER_R);
+    }
+  });
+});
+
+describe('soft brakes: a runner who can\'t stop brushes past a body', () => {
+  const SOFT = { ...NORMAL_HANDLING, decel: 500 };
+  const FAST = { speed: 10, power: 1, jump: 3, control: 3 };
+  /** A runner flat out to the left at (x, z) with `handling`, and Harrison standing at (300, 32). */
+  function charge(z: number, handling = SOFT) {
+    const runner = Object.assign(createPlayer('away', FAST, 340, -1, z), { handling, vx: -212 });
+    const stander = home(300, 32);
+    const flat = { ...NO_INTENT, moveX: -1, sprint: true, pace: 212 / 195.75 };
+    let minGap = Infinity;
+    for (let i = 0; i < ticks(0.4); i++) {
+      tick(runner, stander, flat, NO_INTENT);
+      minGap = Math.min(minGap, gap(runner, stander));
+    }
+    return { runner, stander, minGap };
+  }
+
+  it.each([32, 36, 26])('flat out at a body dead ahead (at depth %d), he goes by its shoulder at full speed, never through it', z => {
+    const { runner, stander, minGap } = charge(z);
+    expect(runner.x).toBeLessThan(stander.x - 40);
+    expect(-runner.vx).toBeGreaterThan(190);
+    expect(minGap).toBeGreaterThanOrEqual(2 * PLAYER_R - 1e-6);
+    expect([stander.x, stander.z]).toEqual([300, 32]);
+  });
+
+  it('dead on, he steps out to the roomier side', () => {
+    const near = charge(32);
+    expect(near.runner.z).not.toBe(32);
+    const { runner } = (() => {
+      const r = Object.assign(createPlayer('away', FAST, 340, -1, 12), { handling: SOFT, vx: -212 });
+      const s = home(300, 12);
+      for (let i = 0; i < ticks(0.4); i++) tick(r, s, { ...NO_INTENT, moveX: -1, sprint: true }, NO_INTENT);
+      return { runner: r };
+    })();
+    expect(runner.z).toBeGreaterThan(12);
+  });
+
+  it('with normal brakes the body stops him, as always', () => {
+    const { runner, stander } = charge(32, NORMAL_HANDLING);
+    expect(runner.x).toBeGreaterThan(stander.x);
+  });
+
+  it('slow on soft brakes, a body still stops him', () => {
+    const runner = Object.assign(createPlayer('away', BASE_STATS, 312, -1, 32), { handling: SOFT });
+    const stander = home(300, 32);
+    for (let i = 0; i < ticks(0.5); i++) tick(runner, stander, { ...NO_INTENT, moveX: -0.3 }, NO_INTENT);
+    expect(runner.x).toBeGreaterThan(stander.x);
+  });
+
+  it('pinned against the near board, he can\'t brush past on the board side and goes by the other, or stops', () => {
+    const runner = Object.assign(createPlayer('away', FAST, 340, -1, PLAYER_R), { handling: SOFT, vx: -212 });
+    const stander = home(300, PLAYER_R + 4);
+    for (let i = 0; i < ticks(0.4); i++) {
+      tick(runner, stander, { ...NO_INTENT, moveX: -1, sprint: true }, NO_INTENT);
+      expect(gap(runner, stander)).toBeGreaterThanOrEqual(2 * PLAYER_R - 1e-6);
+      expect(runner.z).toBeGreaterThanOrEqual(PLAYER_R);
     }
   });
 });

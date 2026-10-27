@@ -3,15 +3,18 @@ import { seeded } from '../engine/random';
 import { DIFFICULTY, KICKOFF_HOLD_S, createBrain, think, type AiBrain, type AiProfile } from './ai';
 import { BALL_REST_Y } from './ball';
 import { inGoalBox } from './field';
-import { NO_INTENT, PLAYER_R, type Player, type PlayerIntent } from './player';
+import { NO_INTENT, NORMAL_HANDLING, PLAYER_R, type Player, type PlayerIntent } from './player';
+import { LADDER_MATCHES, maxStats } from '../meta/ladder';
+import { SAM_HANDLING, SAM_PROFILES, SAM_STATS } from './sam';
 import type { Aim } from './kick';
 import { METER_MIN_REFILL_S, WAVE_READY_S, canStartPower } from './power';
-import { BASE_STATS, STAT_NAMES, type StatName, type Stats } from './stats';
+import { BASE_STATS, STAT_NAMES, runSpeed, type StatName, type Stats } from './stats';
 import { FAKE, defendSpot } from './styles';
 import { CREW_PROFILES, CREW_STATS } from './crew';
 import { maxHasBall } from './steal';
 import { BRACE_DISTANCE } from './wave';
 import { createWorld, placeForKickoff, stepWorld, type World } from './world';
+import { ballAtFeet } from './zones';
 
 const STEP = 1 / 60;
 
@@ -875,5 +878,105 @@ describe('Pesky Pete', () => {
 
   it('gets to the ball carrier sooner than Max would from the same start', () => {
     expect(ticksToBall(CREW_PROFILES.pete.normal)).toBeLessThan(ticksToBall(DIFFICULTY.normal));
+  });
+});
+
+describe('Speedy Sam: all gas, no brakes', () => {
+  const TUNING: Stats = { speed: 7, power: 5, jump: 4, control: 5 };
+  /** Sam in play, placed by hand, with his own handling, and his brain. */
+  function samWorld(o: { sam: readonly [number, number]; harrison: readonly [number, number]; ball: readonly [number, number]; touchedBy?: 'home' | 'away' }, d: 'easy' | 'normal' | 'hard' = 'normal') {
+    const profile = SAM_PROFILES[d];
+    const w = createWorld(TUNING, SAM_STATS, 5, { home: 4, away: profile.aimErrorDeg }, null, null, profile, SAM_HANDLING);
+    w.match.phase = 'playing';
+    Object.assign(w.away, { x: o.sam[0], z: o.sam[1], facing: -1 });
+    Object.assign(w.home, { x: o.harrison[0], z: o.harrison[1], facing: 1 });
+    Object.assign(w.ball, { x: o.ball[0], y: BALL_REST_Y, z: o.ball[1], vx: 0, vy: 0, vz: 0, touchedBy: o.touchedBy });
+    return { w, brain: createBrain(profile) };
+  }
+
+  /**
+   * Harrison standing on the ball at x 300; the opponent starting 120 px off and running at it.
+   * Harrison drags it back when the opponent is `at` px from the ball. Where is everyone half a second later?
+   */
+  function dragBackAt(stats: Stats, profile: AiProfile, handling: typeof NORMAL_HANDLING, z: number, at = 50) {
+    const w = createWorld(TUNING, stats, 1, { home: 4, away: profile.aimErrorDeg }, null, null, profile, handling);
+    w.match.phase = 'playing';
+    Object.assign(w.home, { x: 300, z: 32, facing: 1 });
+    Object.assign(w.ball, { x: 308, y: BALL_REST_Y, z: 32, vx: 0, vy: 0, vz: 0, touchedBy: 'home' });
+    Object.assign(w.away, { x: 420, z, facing: -1 });
+    const brain = createBrain(profile);
+    let [from, touched] = [-1, false];
+    for (let t = 0; t < 300 && (from < 0 || t < from + 30); t++) {
+      if (from < 0 && w.away.x - w.ball.x <= at) from = t;
+      stepWorld(w, from >= 0 && t < from + 3 ? { ...NO_INTENT, moveX: -1 } : NO_INTENT, think(brain, w, w.away, w.home, STEP), STEP);
+      const ev = w.events.kicks[1]!;
+      if (from >= 0) touched ||= ev.touched || ev.kicked !== null || ev.tackledBall;
+    }
+    return { past: w.home.x - w.away.x, touched, hisBall: ballAtFeet(w.home, w.ball) };
+  }
+
+  it.each([32, 50])('the overshoot: a drag-back as he arrives (from depth %d) leaves him flying past, and the ball with Harrison', z => {
+    const { past, touched, hisBall } = dragBackAt(SAM_STATS, SAM_PROFILES.normal, SAM_HANDLING, z);
+    expect(past).toBeGreaterThanOrEqual(15);
+    expect(touched).toBe(false);
+    expect(hisBall).toBe(true);
+  });
+
+  it("the overshoot is Sam's: Max at rung 10 meets the same drag-back without flying past", () => {
+    for (const z of [32, 50]) expect(dragBackAt(maxStats(LADDER_MATCHES), DIFFICULTY.normal, NORMAL_HANDLING, z).past).toBeLessThan(15);
+  });
+
+  it('blocked, he sometimes tries his weak shot from range: the roll decides, once per decision', () => {
+    // Sam on the ball 250 px from Harrison's goal, Harrison 40 px ahead in his lane.
+    const at = { sam: [278, 32], harrison: [238, 34], ball: [270, 32], touchedBy: 'away' } as const;
+    const under = samWorld(at);
+    under.w.rng = () => SAM_PROFILES.normal.rangeShot! / 2;
+    think(under.brain, under.w, under.w.away, under.w.home, STEP);
+    expect(under.brain.plan).toBe('charge');
+    const over = samWorld(at);
+    over.w.rng = () => 0.999;
+    think(over.brain, over.w, over.w.away, over.w.home, STEP);
+    expect(over.brain.plan).toBe('dribble');
+  });
+
+  it('with Harrison out of his lane he never shoots from 250 px', () => {
+    const { w, brain } = samWorld({ sam: [278, 32], harrison: [238, 56], ball: [270, 32], touchedBy: 'away' });
+    w.rng = () => 0;
+    think(brain, w, w.away, w.home, STEP);
+    expect(brain.plan).toBe('dribble');
+  });
+
+  it('dribbling at an open goal he only shoots once inside his shooting range, and the ball goes in off a touch or that shot', () => {
+    for (const seed of [1, 2, 3, 4, 5, 6]) {
+      const { w, brain } = samWorld({ sam: [520, 32], harrison: [620, 60], ball: [512, 32], touchedBy: 'away' });
+      w.rng = seeded(seed);
+      let firstChargeAt: number | null = null;
+      for (let t = 0; t < 600 && w.events.goal === null; t++) {
+        stepWorld(w, NO_INTENT, think(brain, w, w.away, w.home, STEP), STEP);
+        if (firstChargeAt === null && w.away.state === 'charging') firstChargeAt = w.away.x - w.field.goals[0].lineX;
+      }
+      expect(w.events.goal, `seed ${seed}`).toBe('away');
+      if (firstChargeAt !== null) expect(firstChargeAt, `seed ${seed}`).toBeLessThanOrEqual(SAM_PROFILES.normal.shootRange + 16);
+    }
+  });
+
+  it("backing off from a powered-up Harrison he backpedals at rung-10 Max's pace, not his own", () => {
+    const backpedal = (stats: Stats, profile: AiProfile, handling = NORMAL_HANDLING): number => {
+      const w = createWorld(TUNING, stats, 3, { home: 4, away: 6 }, { golden: false }, null, profile, handling);
+      w.match.phase = 'playing';
+      Object.assign(w.home, { x: 300, z: 32 });
+      Object.assign(w.ball, { x: 308, y: BALL_REST_Y, z: 32 });
+      Object.assign(w.away, { x: 360, z: 32 });
+      w.power!.activeS = 2;
+      const brain = createBrain({ ...profile, braceSense: 1, backOffS: 0 });
+      for (let i = 0; i < 20; i++) stepWorld(w, NO_INTENT, think(brain, w, w.away, w.home, STEP), STEP);
+      expect(brain.plan).toBe('backOff');
+      return Math.hypot(w.away.vx, w.away.vz);
+    };
+    const maxPace = runSpeed(maxStats(LADDER_MATCHES)) * 0.9;
+    expect(backpedal(SAM_STATS, SAM_PROFILES.normal, SAM_HANDLING)).toBeCloseTo(maxPace, 0);
+    expect(backpedal(CREW_STATS.pete, CREW_PROFILES.pete.normal)).toBeCloseTo(maxPace, 0);
+    expect(backpedal(maxStats(LADDER_MATCHES), DIFFICULTY.normal)).toBeCloseTo(maxPace, 0);
+    expect(backpedal(maxStats(3), DIFFICULTY.normal)).toBeCloseTo(runSpeed(maxStats(3)) * 0.9, 0);
   });
 });

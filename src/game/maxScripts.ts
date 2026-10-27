@@ -2,8 +2,8 @@ import { seeded } from '../engine/random';
 import { LADDER_MATCHES, maxStats } from '../meta/ladder';
 import { createBrain, think, type AiBrain, type AiProfile, type Difficulty } from './ai';
 import { HUMAN_AIM_ERROR_DEG } from './kick';
-import { opponentProfile, opponentStats, type HumanOpponentId } from './opponents';
-import { NO_INTENT, type PlayerIntent } from './player';
+import { opponentHandling, opponentProfile, opponentStats, type HumanOpponentId } from './opponents';
+import { NO_INTENT, type Handling, type PlayerIntent } from './player';
 import { MAX_STAT_LEVEL, STAT_NAMES, type Stats } from './stats';
 import { inStealReach, maxHasBall } from './steal';
 import { createWorld, stepWorld, type World } from './world';
@@ -120,6 +120,8 @@ export interface MaxMatch {
 export interface Matchup {
   stats: Stats;
   profile: AiProfile;
+  /** The opponent's brakes, touch and shot; normal when absent. */
+  handling?: Handling;
 }
 
 /** How the opponent played, for the personality checks. Recording them draws no random numbers. */
@@ -148,7 +150,7 @@ export interface OpponentMatch extends MaxMatch {
 /** Plays a whole match against `m` headlessly, Harrison a level up on its stats, and reports it from Harrison's side. */
 export function playMatchup(m: Matchup, seed: number, harrison: Stats = harrisonStatsFor(m.stats)): OpponentMatch {
   const { profile } = m;
-  const w = createWorld(harrison, { ...m.stats }, seed, { home: HUMAN_AIM_ERROR_DEG, away: profile.aimErrorDeg }, null, null, profile);
+  const w = createWorld(harrison, { ...m.stats }, seed, { home: HUMAN_AIM_ERROR_DEG, away: profile.aimErrorDeg }, null, null, profile, m.handling);
   const brain = createBrain(profile);
   const memo = scriptMemo(seed);
   const attacks = w.field.goals.find(g => g.side === 'left')!;
@@ -196,7 +198,7 @@ export function playMatchup(m: Matchup, seed: number, harrison: Stats = harrison
 
 /** A whole headless match against a human opponent at difficulty `d` (Max at rung `rung`). */
 export function opponentMatch(id: HumanOpponentId, d: Difficulty, seed: number, rung = LADDER_MATCHES): OpponentMatch {
-  return playMatchup({ stats: opponentStats(id, rung), profile: opponentProfile(id, d) }, seed);
+  return playMatchup({ stats: opponentStats(id, rung), profile: opponentProfile(id, d), handling: opponentHandling(id) }, seed);
 }
 
 /** Plays a whole match against Max on rung `rung` headlessly, and reports it from Harrison's side. */

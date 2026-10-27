@@ -8,6 +8,8 @@ import { CREW_PROFILES, CREW_STATS } from '../game/crew';
 import { seeded } from '../engine/random';
 import { DOG_DIFFICULTY } from '../game/dog';
 import { GOAL_PAUSE_S } from '../game/match';
+import { NORMAL_HANDLING } from '../game/player';
+import { SAM_HANDLING, SAM_PROFILES, SAM_STATS } from '../game/sam';
 import { BASE_STATS } from '../game/stats';
 import { WAVE_READY_S } from '../game/power';
 import { matchById } from '../meta/career';
@@ -809,6 +811,15 @@ describe('match scene: the Park crew', () => {
     expect(ctx.settings.difficulty).toBe('hard');
     expect(s.world.maxProfile).toBe(CREW_PROFILES.leo.hard);
     expect(s.world.aimErrorDeg.away).toBe(CREW_PROFILES.leo.hard.aimErrorDeg);
+  });
+
+  it("Sam's match builds Sam himself: his stats, profile and handling, not a stand-in", () => {
+    const { s } = crewMatch('park-boss');
+    expect(s.world.away.stats).toEqual(SAM_STATS);
+    expect(s.world.maxProfile).toBe(SAM_PROFILES.normal);
+    expect(s.world.away.handling).toBe(SAM_HANDLING);
+    expect(s.hud.awayName).toBe('SAM');
+    expect(crewMatch('park-2').s.world.away.handling).toEqual(NORMAL_HANDLING);
   });
 
   it('a rung still builds Max at the rung, with his difficulty', () => {

@@ -3,16 +3,18 @@ import { BALL_REST_Y } from './ball';
 import { GRAVITY } from './constants';
 import { inGoalBox, type Goal } from './field';
 import type { Aim } from './kick';
+import { LADDER_MATCHES, maxStats } from '../meta/ladder';
 import { NO_INTENT, PLAYER_R, type Player, type PlayerIntent } from './player';
-import { DEFEND_COVER, FAKE, POSSESSION_RANGE, attackDir, chargeHold, defendSpot, fakeMove, goalCentreZ, pressSprint, theirBall } from './styles';
+import { runSpeed } from './stats';
+import { DEFEND_COVER, FAKE, POSSESSION_RANGE, RANGE_SHOT, attackDir, chargeHold, defendSpot, fakeMove, goalCentreZ, pressSprint, theirBall } from './styles';
 import type { Wave } from './wave';
 import type { World } from './world';
 import { REACH_Z } from './zones';
 
 export type Difficulty = 'easy' | 'normal' | 'hard';
 
-/** How an opponent plays, beyond its numbers: Max all round, and each of the Park crew's personalities. */
-export type Style = 'allRound' | 'blocker' | 'shooter' | 'dribbler' | 'presser';
+/** How an opponent plays, beyond its numbers: Max all round, each of the Park crew's personalities, and Speedy Sam. */
+export type Style = 'allRound' | 'blocker' | 'shooter' | 'dribbler' | 'presser' | 'speedster';
 
 export interface AiProfile {
   /** Seconds between decisions. */
@@ -40,6 +42,8 @@ export interface AiProfile {
   /** Scales its run and sprint while it plays the ball (not backing off from a powered-up Harrison). */
   paceFactor: number;
   style: Style;
+  /** The speedster's chance per decision, blocked on the ball within range, of trying his weak shot from there (RANGE_SHOT). */
+  rangeShot?: number;
 }
 
 export const DIFFICULTY: Record<Difficulty, AiProfile> = {
@@ -272,11 +276,14 @@ export function rollBackOff(profile: Pick<AiProfile, 'reactionS' | 'braceSense'>
   return 'stay';
 }
 
+/** Backpedalling, nobody goes faster than rung-10 Max, so the wave's chase-down works against every opponent. */
+const BACKPEDAL_TOP = runSpeed(maxStats(LADDER_MATCHES));
+
 /**
  * Harrison is powered up: it backpedals toward its own goal, facing him,
  * to `gap` px from the ball, in line with it, and stands square there. It
- * backpedals slower than he runs, so he can chase it down, and in front of
- * its goal it runs out of room.
+ * backpedals slower than he runs, and no faster than rung-10 Max, so he can
+ * chase it down, and in front of its goal it runs out of room.
  */
 function backOff(brain: AiBrain, w: World, me: Player, them: Player, gap: number): void {
   brain.plan = 'backOff';
@@ -286,7 +293,8 @@ function backOff(brain: AiBrain, w: World, me: Player, them: Player, gap: number
   const x = dir > 0 ? Math.min(ball.x + gap, own.lineX - BACK_OFF_GOAL_ROOM) : Math.max(ball.x - gap, own.lineX + BACK_OFF_GOAL_ROOM);
   const z = ball.z + (goalCentreZ(own) - ball.z) * DEFEND_COVER;
   const [mx, mz] = goRound(w, me, them, steer(me, x, z), z);
-  brain.intent = { ...NO_INTENT, moveX: mx * BACKPEDAL_PACE, moveZ: mz * BACKPEDAL_PACE, faceX: Math.sign(ball.x - me.x) >= 0 ? 1 : -1 };
+  const pace = Math.min(1, BACKPEDAL_TOP / runSpeed(me.stats));
+  brain.intent = { ...NO_INTENT, moveX: mx * BACKPEDAL_PACE, moveZ: mz * BACKPEDAL_PACE, faceX: Math.sign(ball.x - me.x) >= 0 ? 1 : -1, ...(pace < 1 && { pace }) };
 }
 
 /**
@@ -330,7 +338,11 @@ function decide(brain: AiBrain, w: World, me: Player, them: Player): void {
   if (low && ahead >= 0 && ahead <= POSSESSION_RANGE && inLine) {
     const charging = brain.plan === 'charge' && brain.intent.shootHeld;
     if (charging) return;
-    if (toGoal > 0 && toGoal <= profile.shootRange) {
+    // The speedster, blocked, may try his weak shot from range instead of running into Harrison.
+    const [blockAhead, blockSide] = [(them.x - me.x) * dir, them.z - me.z];
+    const blocked = blockAhead > 0 && blockAhead <= RANGE_SHOT.blockedAhead && Math.abs(blockSide) <= RANGE_SHOT.lane;
+    const rangeShot = profile.style === 'speedster' && blocked && toGoal > 0 && toGoal <= RANGE_SHOT.from && w.rng() < (profile.rangeShot ?? 0);
+    if ((toGoal > 0 && toGoal <= profile.shootRange) || rangeShot) {
       brain.plan = 'charge';
       brain.chargeLeftS = chargeHold(profile.style, w.rng);
       brain.intent = { ...intent, moveX: dir, shootHeld: true, aim: pickAim(w) };

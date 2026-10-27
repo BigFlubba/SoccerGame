@@ -3,8 +3,9 @@ import { maxStats } from '../meta/ladder';
 import { DIFFICULTY, createBrain, think, type Difficulty } from './ai';
 import { BALL_REST_Y } from './ball';
 import { CREW_PROFILES, CREW_STATS, type CrewId } from './crew';
-import { NO_INTENT } from './player';
-import { opponentProfile, opponentStats } from './opponents';
+import { NO_INTENT, NORMAL_HANDLING } from './player';
+import { opponentHandling, opponentProfile, opponentStats } from './opponents';
+import { SAM_HANDLING, SAM_PROFILES, SAM_STATS } from './sam';
 import { cleanStealOdds } from './steal';
 import { BASE_STATS } from './stats';
 import { createWorld, placeForKickoff, stepWorld } from './world';
@@ -54,9 +55,31 @@ describe('opponents', () => {
     }
   });
 
-  it('Sam is a stand-in for now: Pete', () => {
-    expect(opponentStats('sam', 1)).toEqual(CREW_STATS.pete);
-    for (const d of DIFFS) expect(opponentProfile('sam', d)).toBe(CREW_PROFILES.pete[d]);
+  it('Sam plays as himself, with his own stats, profiles and handling: no stand-in', () => {
+    expect(opponentStats('sam', 1)).toEqual(SAM_STATS);
+    expect(SAM_STATS).toEqual({ speed: 10, power: 1, jump: 3, control: 3 });
+    expect(opponentStats('sam', 1)).not.toEqual(CREW_STATS.pete);
+    for (const d of DIFFS) {
+      expect(opponentProfile('sam', d)).toBe(SAM_PROFILES[d]);
+      expect(opponentProfile('sam', d)).not.toBe(CREW_PROFILES.pete[d]);
+      expect(opponentProfile('sam', d).style).toBe('speedster');
+    }
+    expect(opponentHandling('sam')).toBe(SAM_HANDLING);
+  });
+
+  it('everyone else handles normally', () => {
+    for (const id of ['max', ...CREW] as const) expect(opponentHandling(id), id).toBe(NORMAL_HANDLING);
+  });
+
+  it("Sam's profiles keep Max's Energy Wave answers, and every Easy number is gentler than Normal's, Normal's than Hard's", () => {
+    for (const d of DIFFS) expect([SAM_PROFILES[d].braceSense, SAM_PROFILES[d].backOffS], d).toEqual([DIFFICULTY[d].braceSense, DIFFICULTY[d].backOffS]);
+    const [e, n, h] = DIFFS.map(d => SAM_PROFILES[d]);
+    for (const k of ['reactionS', 'cleanSteal', 'wrongFootedS', 'rangeShot'] as const) {
+      expect(e![k], k).toBeGreaterThanOrEqual(n![k]!);
+      expect(n![k], k).toBeGreaterThanOrEqual(h![k]!);
+    }
+    expect(e!.paceFactor).toBeLessThanOrEqual(n!.paceFactor);
+    expect(n!.paceFactor).toBeLessThanOrEqual(h!.paceFactor);
   });
 });
 
