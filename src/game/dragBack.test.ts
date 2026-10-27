@@ -54,6 +54,16 @@ describe('the drag-back', () => {
     expect([w.ball.vx, w.ball.vz]).toEqual([0, 0]);
   });
 
+  it('at a run or a sprint, reversing at any moment between touches turns him with the ball', () => {
+    for (const sprint of [false, true])
+      for (let k = 40; k < 100; k++) {
+        const w = stage({ x: 300, facing: 1, bx: 310 });
+        for (let i = 0; i < k; i++) stepWorld(w, { ...run(1), sprint }, NO_INTENT, STEP);
+        const ahead = (w.ball.x - w.home.x).toFixed(1);
+        expect(startDragBack(w, run(-1)), `${sprint ? 'sprint' : 'run'} after ${k} ticks, ball ${ahead} px ahead`).toBe(true);
+      }
+  });
+
   it('a ball knocked well ahead is not his to turn', () => {
     expect(startDragBack(stage({ x: 300, facing: 1, bx: 340 }), run(-1))).toBe(false);
   });

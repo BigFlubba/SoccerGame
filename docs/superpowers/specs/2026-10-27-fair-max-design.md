@@ -229,9 +229,9 @@ a later change can't quietly make it hard again.
   ball, not while he backs off. Every Easy number is gentler than
   Normal's, and every Normal number gentler than Hard's.
 - **Measured as built:** rung 10, 64 seeds: **Easy 0.797, Normal 0.641,
-  Hard 0.016**; 128 seeds: 0.820 / 0.648 / 0.016 (Hard's 128-seed
+  Hard 0.016**; 128 seeds: 0.797 / 0.656 / 0.016 (Hard's 128-seed
   baseline was 0.016). Rung 1: 32 seeds 1.000 / 0.813 / 0.063, 128 seeds
-  0.914 / 0.789 / 0.047, so the first rung is the easier one. Average
+  0.914 / 0.813 / 0.055, so the first rung is the easier one. Average
   scores at rung 10: Easy 5.5–3.7, Normal 5.7–5.0, Hard 1.2–5.8.
 - **Kickoff reaction (builder's ruling):** once Harrison plays the
   kickoff ball, Max, who has been standing, reacts after his reaction

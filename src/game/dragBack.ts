@@ -1,6 +1,7 @@
 import { BALL_REST_Y } from './ball';
 import { canPlace } from './contact';
 import type { PlayerIntent } from './player';
+import { POWER_REACH } from './power';
 import { FOOT_SPOT, maxHasBall } from './steal';
 import type { World } from './world';
 import { REACH_Z } from './zones';
@@ -14,8 +15,8 @@ import { REACH_Z } from './zones';
 
 /** How long the turn takes, s. */
 export const TURN_S = 0.2;
-/** The ball is his to turn from this far ahead of him along his facing, a little beyond his foot... */
-export const DRAG_REACH = 22;
+/** The ball is his to turn up to this far ahead of him along his facing: where a dribbled ball runs between touches, as for a power-up... */
+export const DRAG_REACH = POWER_REACH;
 /** ...and this far either side of his line. */
 const DRAG_SIDE = REACH_Z + 3;
 const BALL_LOW = BALL_REST_Y + 3;
