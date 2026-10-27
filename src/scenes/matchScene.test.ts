@@ -255,7 +255,7 @@ describe('match scene', () => {
     expect(s.world.match.phase).toBe('fullTime');
     expect(ctx.savedProfiles).toHaveLength(1);
     expect(s.reward).not.toBeNull();
-    expect(s.reward!.summary).toEqual({ result: 'win', goalsFor: 2, goalsAgainst: 1, styleGoals: [], goals: [] });
+    expect(s.reward!.summary).toEqual({ result: 'win', goalsFor: 2, goalsAgainst: 1, styleGoals: [], goals: [], steals: 0 });
     expect(ctx.profile.ladderWins).toBe(1);
     const kinds: (string | undefined)[] = [];
     for (let i = 0; i < Math.round(2 / STEP); i++) kinds.push(s.update(frame(), STEP)?.kind);

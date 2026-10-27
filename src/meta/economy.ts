@@ -25,6 +25,8 @@ export interface MatchSummary {
   styleGoals: readonly StyleKind[];
   /** Every goal he scored, in order. */
   goals: readonly GoalRecord[];
+  /** His clean steals with the steal button, for the steals bonus. */
+  steals: number;
 }
 
 /** One line of the Results tally, e.g. WIN +60. */

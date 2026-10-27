@@ -127,7 +127,7 @@ export function applyMatch(p: Profile, s: MatchSummary, match: CareerMatch, toda
         stars,
         bestBefore,
         improved: stars > bestBefore,
-        bonusDone: BONUSES[match.bonus].done({ goalsFor: s.goalsFor, goalsAgainst: s.goalsAgainst, goals: s.goals, result: s.result }),
+        bonusDone: BONUSES[match.bonus].done({ goalsFor: s.goalsFor, goalsAgainst: s.goalsAgainst, goals: s.goals, result: s.result, steals: s.steals }),
         firstWin: win && !isBeaten(p, match),
         champion: advanced && isChampion(ladderWins),
         allBeaten: allBeaten(profile),

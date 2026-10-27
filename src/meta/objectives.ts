@@ -1,19 +1,21 @@
 import type { GoalRecord, MatchSummary } from './economy';
 
-export type BonusId = 'score3' | 'cleanSheet' | 'header' | 'chip' | 'volley' | 'perfect' | 'early' | 'winBy3' | 'twoStyle' | 'win3Nil' | 'noBossGoals';
+export type BonusId = 'score3' | 'cleanSheet' | 'header' | 'chip' | 'volley' | 'perfect' | 'early' | 'winBy3' | 'twoStyle' | 'win3Nil' | 'noBossGoals' | 'steals3' | 'noSamGoals';
 
-/** What a bonus can be judged on mid-match: the goals so far, and the result once there is one. */
+/** What a bonus can be judged on mid-match: the goals and clean steals so far, and the result once there is one. */
 export interface BonusInput {
   goalsFor: number;
   goalsAgainst: number;
   goals: readonly GoalRecord[];
   result: MatchSummary['result'] | null;
+  /** Harrison's clean steals with the steal button; traps and pokes don't count. */
+  steals: number;
 }
 
 export interface Bonus {
   id: BonusId;
   label: string;
-  /** True when a goal can finish it mid-match; false when only full time can. */
+  /** True when play (a goal, or a steal) can finish it mid-match; false when only full time can. */
   inPlay: boolean;
   done(s: BonusInput): boolean;
 }
@@ -25,6 +27,7 @@ export const MAX_STARS = 3;
 const SCORE3_GOALS = 3;
 const TWO_STYLE_GOALS = 2;
 const WIN_BY_3_MARGIN = 3;
+export const STEALS_FOR_BONUS = 3;
 /** A win by this many or more is worth the second star. */
 const TWO_STAR_MARGIN = 2;
 
@@ -47,11 +50,13 @@ export const BONUSES: Readonly<Record<BonusId, Bonus>> = {
   twoStyle: bonus('twoStyle', 'SCORE 2 STYLE GOALS', true, s => s.goals.filter(isStyle).length >= TWO_STYLE_GOALS),
   win3Nil: bonus('win3Nil', 'WIN 3-0 OR BETTER', false, atFullTime(s => s.goalsFor >= SCORE3_GOALS && s.goalsAgainst === 0)),
   noBossGoals: bonus('noBossGoals', "DON'T LET BISCUIT SCORE", false, atFullTime(s => s.goalsAgainst === 0)),
+  steals3: bonus('steals3', 'WIN THE BALL WITH 3 STEALS', true, s => s.steals >= STEALS_FOR_BONUS),
+  noSamGoals: bonus('noSamGoals', "DON'T LET SAM SCORE", false, atFullTime(s => s.goalsAgainst === 0)),
 };
 
 /** 0 for a draw or loss; 1 for a win; 2 for a win by 2+; 3 for that and the bonus in the same match. */
 export function starsFor(s: MatchSummary, bonus: BonusId): number {
   if (s.result !== 'win') return 0;
   if (s.goalsFor - s.goalsAgainst < TWO_STAR_MARGIN) return 1;
-  return BONUSES[bonus].done({ goalsFor: s.goalsFor, goalsAgainst: s.goalsAgainst, goals: s.goals, result: s.result }) ? MAX_STARS : 2;
+  return BONUSES[bonus].done({ goalsFor: s.goalsFor, goalsAgainst: s.goalsAgainst, goals: s.goals, result: s.result, steals: s.steals }) ? MAX_STARS : 2;
 }

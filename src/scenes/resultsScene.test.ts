@@ -11,8 +11,8 @@ import { frame } from './testInput';
 import type { VsScene } from './vsScene';
 
 const STEP = 1 / 60;
-const WIN_3_0: MatchSummary = { result: 'win', goalsFor: 3, goalsAgainst: 0, styleGoals: [], goals: [] };
-const LOSS_0_2: MatchSummary = { result: 'lose', goalsFor: 0, goalsAgainst: 2, styleGoals: [], goals: [] };
+const WIN_3_0: MatchSummary = { result: 'win', goalsFor: 3, goalsAgainst: 0, styleGoals: [], goals: [], steals: 0 };
+const LOSS_0_2: MatchSummary = { result: 'lose', goalsFor: 0, goalsAgainst: 2, styleGoals: [], goals: [], steals: 0 };
 const boss = matchById(BOSS_ID)!;
 const g = (minute: number): GoalRecord => ({ minute, kind: 'shot', perfect: false });
 
@@ -243,7 +243,7 @@ describe('careerLine', () => {
   it('a draw or a loss says go again, naming who took it', () => {
     expect(careerLine(after(LOSS_0_2).reward)).toBe('MAX TAKES THIS ONE. GO AGAIN!');
     expect(careerLine(after(LOSS_0_2, { ...newProfile(), ladderWins: 10 }, boss).reward)).toBe('BISCUIT TAKES THIS ONE. GO AGAIN!');
-    expect(careerLine(after({ result: 'draw', goalsFor: 1, goalsAgainst: 1, styleGoals: [], goals: [] }).reward)).toBe('ALL SQUARE. GO AGAIN!');
+    expect(careerLine(after({ result: 'draw', goalsFor: 1, goalsAgainst: 1, styleGoals: [], goals: [], steals: 0 }).reward)).toBe('ALL SQUARE. GO AGAIN!');
   });
 
   it('bonus and milestone lines', () => {

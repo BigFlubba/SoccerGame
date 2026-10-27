@@ -167,7 +167,7 @@ export function createMatchScene(ctx: GameContext, seed: number, match: CareerMa
   /** Saved at once, so closing the tab during the FULL TIME banner loses nothing. Called once, on the full-time tick. */
   const award = (result: NonNullable<World['match']['result']>) => {
     const { home, away } = world.match.score;
-    const done = applyMatch(ctx.profile, { result, goalsFor: home, goalsAgainst: away, styleGoals: [...styleGoals], goals: [...goals] }, match, ctx.today());
+    const done = applyMatch(ctx.profile, { result, goalsFor: home, goalsAgainst: away, styleGoals: [...styleGoals], goals: [...goals], steals: 0 }, match, ctx.today());
     ctx.saveProfile(done.profile);
     reward = done.reward;
   };
@@ -176,7 +176,7 @@ export function createMatchScene(ctx: GameContext, seed: number, match: CareerMa
     goals.push({ minute: clockMinute(world.match), kind: lastKick?.kind ?? null, perfect: lastKick?.perfect ?? false });
     if (bonusShown || bonusOwed || !bonus.inPlay) return;
     const { home, away } = world.match.score;
-    bonusOwed = bonus.done({ goalsFor: home, goalsAgainst: away, goals, result: null });
+    bonusOwed = bonus.done({ goalsFor: home, goalsAgainst: away, goals, result: null, steals: 0 });
   };
   /** Help and Options come back to this match, still paused, with any new difficulty applied to Max or the dog. */
   const backHere = (): Scene => {
