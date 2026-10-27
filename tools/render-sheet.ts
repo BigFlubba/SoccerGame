@@ -18,6 +18,8 @@ import { JOGGERS, PATH_Y, joggerFrames, parkLayers } from '../src/art/venues/par
 import { harrisonPortrait } from '../src/art/harrison/portrait';
 import { IndexedImage, blit, flipX } from '../src/art/indexedImage';
 import { MAX_HEADS, maxLook } from '../src/art/opponents/max';
+import { CREW_BODY, CREW_HEADS, crewLook } from '../src/art/opponents/crew';
+import type { CrewId } from '../src/game/crew';
 import { BISCUIT_ANCHOR, BISCUIT_FACE, BISCUIT_FRAMES, type DogAnim } from '../src/art/opponents/biscuit';
 import type { AnimName } from '../src/art/body/animations';
 import { DEPTH_SHEAR, project } from '../src/game/camera';
@@ -36,6 +38,8 @@ const OUT_FILE = `${OUT_DIR}/character-sheet.png`;
 /** The Backyard composites on their own, for reviewing the venue layout. */
 const VENUE_FILE = `${OUT_DIR}/backyard.png`;
 const PARK_FILE = `${OUT_DIR}/park.png`;
+const CREW_FILE = `${OUT_DIR}/crew-sheet.png`;
+const CREW: readonly CrewId[] = ['brick', 'leo', 'tia', 'pete'];
 const VENUE_SCALE = 3;
 /** Biscuit galloping the ball at the left goal, one Backyard view per frame in a strip, for slicing into a GIF. */
 const CARRY_FILE = `${OUT_DIR}/biscuit-carry.png`;
@@ -192,9 +196,15 @@ const rightEndView = () => {
   return backyardView(cam, [withShadow(maxAt(560, 24, 'run', 1)), withShadow(harrisonAt(540, 46, 'run', 3)), ballAt(620, BALL_R, 32, 2)]);
 };
 
-/** The Park at the left end: Harrison dribbling at the left goal's far side, the away player closing him down. */
+const crewBaked = Object.fromEntries(CREW.map(id => [id, bakeAll(CREW_BODY[id], CREW_HEADS[id])])) as Record<CrewId, ReturnType<typeof bakeAll>>;
+const crewAt = (id: CrewId, x: number, z: number, clip: AnimName, frame: number, facing: 1 | -1 = -1): Actor => {
+  const img = crewBaked[id][clip].frames[frame]!;
+  return { x, y: 0, z, img: facing === 1 ? img : flipX(img), palette: resolvePalette(crewLook(id)), anchor: facing === 1 ? ANCHOR : { x: img.width - 1 - ANCHOR.x, y: ANCHOR.y }, shadow: true };
+};
+
+/** The Park at the left end: Harrison dribbling at the left goal, Brick deep in his way, Tia coming across behind. */
 const parkMatchView = (nowS = 3) =>
-  parkView(24, [withShadow(harrisonAt(200, 28, 'run', 2)), ballAt(212, BALL_R, 28), withShadow(maxAt(150, 34, 'run', 5, -1))], nowS);
+  parkView(24, [withShadow(harrisonAt(200, 28, 'run', 2, -1)), ballAt(190, BALL_R, 28), crewAt('brick', 120, 30, 'idle', 0, 1), crewAt('tia', 250, 48, 'run', 3, -1)], nowS);
 
 /** Camera at the left end: Biscuit galloping the ball at the left goal, Harrison squared up in his way. */
 const bossView = (x = 150, frame = 0) => backyardView(0, [biscuitAt(x, 30, 'carry', frame % 4), withShadow(harrisonAt(96, 32, 'idle', 0, 1))]);
@@ -206,6 +216,15 @@ const max = bakeAll(HARRISON_BODY, MAX_HEADS);
 const ballRow = ballFrames().map(f => resolved(f, harrisonLook())).map((it, i) => ({ ...it, rgba: toRGBA(ballFrames()[i]!, masterPalette()) }));
 const clipRows = (kit: KitId) => Object.values(baked).map(clip => clip.frames.map(f => item(f, kit)));
 
+/** Each kid's row: face, the three head facings, then idle, run and shoot frames, in their kit. */
+const crewRow = (id: CrewId): SheetItem[] => {
+  const look = crewLook(id);
+  const b = crewBaked[id];
+  return [
+    ...FACINGS.map(f => resolved(CREW_HEADS[id][f].image, look, true)),
+    ...[...b.idle.frames.slice(0, 1), ...b.run.frames, ...b.shoot.frames].map(f => resolved(f, look)),
+  ];
+};
 const EXPRESSIONS = ['neutral', 'celebrate', 'determined', 'disappointed'] as const;
 
 const rows: SheetItem[][] = [
@@ -231,6 +250,8 @@ const rows: SheetItem[][] = [
   Object.values(BISCUIT_FRAMES).flat().slice(0, 10).map(f => ({ width: f.width, height: f.height, rgba: toRGBA(f, masterPalette()) })),
   [...Object.values(BISCUIT_FRAMES).flat().slice(10), BISCUIT_FACE].map(f => ({ width: f.width, height: f.height, rgba: toRGBA(f, masterPalette()) })),
   [bossView()],
+  ...CREW.map(crewRow),
+  [parkMatchView()],
   ballRow,
   [text("HARRISON 0-0 MAX 45'", 1), text('ABCDEFGHIJKLMNOPQRSTUVWXYZ', 1), text("0123456789 -':!?.,/+", 1)],
   [text("HARRISON 0-0 MAX 45'", 2), text('GOAL! PERFECT', 2)],
@@ -246,6 +267,12 @@ writeFileSync(VENUE_FILE, encodePNG(venue.width, venue.height, venue.rgba));
 console.log(`wrote ${VENUE_FILE} (${venue.width}×${venue.height})`);
 
 const parkEndView = () => parkView(0, [withShadow(harrisonAt(80, 20, 'idle', 0, 1)), ballAt(90, BALL_R, 20)], 7);
+const crewFaces = composeSheet([CREW.map(id => resolved(CREW_HEADS[id].front.image, crewLook(id), true)), CREW.flatMap(id => FACINGS.slice(0, 2).map(f => resolved(CREW_HEADS[id][f].image, crewLook(id), true)))], { scale: 10, gap: GAP, background: BACKGROUND });
+writeFileSync(`${OUT_DIR}/crew-faces.png`, encodePNG(crewFaces.width, crewFaces.height, crewFaces.rgba));
+const crewSheet = composeSheet([...CREW.map(crewRow), [parkMatchView()]], { scale: VENUE_SCALE, gap: GAP * 2, background: BACKGROUND });
+writeFileSync(CREW_FILE, encodePNG(crewSheet.width, crewSheet.height, crewSheet.rgba));
+console.log(`wrote ${CREW_FILE} (${crewSheet.width}×${crewSheet.height})`);
+
 const park = composeSheet([[parkMatchView()], [parkEndView()]], { scale: VENUE_SCALE, gap: GAP, background: BACKGROUND });
 writeFileSync(PARK_FILE, encodePNG(park.width, park.height, park.rgba));
 console.log(`wrote ${PARK_FILE} (${park.width}×${park.height})`);

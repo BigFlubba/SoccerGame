@@ -150,7 +150,7 @@ function spriteFrame(p: Player, set: SpriteSet, clip: Clip): HTMLCanvasElement {
 }
 
 function drawPlayer(g: CanvasRenderingContext2D, cam: Camera, p: Player, art: GameArt, clip: Clip = p.anim, set?: SpriteSet, flat = false): void {
-  const frame = spriteFrame(p, set ?? (p.team === 'home' ? art.home : art.away), clip);
+  const frame = spriteFrame(p, set ?? (p.team === 'home' ? art.home : art.opponents.max.sprites), clip);
   const s = screen(cam, p.x, p.y, p.z);
   const hop = clip.name === 'celebrate' && clip.frame === 1 ? CELEBRATE_HOP_PX : 0;
   g.drawImage(flat ? silhouette(frame) : frame, s.x - ANCHOR.x, s.y - ANCHOR.y - hop);

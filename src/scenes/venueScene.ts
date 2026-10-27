@@ -144,7 +144,7 @@ export function createVenueScene(ctx: GameContext, venue: VenueId, cursorId?: st
       drawPanel(g, PANEL.x, PANEL.y, PANEL.w, PANEL.h);
       const chosen = cursor();
       const bossFace = matchState(p, chosen) === 'locked' ? silhouette(art.biscuitFace) : art.biscuitFace;
-      g.drawImage(chosen.kind === 'boss' ? bossFace : art.maxFace, FACE_AT.x, FACE_AT.y);
+      g.drawImage(chosen.kind === 'boss' ? bossFace : art.opponents.max.face, FACE_AT.x, FACE_AT.y);
       panelLines(cursor()).forEach((line, i) => {
         const last = i === panelLines(cursor()).length - 1;
         const colour: MasterColor = i === 0 ? 'energyGold' : last ? 'white' : 'silver';

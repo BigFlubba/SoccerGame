@@ -13,7 +13,7 @@ export const KIT_SLOT_NAMES = [
 ] as const;
 
 export type KitSlots = (typeof KIT_SLOT_NAMES)[number];
-export type KitId = 'home' | 'away' | 'blue';
+export type KitId = 'home' | 'away' | 'blue' | 'orange' | 'purple' | 'teal' | 'lime';
 
 /** Harrison's club kits and opponents' kits, as colours only (no logos or sponsor). */
 export const KITS: Record<KitId, Record<KitSlots, MasterColor>> = {
@@ -50,6 +50,51 @@ export const KITS: Record<KitId, Record<KitSlots, MasterColor>> = {
     Shorts: 'blue',
     SocksShadow: 'navy',
     Socks: 'blue',
+  },
+  // The Park crew's: no two alike, none red or blue.
+  orange: {
+    JerseyShadow: 'flameDark',
+    Jersey: 'flame',
+    JerseyLight: 'flameLight',
+    TrimShadow: 'silver',
+    Trim: 'white',
+    ShortsShadow: 'charcoal',
+    Shorts: 'slate',
+    SocksShadow: 'flameDark',
+    Socks: 'flame',
+  },
+  purple: {
+    JerseyShadow: 'violetDark',
+    Jersey: 'violet',
+    JerseyLight: 'violetLight',
+    TrimShadow: 'silver',
+    Trim: 'white',
+    ShortsShadow: 'silver',
+    Shorts: 'white',
+    SocksShadow: 'violetDark',
+    Socks: 'violet',
+  },
+  teal: {
+    JerseyShadow: 'tealDark',
+    Jersey: 'teal',
+    JerseyLight: 'tealLight',
+    TrimShadow: 'silver',
+    Trim: 'white',
+    ShortsShadow: 'tealDark',
+    Shorts: 'teal',
+    SocksShadow: 'silver',
+    Socks: 'white',
+  },
+  lime: {
+    JerseyShadow: 'voltShadow',
+    Jersey: 'volt',
+    JerseyLight: 'voltLight',
+    TrimShadow: 'charcoal',
+    Trim: 'slate',
+    ShortsShadow: 'charcoal',
+    Shorts: 'slate',
+    SocksShadow: 'voltShadow',
+    Socks: 'volt',
   },
 };
 

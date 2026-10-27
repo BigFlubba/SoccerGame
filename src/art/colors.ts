@@ -83,6 +83,21 @@ export const MASTER = {
   navy: '#1c3c8c',
   blue: '#2c64c8',
   blueLight: '#5a8ce6',
+  // The Park crew: two more skin tones, each with its shadow, light and lip, and their kits.
+  brownShadow: '#4e2c1c',
+  brown: '#74462a',
+  brownLight: '#966040',
+  brownLip: '#5a2c26',
+  tanShadow: '#9a5e3a',
+  tan: '#c08050',
+  tanLight: '#d8a070',
+  tanLip: '#94503e',
+  flameLight: '#ffb466',
+  violetDark: '#5a3496',
+  violetLight: '#bc98f4',
+  tealDark: '#1a6e6a',
+  teal: '#2a9e94',
+  tealLight: '#6cd4c4',
 } as const;
 
 export type MasterColor = keyof typeof MASTER;

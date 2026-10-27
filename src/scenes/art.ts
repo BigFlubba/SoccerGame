@@ -3,7 +3,7 @@ import type { AnimName } from '../art/body/animations';
 import { bakeAll, type BakedClip } from '../art/body/bake';
 import type { HeadSprite } from '../art/body/head';
 import type { HeadFacing } from '../art/body/pose';
-import { HARRISON_BODY } from '../art/body/proportions';
+import { HARRISON_BODY, type BodyProportions } from '../art/body/proportions';
 import { C, masterPalette, resolvePalette, type LookColors, type MasterColor, type ResolvedPalette } from '../art/colors';
 import { renderText, textPalette } from '../art/font';
 import { buttonGlyph, type ButtonName } from '../art/glyphs';
@@ -12,12 +12,14 @@ import { harrisonLook } from '../art/harrison/look';
 import { harrisonPortrait, type Expression } from '../art/harrison/portrait';
 import { IndexedImage, blit, flipX } from '../art/indexedImage';
 import { BISCUIT_FACE, BISCUIT_FRAMES, type DogAnim } from '../art/opponents/biscuit';
+import { CREW_BODY, CREW_HEADS, crewLook } from '../art/opponents/crew';
 import { MAX_HEADS, maxLook } from '../art/opponents/max';
 import { addOutline } from '../art/raster';
 import { backyardLayers, goalSprites, type GoalArt, type VenueLayers } from '../art/venues/backyard';
 import { JOGGERS, joggerFrames, parkLayers } from '../art/venues/park';
-import type { VenueId } from '../meta/career';
+import type { OpponentId, VenueId } from '../meta/career';
 import { toCanvas } from '../engine/bitmaps';
+import type { CrewId } from '../game/crew';
 import { SpriteCache, type FacingFrames } from '../engine/sprites';
 
 export interface SpriteSet {
@@ -43,6 +45,11 @@ export interface VenueCanvases {
   joggers: readonly (readonly [HTMLCanvasElement, HTMLCanvasElement])[];
 }
 
+export interface OpponentArt {
+  sprites: SpriteSet;
+  face: HTMLCanvasElement;
+}
+
 export interface GameArt {
   /** Every venue with its own art; drawLayers falls back to the Backyard for the rest. */
   venues: Partial<Record<VenueId, VenueCanvases>>;
@@ -55,11 +62,10 @@ export interface GameArt {
   homePower: SpriteSet;
   /** ...and in Golden Form's gold. */
   homeGolden: SpriteSet;
-  away: SpriteSet;
+  /** Every human opponent: their sprites, and their face, front on and outlined, for the venue panel and the boss node. Sam is Pete's art until part 2. */
+  opponents: Record<Exclude<OpponentId, 'biscuit'>, OpponentArt>;
   /** Harrison's portrait in each expression, in the home kit. */
   portraits: Record<Expression, HTMLCanvasElement>;
-  /** Max's face, front on and outlined, for the venue screen's match panel. */
-  maxFace: HTMLCanvasElement;
   /** Biscuit the Dog, the Backyard's boss. */
   biscuit: DogSprites;
   /** His face, front on and outlined, for the boss node and the VS card. */
@@ -68,8 +74,8 @@ export interface GameArt {
   text(s: string, scale: number, ink: MasterColor, outline: MasterColor): HTMLCanvasElement;
 }
 
-function spriteSet(cache: SpriteCache, who: string, heads: Record<HeadFacing, HeadSprite>, look: LookColors): SpriteSet {
-  const baked = bakeAll(HARRISON_BODY, heads);
+function spriteSet(cache: SpriteCache, who: string, heads: Record<HeadFacing, HeadSprite>, look: LookColors, body: BodyProportions = HARRISON_BODY): SpriteSet {
+  const baked = bakeAll(body, heads);
   const palette = resolvePalette(look);
   const set: SpriteSet = { right: {} as SpriteSet['right'], left: {} as SpriteSet['left'] };
   for (const [name, clip] of Object.entries(baked) as [AnimName, BakedClip][]) {
@@ -110,6 +116,8 @@ export function loadGameArt(): GameArt {
     const [a, b] = joggerFrames(j.shirt, j.hair);
     return j.dir === 1 ? ([a, b] as const) : ([flipX(a), flipX(b)] as const);
   });
+  const crewArt = (id: CrewId): OpponentArt => ({ sprites: spriteSet(cache, id, CREW_HEADS[id], crewLook(id), CREW_BODY[id]), face: faceCanvas(CREW_HEADS[id].front, crewLook(id)) });
+  const crew = { brick: crewArt('brick'), leo: crewArt('leo'), tia: crewArt('tia'), pete: crewArt('pete') };
   const texts = new Map<string, HTMLCanvasElement>();
   return {
     venues: { backyard: venueCanvases(backyardLayers(), [], master), park: venueCanvases(parkLayers(), parkJoggers, master) },
@@ -119,9 +127,13 @@ export function loadGameArt(): GameArt {
     home: spriteSet(cache, 'harrison', HARRISON_HEADS, harrisonLook('home')),
     homePower: spriteSet(cache, 'harrison-power', HARRISON_POWER_HEADS, harrisonLook('home')),
     homeGolden: spriteSet(cache, 'harrison-golden', HARRISON_POWER_HEADS, harrisonLook('home', 'golden')),
-    away: spriteSet(cache, 'max', MAX_HEADS, maxLook()),
+    opponents: {
+      max: { sprites: spriteSet(cache, 'max', MAX_HEADS, maxLook()), face: faceCanvas(MAX_HEADS.front, maxLook()) },
+      ...crew,
+      // Stand-in until Sam lands (part 2).
+      sam: crew.pete,
+    },
     portraits: Object.fromEntries(EXPRESSIONS.map(e => [e, toCanvas(harrisonPortrait(e), resolvePalette(harrisonLook('home')))])) as Record<Expression, HTMLCanvasElement>,
-    maxFace: faceCanvas(MAX_HEADS.front, maxLook()),
     biscuit: Object.fromEntries(
       Object.entries(BISCUIT_FRAMES).map(([name, frames]) => [name, cache.frames(`biscuit/${name}`, () => ({ frames: [...frames], palette: master }))]),
     ) as DogSprites,
