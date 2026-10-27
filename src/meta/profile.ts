@@ -39,7 +39,8 @@ export interface Career {
 
 /** Harrison's progress, versioned so every later build can read it. */
 export interface Profile {
-  version: 3;
+  /** v4 adds no fields: it exists so a v3 tab, which drops ids it doesn't know, can't write over Park stars. */
+  version: 4;
   coins: number;
   /** Stored, never worked out from XP, so a change to the curve can't take a level away. */
   level: number;
@@ -59,7 +60,7 @@ export interface Profile {
 
 /** Game-specific, so it never clashes with other pages on the same site. */
 export const PROFILE_KEY = 'harrisons-road-to-the-cup/profile';
-const VERSION = 3;
+const VERSION = 4;
 
 /** Ceilings on loaded counts, so a tampered save can't make levelling run forever. */
 export const MAX_LOADED = { level: 999, xp: 1_000_000, count: 999_999_999, stars: 3, milestones: 4, streak: 99 };

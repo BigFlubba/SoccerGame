@@ -1,5 +1,5 @@
 import { STAT_NAMES } from '../game/stats';
-import { BACKYARD, BOSS_ID } from './career';
+import { BACKYARD, BOSS_ID, PARK, PARK_BOSS_ID } from './career';
 import { FORM_IDS, MOVE_IDS } from './catalog';
 import { TOTAL_NAMES, profileFrom, type Owned, type Profile } from './profile';
 
@@ -148,6 +148,9 @@ export function encodeSaveCode(p: Profile): string {
     ...BACKYARD.matches.map(m => p.career.stars[m.id] ?? 0),
     p.career.milestonesPaid,
     p.career.lossStreaks[BOSS_ID] ?? 0,
+    // v4: the Park's stars in match order, and Sam's loss streak.
+    ...PARK.matches.map(m => p.career.stars[m.id] ?? 0),
+    p.career.lossStreaks[PARK_BOSS_ID] ?? 0,
   ]);
 }
 
@@ -175,5 +178,8 @@ export function decodeSaveCode(text: string): Profile | null {
       lossStreaks: { [BOSS_ID]: next() },
     },
   };
+  // v4, read after every v3 field, in the order they were written.
+  Object.assign(record.career.stars, Object.fromEntries(PARK.matches.map(m => [m.id, next()])));
+  Object.assign(record.career.lossStreaks, { [PARK_BOSS_ID]: next() });
   return profileFrom(record);
 }

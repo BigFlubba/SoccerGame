@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import type { InputFrame } from '../engine/input';
 import { newProfile, type Profile } from '../meta/profile';
 import { encodeSaveCode } from '../meta/saveCode';
-import { BACKYARD } from '../meta/career';
+import { BACKYARD, PARK } from '../meta/career';
 import { MAX_ENTRY, codeLines, createSaveCodeScene } from './saveCodeScene';
 import type { Scene } from './scene';
 import { testContext } from './testContext';
@@ -141,7 +141,7 @@ describe('codeLines', () => {
       ladderWins: 10,
       dailyWinDate: '2099-12-31',
       totals: { matches: 999_999_999, wins: 999_999_999, draws: 999_999_999, losses: 999_999_999, goalsFor: 999_999_999, goalsAgainst: 999_999_999, styleGoals: 999_999_999, xpEarned: 999_999_999 },
-      career: { stars: Object.fromEntries(BACKYARD.matches.map(m => [m.id, 3])), milestonesPaid: 4, lossStreaks: { 'backyard-boss': 99 } },
+      career: { stars: Object.fromEntries([...BACKYARD.matches, ...PARK.matches].map(m => [m.id, 3])), milestonesPaid: 4, lossStreaks: { 'backyard-boss': 99, 'park-boss': 99 } },
     };
     const shown = codeLines(encodeSaveCode(max));
     expect(shown.scale).toBe(1);

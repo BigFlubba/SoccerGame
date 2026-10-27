@@ -6,7 +6,7 @@ const ALPHABET = '0123456789ABCDEFGHJKMNPQRSTVWXYZ';
 
 /** A save with something in every field, both unlocks owned. */
 const RICH: Profile = {
-  version: 3,
+  version: 4,
   coins: 840,
   level: 6,
   xp: 125,
@@ -61,7 +61,7 @@ describe('save code', () => {
   it('a code from a newer build with an extra field still loads', () => {
     const fields = decodeFields(encodeSaveCode(RICH));
     expect(fields).not.toBeNull();
-    const newer = [4, ...(fields ?? []).slice(1), 77];
+    const newer = [5, ...(fields ?? []).slice(1), 77];
     expect(decodeSaveCode(encodeFields(newer))).toEqual(RICH);
   });
 
@@ -75,6 +75,22 @@ describe('save code', () => {
     const fields = decodeFields(encodeSaveCode(RICH)) ?? [];
     const v2 = decodeSaveCode(encodeFields([2, ...fields.slice(1, 22)]));
     expect(v2?.career).toEqual(RETRO_ONLY);
+  });
+
+  it('the Park stars and Sam\'s loss streak survive a round trip', () => {
+    const p: Profile = { ...RICH, ladderWins: 10, career: { stars: { ...RICH.career.stars, 'backyard-boss': 2, 'park-1': 3, 'park-2': 2, 'park-3': 1, 'park-4': 3, 'park-boss': 1 }, milestonesPaid: 2, lossStreaks: { 'backyard-boss': 1, 'park-boss': 2 } } };
+    const back = decodeSaveCode(encodeSaveCode(p));
+    expect(back?.career.stars).toMatchObject({ 'park-1': 3, 'park-2': 2, 'park-3': 1, 'park-4': 3, 'park-boss': 1 });
+    expect(back?.career.lossStreaks).toEqual({ 'backyard-boss': 1, 'park-boss': 2 });
+  });
+
+  it('a v3 code, without the Park fields, applies with no Park stars', () => {
+    const p: Profile = { ...RICH, career: { ...RICH.career, stars: { ...RICH.career.stars, 'park-1': 3 }, lossStreaks: { 'park-boss': 4 } } };
+    const fields = decodeFields(encodeSaveCode(p)) ?? [];
+    const v3 = decodeSaveCode(encodeFields([3, ...fields.slice(1, fields.length - 6)]));
+    expect(v3?.version).toBe(4);
+    expect(v3?.career.stars).toEqual(RICH.career.stars);
+    expect(v3?.career.lossStreaks).toEqual({});
   });
 
   it('rung loss streaks do not travel, the boss streak does', () => {

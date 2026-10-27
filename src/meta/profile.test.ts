@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { addXp } from './economy';
 import { LADDER_MATCHES, MAX_LOADED, PROFILE_KEY, followProfile, loadProfile, newProfile, saveProfile, type Profile } from './profile';
-import type { KeyValueStore } from './storage';
+import { writeUnlessNewer, type KeyValueStore } from './storage';
 
 /** An in-memory store, standing in for localStorage. */
 function memoryStore(initial: Record<string, string> = {}): KeyValueStore & { data: Record<string, string> } {
@@ -24,7 +24,7 @@ const ZERO_TOTALS = { matches: 0, wins: 0, draws: 0, losses: 0, goalsFor: 0, goa
 
 /** A save with something in every field. */
 const SOME: Profile = {
-  version: 3,
+  version: 4,
   coins: 420,
   level: 3,
   xp: 35,
@@ -46,7 +46,7 @@ describe('profile', () => {
   it('a missing save is a new profile under a game-specific key', () => {
     expect(loadProfile(memoryStore())).toEqual(newProfile());
     expect(newProfile()).toEqual({
-      version: 3,
+      version: 4,
       coins: 0,
       level: 1,
       xp: 0,
@@ -83,7 +83,7 @@ describe('profile', () => {
     });
     const tenRetro = Object.fromEntries([...Array(10)].map((_, i) => [`backyard-${i + 1}`, 1]));
     expect(loadProfile(store)).toEqual({
-      version: 3,
+      version: 4,
       coins: 0,
       level: 1,
       xp: 0,
@@ -101,7 +101,7 @@ describe('profile', () => {
     expect(loadProfile(stored({ ...SOME, coins: -5 })).coins).toBe(0);
   });
 
-  it('a full v1 save loads into v3 with every field kept', () => {
+  it('a full v1 save loads into v4 with every field kept', () => {
     const v1 = {
       version: 1,
       coins: 640,
@@ -112,13 +112,13 @@ describe('profile', () => {
       dailyWinDate: '2026-10-24',
       totals: { matches: 12, wins: 7, draws: 2, losses: 3, goalsFor: 21, goalsAgainst: 11, styleGoals: 5, xpEarned: 480 },
     };
-    expect(loadProfile(stored(v1))).toEqual({ ...v1, version: 3, powerMoves: NO_POWER, powerForms: NO_POWER, career: { ...NO_CAREER, stars: FOUR_RETRO } });
+    expect(loadProfile(stored(v1))).toEqual({ ...v1, version: 4, powerMoves: NO_POWER, powerForms: NO_POWER, career: { ...NO_CAREER, stars: FOUR_RETRO } });
   });
 
-  it('a v2 save loads into v3 with retro stars for its ladder wins', () => {
+  it('a v2 save loads into v4 with retro stars for its ladder wins', () => {
     const v2 = { ...SOME, version: 2, career: undefined };
     delete (v2 as { career?: unknown }).career;
-    expect(loadProfile(stored(v2))).toEqual({ ...SOME, version: 3, career: { stars: FOUR_RETRO, milestonesPaid: 0, lossStreaks: {} } });
+    expect(loadProfile(stored(v2))).toEqual({ ...SOME, version: 4, career: { stars: FOUR_RETRO, milestonesPaid: 0, lossStreaks: {} } });
   });
 
   it("Harrison's champion save unlocks Biscuit with ten stars", () => {
@@ -179,8 +179,36 @@ describe('profile', () => {
     expect(p.stats.speed).toBe(3);
   });
 
+  it('a v3 save keeps Park stars, because Park ids are catalog ids', () => {
+    const v3 = { ...SOME, version: 3, career: { ...SOME.career, stars: { ...SOME.career.stars, 'park-2': 3 }, lossStreaks: { 'park-boss': 1 } } };
+    const p = loadProfile(stored(v3));
+    expect(p.version).toBe(4);
+    expect(p.career.stars['park-2']).toBe(3);
+    expect(p.career.lossStreaks).toEqual({ 'park-boss': 1 });
+  });
+
+  it('a v3 save without Park ids loads with no Park stars', () => {
+    const p = loadProfile(stored({ ...SOME, version: 3 }));
+    expect(p.version).toBe(4);
+    expect(Object.keys(p.career.stars).filter(id => id.startsWith('park-'))).toEqual([]);
+  });
+
+  it('a v4 save writes over a stored v3 one', () => {
+    const store = stored({ ...SOME, version: 3, coins: 1 });
+    saveProfile(store, SOME);
+    expect(JSON.parse(store.data[PROFILE_KEY]!)).toMatchObject({ version: 4, coins: SOME.coins });
+  });
+
+  it('a v3 tab left open cannot write over a v4 save with Park stars', () => {
+    const v4 = { ...SOME, career: { ...SOME.career, stars: { ...SOME.career.stars, 'park-1': 2 } } };
+    const store = stored(v4);
+    const before = store.data[PROFILE_KEY];
+    writeUnlessNewer(store, PROFILE_KEY, { ...SOME, version: 3 });
+    expect(store.data[PROFILE_KEY]).toBe(before);
+  });
+
   it('a newer save is read best-effort and never written over', () => {
-    const store = stored({ ...SOME, version: 4, coins: 300, gems: 5 });
+    const store = stored({ ...SOME, version: 5, coins: 300, gems: 5 });
     const before = store.data[PROFILE_KEY];
     expect(loadProfile(store).coins).toBe(300);
     saveProfile(store, { ...newProfile(), coins: 0 });
