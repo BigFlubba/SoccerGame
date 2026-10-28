@@ -926,6 +926,22 @@ describe('Speedy Sam: all gas, no brakes', () => {
     for (const z of [32, 50]) expect(dragBackAt(maxStats(LADDER_MATCHES), DIFFICULTY.normal, NORMAL_HANDLING, z).past).toBeLessThan(15);
   });
 
+  it.each([
+    ['charging a shot', 12],
+    ['charging a shot, Sam level with him in depth', 24],
+  ] as const)("coming back from behind Harrison %s, he goes round the ball, never knocking it toward his own goal (from depth %d)", (_, samZ) => {
+    // Harrison at x 482 winding up a shot at Sam's goal, the ball at his feet; Sam behind him, toward Harrison's own goal.
+    for (const seed of [1, 2, 3]) {
+      const { w, brain } = samWorld({ sam: [440, samZ], harrison: [482, 12], ball: [491, 8], touchedBy: 'home' });
+      w.rng = seeded(seed);
+      for (let t = 0; t < 90; t++) {
+        stepWorld(w, { ...NO_INTENT, shootHeld: true, faceX: 1 }, think(brain, w, w.away, w.home, STEP), STEP);
+        const touched = w.events.kicks[1]!.touched || w.events.kicks[1]!.tackledBall;
+        expect(touched && w.ball.vx > 0, `seed ${seed} tick ${t}: Sam knocked it ${w.ball.vx.toFixed(0)} px/s toward his own goal`).toBe(false);
+      }
+    }
+  });
+
   it('blocked, he sometimes tries his weak shot from range: the roll decides, once per decision', () => {
     // Sam on the ball 250 px from Harrison's goal, Harrison 40 px ahead in his lane.
     const at = { sam: [278, 32], harrison: [238, 34], ball: [270, 32], touchedBy: 'away' } as const;
@@ -937,6 +953,29 @@ describe('Speedy Sam: all gas, no brakes', () => {
     over.w.rng = () => 0.999;
     think(over.brain, over.w, over.w.away, over.w.home, STEP);
     expect(over.brain.plan).toBe('dribble');
+  });
+
+  it('with Harrison rushing at him in his lane, he knocks it past him rather than trying his range shot', () => {
+    const { w, brain } = samWorld({ sam: [278, 32], harrison: [218, 32], ball: [270, 32], touchedBy: 'away' });
+    w.home.vx = 170;
+    w.rng = () => 0;
+    const i = think(brain, w, w.away, w.home, STEP);
+    expect(brain.plan).toBe('dribble');
+    expect(i.moveX).toBeLessThan(0);
+    expect(Math.abs(i.moveZ)).toBeGreaterThan(0.2);
+  });
+
+  it('he heads a high ball only facing the goal he attacks, never one that would go at his own', () => {
+    // A high ball dropping just on his own-goal side of him: heading it would send it at his own goal.
+    const back = samWorld({ sam: [400, 32], harrison: [200, 32], ball: [410, 32] });
+    Object.assign(back.w.ball, { y: 36, vx: 0, vy: -20 });
+    think(back.brain, back.w, back.w.away, back.w.home, STEP);
+    expect(back.brain.plan).not.toBe('jump');
+    // The same ball on his upfield side: he heads it on.
+    const front = samWorld({ sam: [400, 32], harrison: [200, 32], ball: [390, 32] });
+    Object.assign(front.w.ball, { y: 36, vx: 0, vy: -20 });
+    think(front.brain, front.w, front.w.away, front.w.home, STEP);
+    expect(front.brain.plan).toBe('jump');
   });
 
   it('with Harrison out of his lane he never shoots from 250 px', () => {

@@ -90,6 +90,10 @@ const HIGH_BALL_RANGE = 30;
 const ROUND_BALL_RANGE = 40;
 /** ...passing this far to the side of it. */
 const ROUND_BALL_Z = 12;
+/** The speedster can't turn sharply, so he starts round a ball from further off and passes wider. */
+const SPEEDSTER_ROUND = { range: 120, z: 24 };
+/** A challenger running at the speedster faster than `closing` px/s, within `ahead` px and `lane` px of his line: he knocks the ball past him, `side` px wide, aiming `beyond` px past him. */
+const KNOCK_PAST = { closing: 80, ahead: 90, lane: 16, side: 26, beyond: 40 };
 /** An opponent this close ahead on its path, and this close to the path's line, is in the way: it sidesteps. */
 const BLOCKER_AHEAD = 16;
 const BLOCKER_SIDE = 10;
@@ -333,15 +337,24 @@ function decide(brain: AiBrain, w: World, me: Player, them: Player): void {
     return { ...intent, moveX, moveZ };
   };
   const toGoal = (attacking.lineX - me.x) * dir;
+  const speedster = profile.style === 'speedster';
 
   // Has the ball: dribble at goal, and shoot once in range.
   if (low && ahead >= 0 && ahead <= POSSESSION_RANGE && inLine) {
     const charging = brain.plan === 'charge' && brain.intent.shootHeld;
     if (charging) return;
-    // The speedster, blocked, may try his weak shot from range instead of running into Harrison.
     const [blockAhead, blockSide] = [(them.x - me.x) * dir, them.z - me.z];
+    // With a challenger rushing at him in his lane, he knocks it past him on the roomier side, out of range of a shot.
+    const rushing = them.vx * -dir > KNOCK_PAST.closing;
+    if (speedster && rushing && toGoal > profile.shootRange && blockAhead > 0 && blockAhead <= KNOCK_PAST.ahead && Math.abs(blockSide) <= KNOCK_PAST.lane) {
+      brain.plan = 'dribble';
+      const passZ = them.z + (Math.sign(me.z - them.z) || roomySide(w, them.z, me.z)) * KNOCK_PAST.side;
+      brain.intent = moveTo(them.x + dir * KNOCK_PAST.beyond, Math.min(Math.max(passZ, PLAYER_R), w.field.depth - PLAYER_R));
+      return;
+    }
+    // Blocked by one waiting in his lane, the speedster may try his weak shot from range instead of running into him.
     const blocked = blockAhead > 0 && blockAhead <= RANGE_SHOT.blockedAhead && Math.abs(blockSide) <= RANGE_SHOT.lane;
-    const rangeShot = profile.style === 'speedster' && blocked && toGoal > 0 && toGoal <= RANGE_SHOT.from && w.rng() < (profile.rangeShot ?? 0);
+    const rangeShot = speedster && blocked && toGoal > 0 && toGoal <= RANGE_SHOT.from && w.rng() < (profile.rangeShot ?? 0);
     if ((toGoal > 0 && toGoal <= profile.shootRange) || rangeShot) {
       brain.plan = 'charge';
       brain.chargeLeftS = chargeHold(profile.style, w.rng);
@@ -364,9 +377,20 @@ function decide(brain: AiBrain, w: World, me: Player, them: Player): void {
     return;
   }
 
+  // On the wrong side of the ball it passes it to one side, so it never runs the ball back at its own goal.
+  const round = speedster ? SPEEDSTER_ROUND : { range: ROUND_BALL_RANGE, z: ROUND_BALL_Z };
+  const wrongSide = low && ahead < 0 && -ahead <= round.range;
+  const side = Math.sign(me.z - ball.z) || roomySide(w, ball.z, me.z);
+  const besideZ = Math.min(Math.max(ball.z + side * round.z, PLAYER_R), w.field.depth - PLAYER_R);
+
   // The opponent has it: get goal-side across the pitch, and slide in when close.
   if (low && theirBall(profile.style, w, them)) {
     brain.plan = 'defend';
+    // The speedster coming back from behind it goes round, never through it: his long touch, or a slide, would send it at his own goal.
+    if (speedster && wrongSide) {
+      brain.intent = moveTo(defendSpot(profile.style, w, me, defending).x, besideZ);
+      return;
+    }
     const facingBall = Math.sign(ball.x - me.x) === me.facing;
     const close = dist <= SLIDE_RANGE;
     if (close && !facingBall) {
@@ -386,8 +410,9 @@ function decide(brain: AiBrain, w: World, me: Player, them: Player): void {
     return;
   }
 
-  // Loose ball: head it if it's overhead, otherwise get behind it.
-  if (ball.y > HIGH_BALL && Math.abs(ball.x - me.x) <= HIGH_BALL_RANGE && inLine) {
+  // Loose ball: head it if it's overhead, otherwise get behind it. The speedster only heads one he faces upfield: turned the other way, it would go at his own goal.
+  const headsUpfield = !speedster || Math.sign(ball.x - me.x) === dir;
+  if (ball.y > HIGH_BALL && Math.abs(ball.x - me.x) <= HIGH_BALL_RANGE && inLine && headsUpfield) {
     brain.plan = 'jump';
     brain.intent = { ...intent, moveX: Math.sign(ball.x - me.x), jump: true, aim: 'straight' };
     return;
@@ -400,11 +425,7 @@ function decide(brain: AiBrain, w: World, me: Player, them: Player): void {
     brain.intent = moveTo(at.x, at.z);
     return;
   }
-  // On the wrong side of the ball, pass it to one side instead of running it back toward its own goal.
-  const wrongSide = low && ahead < 0 && -ahead <= ROUND_BALL_RANGE;
-  const side = Math.sign(me.z - ball.z) || roomySide(w, ball.z, me.z);
-  const z = wrongSide ? Math.min(Math.max(ball.z + side * ROUND_BALL_Z, PLAYER_R), w.field.depth - PLAYER_R) : at.z;
-  brain.intent = moveTo(behindX, z, at.z);
+  brain.intent = moveTo(behindX, wrongSide ? besideZ : at.z, at.z);
 }
 
 /** Her fake is over: she stops carrying the ball and decides afresh this tick. */
