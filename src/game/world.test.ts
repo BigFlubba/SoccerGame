@@ -582,6 +582,22 @@ describe('world: handling', () => {
     expect(reversed).toBe(true);
   });
 
+  it('running back at his own goal with the ball near it, his touches shield it: no own goal off his long touch', () => {
+    // Sam attacks left, so his own goal is the right one; he chases a ball rolling toward it from behind.
+    const w = createWorld(TUNING, FAST, 1, ERR, null, null, DIFFICULTY.normal, SOFT);
+    w.match.phase = 'playing';
+    Object.assign(w.home, { x: 100, z: 60 });
+    Object.assign(w.away, { x: 480, z: 32, facing: 1, vx: 200 });
+    Object.assign(w.ball, { x: 492, y: BALL_REST_Y, z: 32, vx: 120, vy: 0, vz: 0, touchedBy: 'home' });
+    let touched = false;
+    for (let t = 0; t < 120; t++) {
+      stepWorld(w, NO_INTENT, run(1), STEP);
+      touched ||= w.events.kicks[1]!.touched;
+      expect(w.events.goal, `tick ${t}`).toBeNull();
+    }
+    expect(touched).toBe(true);
+  });
+
   it('a kickoff while he skids puts him on his spot standing still, still on his own brakes', () => {
     const w = samOnTheBall(300, 32, 1);
     for (let t = 0; t < 6; t++) stepWorld(w, NO_INTENT, run(-1), STEP);

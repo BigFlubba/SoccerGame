@@ -8,7 +8,7 @@ import { checkPinned, createDog, dropBall, parkBall, quietDog, resetDog, stepDog
 import { BACKYARD, goalScored, type Field } from './field';
 import { startDragBack, stepDragBack } from './dragBack';
 import { createMatch, stepMatch, type MatchState, type Team } from './match';
-import { NO_INTENT, NORMAL_HANDLING, createPlayer, stepPlayer, type Handling, type Player, type PlayerIntent } from './player';
+import { DECEL, NO_INTENT, NORMAL_HANDLING, createPlayer, stepPlayer, type Handling, type Player, type PlayerIntent } from './player';
 import {
   POWERED_S,
   addMeter,
@@ -80,7 +80,7 @@ const KICKOFF_DEFENDER_DEPTH = 70;
 const attackDir = (team: Team): 1 | -1 => (team === 'home' ? 1 : -1);
 
 const quietPower = (): PowerEvents => ({ started: false, ready: false, cancelled: false, fired: false, braced: false, blown: false });
-const quietContact = (): ContactEvents => ({ touched: false, kicked: null, perfect: false, tackledBall: false, trippedOpponent: false });
+const quietContact = (): ContactEvents => ({ touched: false, blocked: false, kicked: null, perfect: false, tackledBall: false, trippedOpponent: false });
 const quietBall = (): BallEvents => ({ bounced: false, hitBar: false, hitPost: false, hitWall: false, hitNet: false });
 const quietEvents = (): WorldEvents => ({
   kicks: [],
@@ -292,7 +292,9 @@ export function stepWorld(w: World, homeIntent: PlayerIntent, awayIntent: Player
   // In a drag-back his sole has the ball: only the other player's contacts can take it.
   const contact = (p: Player, other: Player) => {
     if (w.wave?.live || (p === home && home.turnS > 0)) return quietContact();
-    const ev = resolveContacts(p, other, w.ball, w.aimErrorDeg[p.team], w.rng, w.field, { trips: true, squeeze, clearUpfield: p === home, keepOut: p === home });
+    // Harrison, and a player on soft brakes who can't stop short of his own goal, never knock the ball at it near it.
+    const guarded = p === home || p.handling.decel < DECEL;
+    const ev = resolveContacts(p, other, w.ball, w.aimErrorDeg[p.team], w.rng, w.field, { trips: true, squeeze, clearUpfield: guarded, keepOut: guarded });
     if (ev.touched || ev.kicked || ev.tackledBall) w.ball.touchedBy = p.team;
     return ev;
   };
