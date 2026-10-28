@@ -4,7 +4,9 @@ import { HARRISON_HEADS, HARRISON_POWER_HEADS } from '../harrison/head';
 import { harrisonLook } from '../harrison/look';
 import { MAX_HEADS } from '../opponents/max';
 import { opaqueBounds } from '../raster';
-import { CLIPS, SKID_FRAME_HOLD } from './animations';
+import { CREW_BODY, CREW_HEADS } from '../opponents/crew';
+import { SAM_HEADS } from '../opponents/sam';
+import { CLIPS, FLICK_RELEASE_FRAME, SKID_FRAME_HOLD } from './animations';
 import { bakeAll, frameIndexAt, samplePoses } from './bake';
 import { flipX } from '../indexedImage';
 import { ANCHOR, FRAME_W, lerpPose, mirrorPose, solvePose } from './pose';
@@ -34,7 +36,54 @@ describe('bakeAll', () => {
       celebrate: 2,
       brace: 1,
       skid: 2,
+      stepover: 4,
+      flick: 6,
+      fooled: 3,
+      stumble: 4,
     });
+  });
+
+  it.each([
+    ['max', HARRISON_BODY, MAX_HEADS],
+    ['brick', CREW_BODY.brick, CREW_HEADS.brick],
+    ['leo', CREW_BODY.leo, CREW_HEADS.leo],
+    ['tia', CREW_BODY.tia, CREW_HEADS.tia],
+    ['pete', CREW_BODY.pete, CREW_HEADS.pete],
+    ['sam', HARRISON_BODY, SAM_HEADS],
+  ] as const)('bakes the trick clips for %s at their counts, inside the frame', (_, body, heads) => {
+    const clips = bakeAll(body, heads);
+    expect([clips.stepover, clips.flick, clips.fooled, clips.stumble].map(c => c.frames.length)).toEqual([4, 6, 3, 4]);
+    for (const clip of [clips.stepover, clips.flick, clips.fooled, clips.stumble]) {
+      for (const f of clip.frames) {
+        const b = opaqueBounds(f)!;
+        expect(b.x >= 1 && b.y >= 1 && b.x + b.w <= FRAME_W - 1 && b.y + b.h <= 55, `${clip.name} clipped`).toBe(true);
+      }
+    }
+  });
+
+  it('times the tricks: a 0.4 s stepover and a 0.5 s flick that hold, a looping confusion, a stumble that holds', () => {
+    expect([CLIPS.stepover.fps, CLIPS.stepover.loop]).toEqual([10, false]);
+    expect([CLIPS.flick.fps, CLIPS.flick.loop]).toEqual([12, false]);
+    expect([CLIPS.fooled.fps, CLIPS.fooled.loop]).toEqual([6, true]);
+    expect([CLIPS.stumble.fps, CLIPS.stumble.loop]).toEqual([10, false]);
+    expect(FLICK_RELEASE_FRAME / CLIPS.flick.fps).toBeCloseTo(0.25);
+  });
+
+  it("at the flick's release his near heel is kicked up behind his hips", () => {
+    const j = solvePose(samplePoses(CLIPS.flick)[FLICK_RELEASE_FRAME]!, HARRISON_BODY);
+    expect(j.nearLeg.ankle.x).toBeLessThan(j.hip.x - 2);
+    expect(j.nearLeg.ankle.y).toBeLessThan(53 - HARRISON_BODY.ankleHeight - 6);
+  });
+
+  it("the stumble's first frame lurches forward, the torso ahead of the hips", () => {
+    const j = solvePose(samplePoses(CLIPS.stumble)[0]!, HARRISON_BODY);
+    expect(j.neck.x).toBeGreaterThan(j.hip.x + 3);
+  });
+
+  it('the stepover and the flick keep a sole on the ground in every frame', () => {
+    for (const clip of [baked.stepover, baked.flick]) {
+      for (const f of clip.frames) expect(opaqueBounds(f)!.y + opaqueBounds(f)!.h - 1, clip.name).toBe(54);
+    }
   });
 
   it('bakes the skid: two frames at 8 fps that hold, not loop', () => {

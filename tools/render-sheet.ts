@@ -26,7 +26,8 @@ import type { AnimName } from '../src/art/body/animations';
 import { DEPTH_SHEAR, project } from '../src/game/camera';
 import { BACKYARD } from '../src/game/field';
 import type { KitId } from '../src/art/kits';
-import { addOutline } from '../src/art/raster';
+import { addOutline, opaqueBounds } from '../src/art/raster';
+import { FOOT_SPOT } from '../src/game/steal';
 import { encodePNG } from './png';
 import { composeSheet, type SheetItem } from './sheet';
 
@@ -307,3 +308,69 @@ console.log(`wrote ${PARK_FILE} (${park.width}×${park.height})`);
 const carry = composeSheet([Array.from({ length: CARRY_FRAMES }, (_, i) => bossView(236 - i * CARRY_STEP, i))], { scale: 1, gap: 0, background: BACKGROUND });
 writeFileSync(CARRY_FILE, encodePNG(carry.width, carry.height, carry.rgba));
 console.log(`wrote ${CARRY_FILE} (${carry.width}×${carry.height})`);
+
+/** The tricks: Harrison's stepover and flick in both kits, every opponent fooled and stumbling, Biscuit's tilt and tumble, two match views. */
+const TRICKS_FILE = `${OUT_DIR}/tricks-sheet.png`;
+const QUESTION = renderText('?', 1);
+const QUESTION_PAL = textPalette('white', 'outline');
+/** How far over the top of his head the "?" floats, px. */
+const MARK_GAP = 2;
+
+/** A frame with the white "?" over its head, as the match draws it over a confused player; padded on top so the mark fits. */
+function marked(img: IndexedImage, palette: ResolvedPalette): SheetItem {
+  const pad = QUESTION.height + MARK_GAP;
+  const width = img.width;
+  const rgba = new Uint8ClampedArray(width * (img.height + pad) * 4);
+  rgba.set(toRGBA(img, palette), width * pad * 4);
+  const mark = toRGBA(QUESTION, QUESTION_PAL);
+  const b = opaqueBounds(img)!;
+  const left = Math.round(b.x + b.w / 2 - QUESTION.width / 2);
+  const top = pad + b.y - MARK_GAP - QUESTION.height;
+  for (let y = 0; y < QUESTION.height; y++) {
+    for (let x = 0; x < QUESTION.width; x++) {
+      const src = (y * QUESTION.width + x) * 4;
+      if (mark[src + 3] === 0) continue;
+      rgba.set(mark.subarray(src, src + 4), ((top + y) * width + left + x) * 4);
+    }
+  }
+  return { width, height: img.height + pad, rgba };
+}
+
+/** The "?" over an actor's head in a match view. */
+const markOver = (a: Actor): Actor => {
+  const b = opaqueBounds(a.img)!;
+  return { ...a, img: QUESTION, palette: QUESTION_PAL, shadow: false, anchor: { x: a.anchor.x - Math.round(b.x + b.w / 2 - QUESTION.width / 2), y: a.anchor.y - b.y + MARK_GAP + QUESTION.height } };
+};
+
+const OPPONENTS: readonly { label: string; clips: ReturnType<typeof bakeAll>; look: LookColors }[] = [
+  { label: 'MAX', clips: max, look: maxLook() },
+  ...CREW.map(id => ({ label: id.toUpperCase(), clips: crewBaked[id], look: crewLook(id) })),
+  { label: 'SAM', clips: sam, look: samLook() },
+];
+const opponentTrickRow = ({ label, clips, look }: (typeof OPPONENTS)[number]): SheetItem[] => {
+  const pal = resolvePalette(look);
+  return [text(label, 1), marked(clips.fooled.frames[0]!, pal), ...[...clips.fooled.frames.slice(1), ...clips.stumble.frames].map(f => resolved(f, look))];
+};
+const harrisonTrickRow = (kit: KitId): SheetItem[] => [text(kit.toUpperCase(), 1), ...[...baked.stepover.frames, ...baked.flick.frames].map(f => item(f, kit))];
+const dogItem = (f: IndexedImage): SheetItem => ({ width: f.width, height: f.height, rgba: toRGBA(f, masterPalette()) });
+const biscuitTrickRow = (): SheetItem[] => [
+  text('BISCUIT', 1),
+  marked(BISCUIT_FRAMES.tilt[0]!, masterPalette()),
+  ...[...BISCUIT_FRAMES.tilt.slice(1), ...BISCUIT_FRAMES.tumble].map(dogItem),
+];
+
+/** Mid-stepover past Max: the ball at his feet, Max swayed the wrong way with the "?" over him. */
+const stepoverView = () => {
+  const maxFooled = withShadow(maxAt(186, 38, 'fooled', 0));
+  return backyardView(40, [withShadow(harrisonAt(160, 30, 'stepover', 2)), ballAt(160 + FOOT_SPOT, BALL_R, 30), maxFooled, markOver(maxFooled)]);
+};
+/** Just after the flick: the ball up over Max's head, Max lurching on. */
+const flickView = () =>
+  backyardView(40, [withShadow(harrisonAt(165, 30, 'flick', 4)), ballAt(186, 50, 30, 1), withShadow(maxAt(194, 30, 'stumble', 1))]);
+
+const tricks = composeSheet(
+  [harrisonTrickRow('home'), harrisonTrickRow('away'), ...OPPONENTS.map(opponentTrickRow), biscuitTrickRow(), [stepoverView(), flickView()]],
+  { scale: VENUE_SCALE, gap: GAP * 2, background: BACKGROUND },
+);
+writeFileSync(TRICKS_FILE, encodePNG(tricks.width, tricks.height, tricks.rgba));
+console.log(`wrote ${TRICKS_FILE} (${tricks.width}×${tricks.height})`);

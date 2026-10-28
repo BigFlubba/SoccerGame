@@ -1,7 +1,7 @@
 import { plantLeg, type ArmPose, type HeadFacing, type LegPose, type Pose } from './pose';
 import { HARRISON_BODY, standingHipHeight, type BodyProportions } from './proportions';
 
-export type AnimName = 'idle' | 'run' | 'jump' | 'shoot' | 'powerUp' | 'sprint' | 'chip' | 'header' | 'volley' | 'slide' | 'fall' | 'juggle' | 'celebrate' | 'brace' | 'skid';
+export type AnimName = 'idle' | 'run' | 'jump' | 'shoot' | 'powerUp' | 'sprint' | 'chip' | 'header' | 'volley' | 'slide' | 'fall' | 'juggle' | 'celebrate' | 'brace' | 'skid' | 'stepover' | 'flick' | 'fooled' | 'stumble';
 
 /** Shoot frame held while a shot charges. */
 export const SHOOT_CHARGE_FRAME = 1;
@@ -11,6 +11,8 @@ export const SHOOT_STRIKE_FRAME = 2;
 export const SLIDE_HOLD_FRAME = 2;
 /** Skid frame held for as long as he's still braking. */
 export const SKID_FRAME_HOLD = 1;
+/** Flick frame where the heel lets the ball go: 0.25 s in at 12 fps, the trick's sell. */
+export const FLICK_RELEASE_FRAME = 3;
 
 export interface AnimationClip {
   name: AnimName;
@@ -247,6 +249,60 @@ export function clipsFor(body: BodyProportions): Record<AnimName, AnimationClip>
       keys: [
         k({ x: -1, hip: -2, torso: -5, near: { plant: 7, ankle: -10 }, far: { plant: -4 }, nearArm: [-30, 40], farArm: [-20, 40] }),
         k({ x: -3, hip: -5, torso: -24, head: { dx: -1 }, near: { plant: 9, ankle: -20 }, far: { plant: -3 }, nearArm: [-70, 30], farArm: [-50, 40] }),
+      ],
+    },
+    stepover: {
+      name: 'stepover',
+      frameCount: 4,
+      fps: 10,
+      loop: false,
+      // The near foot lifts, circles out over the ball and lands beyond it as the body dips that way, then he goes.
+      keys: [
+        k({ hip: -1, torso: 5, near: { hip: 50, knee: 95, ankle: 10 }, far: { plant: -2 }, nearArm: [-35, 30], farArm: [35, 30] }),
+        k({ hip: -2, torso: 8, head: { facing: 'threeQuarter' }, near: { hip: 65, knee: 40, ankle: -15 }, far: { plant: -3 }, nearArm: [-60, 20], farArm: [70, 20] }),
+        k({ x: 1, hip: -5, torso: 15, head: { facing: 'threeQuarter', dy: 1 }, near: { plant: 10 }, far: { plant: -4 }, nearArm: [-75, 20], farArm: [85, 30] }),
+        k({ hip: -2, torso: RUN_TORSO, near: { plant: 5 }, far: { hip: -20, knee: 60, ankle: 30 }, nearArm: [-25, 60], farArm: [30, 60] }),
+      ],
+    },
+    flick: {
+      name: 'flick',
+      frameCount: 6,
+      fps: 12,
+      loop: false,
+      // Ball trapped between the feet, rolled up the back of the near leg by the far foot,
+      // flicked up and over by the near heel, follow-through, then away after it.
+      keys: [
+        k({ hip: -2, torso: 8, near: { plant: 6 }, far: { plant: -5 }, nearArm: [-20, 30], farArm: [20, 30] }),
+        k({ hip: -2, torso: 12, near: { plant: 2 }, far: { hip: -15, knee: 50, ankle: -20 }, nearArm: [-30, 30], farArm: [35, 30] }),
+        k({ hip: -2, torso: 15, near: { hip: -5, knee: 60, ankle: 20 }, far: { plant: -2 }, nearArm: [-45, 30], farArm: [50, 30] }),
+        k({ hip: -2, torso: 22, head: { dy: -1 }, near: { hip: -20, knee: 115, ankle: 50 }, far: { plant: 0 }, nearArm: [-60, 20], farArm: [75, 20] }),
+        k({ hip: -1, torso: 5, head: { dy: -1 }, near: { hip: -15, knee: 70, ankle: 30 }, far: { plant: 0 }, nearArm: [-40, 30], farArm: [50, 30] }),
+        k({ hip: -2, torso: RUN_TORSO, near: { plant: 5 }, far: { hip: -25, knee: 60, ankle: 30 }, nearArm: [-35, 70], farArm: [40, 80] }),
+      ],
+    },
+    fooled: {
+      name: 'fooled',
+      frameCount: 3,
+      fps: 6,
+      loop: true,
+      // Caught leaning the wrong way: weight back on his heels, arms out, head turning to look.
+      keys: [
+        k({ x: -1, hip: -2, torso: -12, head: { facing: 'threeQuarter' }, near: { plant: 6 }, far: { plant: -4 }, nearArm: [-55, 30], farArm: [75, 25] }),
+        k({ x: -1, hip: -3, torso: -16, head: { facing: 'threeQuarter', dx: -1 }, near: { plant: 6 }, far: { plant: -4 }, nearArm: [-65, 35], farArm: [90, 20] }),
+        k({ x: -1, hip: -2, torso: -10, head: { facing: 'threeQuarter' }, near: { plant: 6 }, far: { plant: -4 }, nearArm: [-50, 25], farArm: [70, 30] }),
+      ],
+    },
+    stumble: {
+      name: 'stumble',
+      frameCount: 4,
+      fps: 10,
+      loop: false,
+      // The lurch forward, arms flailing, a stride to catch himself, then upright again.
+      keys: [
+        k({ hip: -2, torso: 35, near: { plant: 8 }, far: { hip: -35, knee: 45, ankle: 30 }, nearArm: [100, 30], farArm: [-70, 30] }),
+        k({ hip: -5, torso: 45, head: { dy: 1 }, near: { plant: 10 }, far: { hip: -55, knee: 30, ankle: 30 }, nearArm: [-110, 30], farArm: [120, 30] }),
+        k({ hip: -4, torso: 25, near: { plant: -6 }, far: { plant: 10 }, nearArm: [70, 30], farArm: [40, 30] }),
+        k({ hip: -1, torso: 10, near: { plant: 3 }, far: { plant: -2 }, nearArm: [30, 30], farArm: [-20, 30] }),
       ],
     },
   };

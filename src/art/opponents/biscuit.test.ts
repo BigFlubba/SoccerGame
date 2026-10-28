@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { M } from '../colors';
 import { BISCUIT_ANCHOR, BISCUIT_FACE, BISCUIT_FPS, BISCUIT_FRAMES, MUZZLE, type DogAnim } from './biscuit';
 
-const COUNTS: Record<DogAnim, number> = { idle: 2, run: 4, carry: 4, grab: 2, jink: 2, pant: 2, blown: 2, brace: 1 };
+const COUNTS: Record<DogAnim, number> = { idle: 2, run: 4, carry: 4, grab: 2, jink: 2, pant: 2, blown: 2, brace: 1, tilt: 2, tumble: 5 };
 
 describe("Biscuit's frames", () => {
   it('has every clip at its frame count, all one size, with the anchor inside', () => {

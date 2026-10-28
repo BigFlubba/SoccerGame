@@ -4,7 +4,7 @@ import type { Point } from '../raster';
 
 export const BISCUIT_NAME = 'BISCUIT THE DOG';
 
-export type DogAnim = 'idle' | 'run' | 'carry' | 'grab' | 'jink' | 'pant' | 'blown' | 'brace';
+export type DogAnim = 'idle' | 'run' | 'carry' | 'grab' | 'jink' | 'pant' | 'blown' | 'brace' | 'tilt' | 'tumble';
 
 /**
  * Biscuit, the Backyard's boss: a golden retriever, drawn straight in
@@ -33,13 +33,68 @@ export const BISCUIT_ANCHOR: Point = { x: 21, y: 23 };
 /** Where the ball's centre sits in a carry, grab or jink frame, relative to the anchor; the sim places the world ball there. */
 export const MUZZLE: Point = { x: 10, y: -12 };
 
-export const BISCUIT_FPS: Readonly<Record<DogAnim, number>> = { idle: 3, run: 10, carry: 10, grab: 8, jink: 8, pant: 4, blown: 6, brace: 1 };
+export const BISCUIT_FPS: Readonly<Record<DogAnim, number>> = { idle: 3, run: 10, carry: 10, grab: 8, jink: 8, pant: 4, blown: 6, brace: 1, tilt: 3, tumble: 10 };
+
+/** Leaping up at a flicked ball, then coming down nose first having missed it. */
+const SPRING = frame([
+  '....................................',
+  '....................................',
+  '....................................',
+  '......................o.............',
+  '.....................odooooo........',
+  '....................ohdgggggooooo...',
+  '....................ohddggggggggso..',
+  'o....................ohdggooggggo...',
+  'go...................oodggogggggo...',
+  'ggo.................oggggggooooo....',
+  'ggo............oooooogggggogggo.....',
+  'gggoo.....ooooogggggggggggggoooo....',
+  'gggggo..ooggggggggggggggggggggggo...',
+  'dgggooooogggggggggggggggggggggggo...',
+  'oodgggggggggggggggggggggggggggggo...',
+  '..ooggggggggggggggggggggggggggoo....',
+  '..ogggggggggggggdggggggggggooodo....',
+  '..ogggggggddddddoddgggooooodddddo...',
+  'ooogggggggoooooo.ooodgoooddooooo....',
+  'ggggggggggodo.......oo...oo.........',
+  'ogggggggggdo........................',
+  'ogggggggooo.........................',
+  '.ooogoooddo.........................',
+  '.oddoooooo..........................',
+]);
+const MISS = frame([
+  '....................................',
+  '..ooo...............................',
+  '.ogggo..............................',
+  '.odggo..............................',
+  '.odgggo...................o.........',
+  '.ooggggo.................odo........',
+  '..oggggo................ohdooo......',
+  '..odgooo..oo............ohdgggo.....',
+  '...ooggoooggooooo......ohdgggggo....',
+  '...ogggggggggggggoooo..oodgggggooo..',
+  'oooogggggggggggggggggoogggggooggggo.',
+  'ggogggggggggggggggggggggggggggggggso',
+  'ggggggggggggggggggggggggggggooogggo.',
+  'ggggggggggdggggggggggggggggggggooo..',
+  'ooggggggggodddddgggggggggggggooo....',
+  'ddgggggggodooooodgggggggggggggoo....',
+  'odoooooodoo.....oddgggggggggggggo...',
+  '.oooooddo.......oodgogggggggggggo...',
+  '......oo..........oooooooggggogo....',
+  '.....................ooddoooodo.....',
+  '.......................oodddddo.....',
+  '.........................oooooo.....',
+  '....................................',
+  '....................................',
+]);
 
 /**
- * His clips. carry, grab and jink hold the ball in his mouth at MUZZLE;
+ * His drawn clips. carry, grab and jink hold the ball in his mouth at MUZZLE;
  * the rest don't. blown is the flier, then the tumble with his legs up.
+ * tilt cocks his head at a stepover.
  */
-export const BISCUIT_FRAMES: Readonly<Record<DogAnim, readonly IndexedImage[]>> = {
+const DRAWN: Readonly<Record<Exclude<DogAnim, 'tumble'>, readonly IndexedImage[]>> = {
   idle: [
     frame([
       '....................................',
@@ -550,6 +605,66 @@ export const BISCUIT_FRAMES: Readonly<Record<DogAnim, readonly IndexedImage[]>> 
       '.........oo.oo..........oooooo......',
     ]),
   ],
+  tilt: [
+    frame([
+      '....................................',
+      '...ooo.................ooo..........',
+      '..ogggo...............ogggoo........',
+      '..ogggo..............ogggggdoo......',
+      '.ogdggo..............ogggggdggo.....',
+      '.ogdggo.............ohdgggogggoo....',
+      '.odgggo............ohhddggggggsso...',
+      '.odgggo...oooooooooohdddggggggoo....',
+      '..odgooooogggggggggghdddgsssggo.....',
+      '..odogggggggggggggggghddggggoo......',
+      '...oggggggggggggggggghddgggo........',
+      '...oggggggggggggggggggghdggo........',
+      '...oggggggggggggggggggggggggo.......',
+      '...ogggggggddddddggggggggooo........',
+      '....ooggggggoooooddggggggo..........',
+      '......ogggggoddo.oodgogggo..........',
+      '......ogggggoddo..oooogggo..........',
+      '.....oggggggoddo..oddogggo..........',
+      '....ogggggggoddo..oddogggo..........',
+      '....oggggoooooo...oddogggo..........',
+      '....oggggoddo.....oddogggo..........',
+      '.....ooggoddo.....oddogggo..........',
+      '......oggoddo.....oddogggo..........',
+      '.......oo.oo.......oooooo...........',
+    ]),
+    frame([
+      '....................................',
+      '...ooo.................ooo..........',
+      '..ogggo...............ogggoo........',
+      '..ogggo.........oo...ogggggdoo......',
+      '.ogdggo........ohdo..ogggggdggo.....',
+      '.ogdggo........ohddooodgggogggoo....',
+      '.odgggo.........ohdddgggggggggsso...',
+      '.odgggo...oooooooohdddggggggggoo....',
+      '..odgooooogggggggggoohggsssggo......',
+      '..odogggggggggggggggggggggggo.......',
+      '...ogggggggggggggggggggggggo........',
+      '...oggggggggggggggggggggggo.........',
+      '...oggggggggggggggggggggggggo.......',
+      '...ogggggggddddddggggggggooo........',
+      '....ooggggggoooooddggggggo..........',
+      '......ogggggoddo.oodgogggo..........',
+      '......ogggggoddo..oooogggo..........',
+      '.....oggggggoddo..oddogggo..........',
+      '....ogggggggoddo..oddogggo..........',
+      '....oggggoooooo...oddogggo..........',
+      '....oggggoddo.....oddogggo..........',
+      '.....ooggoddo.....oddogggo..........',
+      '......oggoddo.....oddogggo..........',
+      '.......oo.oo.......oooooo...........',
+    ]),
+  ],
+};
+
+/** Every clip. The tumble under a flick: spring, miss, roll on his back, scramble up, and up again. */
+export const BISCUIT_FRAMES: Readonly<Record<DogAnim, readonly IndexedImage[]>> = {
+  ...DRAWN,
+  tumble: [SPRING, MISS, DRAWN.blown[1]!, DRAWN.brace[0]!, DRAWN.pant[0]!],
 };
 
 /** His face for the boss node and the VS card: 12×12, outlined. */
