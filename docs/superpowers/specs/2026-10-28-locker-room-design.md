@@ -554,3 +554,23 @@ Settled on the way; the code and its tests are the detail.
 - **Measured in the browser:** a match frame with INFERNO, FIRE and
   every extra draws in about 0.4 ms (median); the first frame in a new
   outfit bakes it, about 6 ms.
+- **A match warms his sprite sets on its first frame** (the still
+  kickoff), after the final review found a first power-up in a new
+  outfit baked them mid-play.
+
+### Deferred minors (from the final review, for the parent to weigh)
+
+- When one match crosses 10 stars and levels him up, the armband's
+  gift line can push the unlock line (e.g. ENERGY WAVE UNLOCKED) off
+  Results' three foot lines. Dropping the gift line first would keep
+  the unlock; the Hub's NEW still points to the gift.
+- During the 1.2 s cheer after wearing or buying a trail boot, the
+  trail keeps streaming while he hops.
+- Taking an extra off leaves it on the shown sprite, with TRYING ON,
+  because the cursor still tries it on: the press can look like it did
+  nothing.
+- A wear and a take-off both play `menuConfirm`; the cheer has no cue
+  of its own (`star` is the obvious one). Unheard by a person.
+- His per-outfit art caches never shrink in a session (bounded in
+  practice).
+- No unit tests pin `HarrisonArt`'s cache keys or `dress`'s no-op.
