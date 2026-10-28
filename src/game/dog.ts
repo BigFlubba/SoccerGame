@@ -149,7 +149,8 @@ function inReach(dog: Player, w: World): boolean {
 
 /**
  * Whether a loose or controlled ball can be taken this tick (reach, speed,
- * height, not fallen/blown/bracing, no regrab wait, not panting). Never on
+ * height, not fallen/blown/bracing, not fooled by a trick, no regrab wait,
+ * not panting). Never on
  * the tick Harrison strikes the Energy Wave: the wave has the ball.
  */
 export function canGrab(w: World): boolean {
@@ -157,7 +158,7 @@ export function canGrab(w: World): boolean {
   const b = w.ball;
   const striking = w.home.kick?.kind === 'wave' && w.home.kick.active;
   if (!d || d.carrying || w.match.phase !== 'playing' || w.wave?.live || striking) return false;
-  if (w.away.state !== 'ground' || d.regrabS > 0 || d.pantS > 0) return false;
+  if (w.away.state !== 'ground' || w.away.fooled || d.regrabS > 0 || d.pantS > 0) return false;
   return Math.hypot(b.vx, b.vy, b.vz) <= DOG_CATCH_SPEED && b.y <= DOG_CATCH_HEIGHT && inReach(w.away, w);
 }
 

@@ -1,8 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import { BALL_REST_Y } from './ball';
-import { DOG_BACKPEDAL_SPEED, DOG_DIFFICULTY, DOG_SPEED, JINK_S, TUNING_STATS, dwellFor, parkBall, type DogProfile } from './dog';
+import { DOG_BACKPEDAL_SPEED, DOG_CATCH_HEIGHT, DOG_DIFFICULTY, DOG_SPEED, JINK_S, TUNING_STATS, canGrab, dwellFor, parkBall, type DogProfile } from './dog';
 import { createDogBrain, dogThink, type DogBrain } from './dogAi';
-import { NO_INTENT, type PlayerIntent } from './player';
+import { NO_INTENT, NORMAL_HANDLING, type PlayerIntent } from './player';
+import { trickSetup } from './opponents';
 import { POWERED_S } from './power';
 import { createWorld, stepWorld, type World } from './world';
 
@@ -298,5 +299,63 @@ describe('dogThink', () => {
     expect(w.events.power.fired).toBe(true);
     dogThink(brain, w, STEP);
     expect(brain.plan).toBe('faceWave');
+  });
+});
+
+describe('fooled by a trick', () => {
+  const RB: PlayerIntent = { ...NO_INTENT, skill: true };
+  const FLICK_PRESS: PlayerIntent = { ...RB, moveZ: 1 };
+
+  /** Harrison on the ball at x 300; the dog closing from 60 px, so he's squared up at the sell; stepped to the sell. */
+  function tricked(press: PlayerIntent) {
+    const w = createWorld(TUNING_STATS, AWAY_STATS, 5, ERR, null, DOG_DIFFICULTY.normal, null, NORMAL_HANDLING, trickSetup('normal', 'biscuit'));
+    w.match.phase = 'playing';
+    Object.assign(w.home, { x: 300, z: 32, facing: 1 });
+    Object.assign(w.away, { x: 360, z: 32, facing: -1 });
+    Object.assign(w.ball, { x: 308, y: BALL_REST_Y, z: 32, vx: 0, vy: 0, vz: 0 });
+    const brain = createDogBrain(DOG_DIFFICULTY.normal);
+    const step = stepper(w, brain);
+    step(press);
+    for (let i = 0; i < 60 && !w.away.fooled; i++) step();
+    expect(w.away.fooled).toBeTruthy();
+    return { w, brain, step };
+  }
+
+  it('a stepover tilts his head: he stands facing the ball and never grabs it while it lasts', () => {
+    const { w, brain, step } = tricked(RB);
+    for (let i = 0; i < 12; i++) step();
+    expect(brain.plan).toBe('tilt');
+    for (let i = 0; i < 60 && w.away.fooled; i++) {
+      step();
+      expect(w.dog!.carrying).toBe(false);
+    }
+    expect(Math.hypot(w.away.vx, w.away.vz)).toBeLessThan(5);
+    expect(w.away.facing).toBe(Math.sign(w.ball.x - w.away.x));
+  });
+
+  it('a flick sails over him above his catch height and he tumbles, then reacts to the ball once it ends', () => {
+    const { w, brain, step } = tricked(FLICK_PRESS);
+    step();
+    expect(brain.plan).toBe('tumble');
+    let passed = false;
+    for (let i = 0; i < 90 && w.away.fooled; i++) {
+      step();
+      if (Math.abs(w.ball.x - w.away.x) < 6) {
+        passed = true;
+        expect(w.ball.y).toBeGreaterThan(DOG_CATCH_HEIGHT);
+      }
+      expect(w.dog!.carrying).toBe(false);
+    }
+    expect(passed).toBe(true);
+    expect(w.away.fooled).toBeNull();
+    step();
+    expect(['react', 'chase']).toContain(brain.plan);
+  });
+
+  it("can't grab a ball at his muzzle while he's fooled (Review Focus 4)", () => {
+    const w = scene({ dog: 300, home: 500, ball: 290 });
+    expect(canGrab(w)).toBe(true);
+    w.away.fooled = { kind: 'confused', leftS: 0.5, totalS: 0.7, swayZ: 32 };
+    expect(canGrab(w)).toBe(false);
   });
 });

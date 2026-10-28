@@ -17,7 +17,7 @@ export interface DogBrain {
   profile: DogProfile;
   nextDecisionS: number;
   intent: PlayerIntent;
-  plan: 'chase' | 'react' | 'carry' | 'jink' | 'pant' | 'dazed' | 'backOff' | 'hesitate' | 'faceWave';
+  plan: 'chase' | 'react' | 'carry' | 'jink' | 'pant' | 'dazed' | 'backOff' | 'hesitate' | 'faceWave' | 'tilt' | 'tumble';
   /** As Max's: while Harrison is powered up, where it means to stand and when it starts, or 'stay'. */
   backOff: null | 'stay' | { gap: number; inS: number };
   /** The depth the current jink cuts to. */
@@ -295,7 +295,11 @@ export function dogThink(brain: DogBrain, w: World, dt: number): PlayerIntent {
   const backing = brain.backOff !== null && brain.backOff !== 'stay' ? brain.backOff : null;
   if (backing) backing.inS -= dt;
   if (wave) brain.intent = faceWave(brain, w, wave);
-  else if (backing && backing.inS <= 0) brain.intent = backOff(brain, w, backing.gap);
+  else if (me.fooled) {
+    // Fooled by a trick: a stepover stops him to tilt his head at the ball; a flick he leapt for and missed leaves him tumbling.
+    brain.plan = me.fooled.kind === 'confused' ? 'tilt' : 'tumble';
+    brain.intent = brain.plan === 'tilt' ? { ...NO_INTENT, faceX: faceBall(w, me) } : { ...NO_INTENT };
+  } else if (backing && backing.inS <= 0) brain.intent = backOff(brain, w, backing.gap);
   else if (powered || d.pantS > 0 || d.regrabS > 0) {
     // Before he reacts, or when he doesn't back off at all, he hesitates where he is; panting, or
     // knocked off the ball and shaking it off, he just stands.

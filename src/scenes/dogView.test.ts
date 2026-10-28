@@ -86,3 +86,29 @@ describe('dogClip', () => {
     expect(dogClip(w, 0).frame).toBe(1);
   });
 });
+
+describe('dogClip when fooled', () => {
+  it('tilts his head while confused, from the sell', () => {
+    const w = boss();
+    w.away.fooled = { kind: 'confused', leftS: 0.7, totalS: 0.7, swayZ: 32 };
+    expect(dogClip(w, 3)).toEqual({ name: 'tilt', frame: 0 });
+    w.away.fooled.leftS = 0.7 - 1 / BISCUIT_FPS.tilt;
+    expect(dogClip(w, 3)).toEqual({ name: 'tilt', frame: 1 });
+  });
+
+  it('tumbles while stumbling, the frames running on, and holds the last', () => {
+    const w = boss();
+    w.away.fooled = { kind: 'stumble', leftS: 0.7, totalS: 0.7, swayZ: 32 };
+    expect(dogClip(w, 3)).toEqual({ name: 'tumble', frame: 0 });
+    w.away.fooled.leftS = 0.7 - 0.25;
+    expect(dogClip(w, 3)).toEqual({ name: 'tumble', frame: 2 });
+    w.away.fooled.leftS = 0.02;
+    expect(dogClip(w, 3)).toEqual({ name: 'tumble', frame: 4 });
+  });
+
+  it('is back to his usual clips once it ends', () => {
+    const w = boss();
+    w.away.fooled = null;
+    expect(name(w)).toBe('idle');
+  });
+});

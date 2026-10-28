@@ -20,7 +20,7 @@ const looping = (name: DogAnim, nowS: number): DogClip => ({ name, frame: Math.f
 /**
  * Which clip and frame the dog shows: blown or braced from his body's state
  * (flat out going up, tumbling on the way down, then on his feet shaking it
- * off); then the pant, which is also how he shakes off a lost ball; the
+ * off); then a trick's head tilt or tumble; then the pant, which is also how he shakes off a lost ball; the
  * jink (crouch, then cut); the grab for GRAB_SHOW_S after he takes the
  * ball; the carry, standing or galloping; the run when moving; idle
  * otherwise. Looping clips run on `nowS`.
@@ -30,6 +30,12 @@ export function dogClip(w: World, nowS: number): DogClip {
   const p = w.away;
   if (p.state === 'blown' && (p.y > 0 || p.vy > 0)) return { name: 'blown', frame: p.vy > 0 ? 0 : 1 };
   if (p.state === 'bracing') return { name: 'brace', frame: 0 };
+  // Fooled by a trick, on the reaction's clock: the head tilt loops, the tumble holds its last frame.
+  if (p.fooled) {
+    const into = Math.max(0, p.fooled.totalS - p.fooled.leftS);
+    if (p.fooled.kind === 'confused') return looping('tilt', into);
+    return { name: 'tumble', frame: Math.min(BISCUIT_FRAMES.tumble.length - 1, Math.floor(into * BISCUIT_FPS.tumble)) };
+  }
   // Landed from a wave, knocked off the ball, or out of breath: standing, heaving.
   if (p.state === 'blown' || d.pantS > 0 || (d.regrabS > 0 && !d.carrying)) return looping('pant', nowS);
   if (d.jinkS > 0) return { name: 'jink', frame: d.jinkS > JINK_S / 2 ? 0 : 1 };
