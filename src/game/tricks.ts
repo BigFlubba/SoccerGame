@@ -40,12 +40,12 @@ export interface TrickSetup {
 /**
  * The windows are the spec's; Hard's times went from 0.5 to 0.6 s in the
  * tuning. Measured with trickTuning's scripts (seeds 100-163, 2026-10-28):
- * fooling tricks that beat Max E/N/H .91/.86/.81; trickster wins vs Max
- * E/N/H .688/.656/.063 (plain .875/.625/.016); spammer wins E/N/H
- * .422/.203/.047; vs Biscuit on Normal plain .625, trickster .656, spammer
+ * fooling tricks that beat Max E/N/H .84/.76/.74; trickster wins vs Max
+ * E/N/H .688/.672/.063 (plain .875/.625/.016); spammer wins E/N/H
+ * .438/.203/.047; vs Biscuit on Normal plain .625, trickster .656, spammer
  * 0. Personalities (Normal, seeds 100-131): fooling stepovers that beat
- * Max 1.00, Tia .57, Brick .14 (Pete .92 over 64 seeds); a fooled Sam ends
- * 84.7 px past Harrison, Max 30.1. Mutable, for headless sweeps.
+ * Max 1.00, Tia .57, Brick 0 (Pete .92 over 64 seeds); a fooled Sam ends
+ * 82.4 px past Harrison, Max 29.6. Mutable, for headless sweeps.
  */
 export const TRICK_DIFFICULTY: Record<Difficulty, TrickProfile> = {
   easy: { near: 12, far: 56, confusedS: 0.9, stumbleS: 0.9 },
