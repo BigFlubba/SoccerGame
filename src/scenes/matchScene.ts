@@ -113,7 +113,7 @@ function harrisonIntent(input: InputFrame): PlayerIntent {
  */
 export function createMatchScene(ctx: GameContext, seed: number, match: CareerMatch = nextCareerMatch(ctx.profile)): MatchScene {
   const { art } = ctx;
-  let difficulty = ctx.settings.difficulty;
+  let difficulty = ctx.profile.difficulty;
   const dog = match.opponent === 'biscuit';
   const human: HumanOpponentId = match.opponent === 'biscuit' ? 'max' : match.opponent;
   const thinking = opponentProfile(human, difficulty);
@@ -219,7 +219,7 @@ export function createMatchScene(ctx: GameContext, seed: number, match: CareerMa
   };
   /** Help and Options come back to this match, still paused, with any new difficulty applied to the opponent. */
   const backHere = (): Scene => {
-    difficulty = ctx.settings.difficulty;
+    difficulty = ctx.profile.difficulty;
     brain.profile = opponentProfile(human, difficulty);
     world.aimErrorDeg.away = brain.profile.aimErrorDeg;
     if (world.maxProfile) world.maxProfile = brain.profile;

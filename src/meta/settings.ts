@@ -4,6 +4,11 @@ import { isRecord, readStored, writeUnlessNewer, type KeyValueStore } from './st
 /** Player settings, versioned so a later build can always read them. */
 export interface Settings {
   version: 2;
+  /**
+   * Kept so older builds read these settings as before. Each save has its
+   * own difficulty now: this is only the loader's fallback for a save that
+   * has none (his live save, the first time it loads), and nothing writes it.
+   */
   difficulty: Difficulty;
   /** 0–VOLUME_MAX. */
   musicVolume: number;

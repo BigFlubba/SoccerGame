@@ -1,10 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { DIFFICULTY } from '../game/ai';
+import { DIFFICULTY, type Difficulty } from '../game/ai';
 import { measureText } from '../art/font';
 import { careerCardLines } from '../meta/career';
 import { maxStats } from '../meta/ladder';
 import { newProfile } from '../meta/profile';
-import { DEFAULT_SETTINGS, type Settings } from '../meta/settings';
 import { HUB_ITEMS, createHubScene, statsLine } from './hubScene';
 import type { MatchScene } from './matchScene';
 import { testContext } from './testContext';
@@ -13,8 +12,8 @@ import { createPressStartScene } from './titleScene';
 import type { VsScene } from './vsScene';
 
 const STEP = 1 / 60;
-function context(difficulty: Settings['difficulty'] = 'normal') {
-  return testContext({ settings: { ...DEFAULT_SETTINGS, difficulty } });
+function context(difficulty: Difficulty = 'normal') {
+  return testContext({ profile: { ...newProfile(), difficulty } });
 }
 
 describe('press start screen', () => {
@@ -49,7 +48,7 @@ describe('hub', () => {
     expect(match.world.away.stats).toEqual(maxStats(5));
   });
 
-  it('a match reached from the Hub plays at the saved difficulty', () => {
+  it("a match reached from the Hub plays at the save's difficulty", () => {
     for (const difficulty of ['easy', 'hard'] as const) {
       let scene = createHubScene(context(difficulty));
       for (let i = 0; i < 4; i++) scene = scene.update(frame(['confirm']), STEP)!;

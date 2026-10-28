@@ -1,18 +1,17 @@
 import { MASTER } from '../art/colors';
 import { BASE_W } from '../engine/viewport';
-import { DIFFICULTIES } from '../game/ai';
+import { DIFFICULTIES, type Difficulty } from '../game/ai';
 import { VOLUME_MAX, type Settings } from '../meta/settings';
 import { drawBackdrop } from './backdrop';
 import type { GameContext } from './context';
 import { backsOut } from './menu';
-import { createResetScene } from './resetScene';
 import { createSaveCodeScene } from './saveCodeScene';
 import type { Scene } from './scene';
 
 export const OPTION_ROWS = ['DIFFICULTY', 'MUSIC', 'SFX', 'RUMBLE'] as const;
 export type OptionRow = (typeof OPTION_ROWS)[number];
 /** Only from the Hub: never in the middle of a match. */
-const SAVE_ROWS = ['SAVE CODE', 'RESET SAVE'] as const;
+const SAVE_ROWS = ['SAVE CODE'] as const;
 
 export interface OptionsScene extends Scene {
   readonly rows: readonly string[];
@@ -30,20 +29,22 @@ const FOOTER_UP = 14;
 const BUTTON_GAP = 4;
 const BUTTON_RAISE = 2;
 
-/** A row as shown: left and right change it. */
-export function optionRow(row: OptionRow, s: Settings): string {
-  const value = { DIFFICULTY: s.difficulty.toUpperCase(), MUSIC: `${s.musicVolume}`, SFX: `${s.sfxVolume}`, RUMBLE: s.rumble ? 'ON' : 'OFF' }[row];
+/** A row as shown, DIFFICULTY with the save's: left and right change it. */
+export function optionRow(row: OptionRow, s: Settings, difficulty: Difficulty): string {
+  const value = { DIFFICULTY: difficulty.toUpperCase(), MUSIC: `${s.musicVolume}`, SFX: `${s.sfxVolume}`, RUMBLE: s.rumble ? 'ON' : 'OFF' }[row];
   return `${row}  < ${value} >`;
 }
 
-/** One step left or right on a row: difficulty wraps, volumes stop at 0 and VOLUME_MAX, rumble toggles. */
-export function changeOption(s: Settings, row: OptionRow, step: 1 | -1): Settings {
+/** One step through DIFFICULTIES, wrapping. */
+export function nextDifficulty(d: Difficulty, step: 1 | -1): Difficulty {
+  const n = DIFFICULTIES.length;
+  return DIFFICULTIES[(DIFFICULTIES.indexOf(d) + step + n) % n]!;
+}
+
+/** One step left or right on a setting: volumes stop at 0 and VOLUME_MAX, rumble toggles. */
+export function changeOption(s: Settings, row: Exclude<OptionRow, 'DIFFICULTY'>, step: 1 | -1): Settings {
   const volume = (v: number) => Math.min(Math.max(v + step, 0), VOLUME_MAX);
   switch (row) {
-    case 'DIFFICULTY': {
-      const n = DIFFICULTIES.length;
-      return { ...s, difficulty: DIFFICULTIES[(DIFFICULTIES.indexOf(s.difficulty) + step + n) % n]! };
-    }
     case 'MUSIC':
       return { ...s, musicVolume: volume(s.musicVolume) };
     case 'SFX':
@@ -55,8 +56,9 @@ export function changeOption(s: Settings, row: OptionRow, step: 1 | -1): Setting
 
 /**
  * DIFFICULTY, MUSIC, SFX and RUMBLE: up/down pick a row (wrapping),
- * left/right change it and save at once. From the Hub, SAVE CODE and RESET
- * SAVE follow, and A opens them. B goes back.
+ * left/right change it and save at once. DIFFICULTY is the save's own, so
+ * it saves the save; the others are shared by every save. From the Hub,
+ * SAVE CODE follows, and A opens it. B goes back.
  */
 export function createOptionsScene(ctx: GameContext, back: () => Scene, fromHub = false, startRow = 0): OptionsScene {
   const { art } = ctx;
@@ -79,17 +81,17 @@ export function createOptionsScene(ctx: GameContext, back: () => Scene, fromHub 
       if (input.pressed.has('up')) row = (row - 1 + n) % n;
       if (input.pressed.has('down')) row = (row + 1) % n;
       const name = rows[row]!;
-      if (row === before && input.pressed.has('confirm') && (name === 'SAVE CODE' || name === 'RESET SAVE')) {
+      if (row === before && input.pressed.has('confirm') && name === 'SAVE CODE') {
         ctx.audio.play('menuConfirm');
         const here = row;
-        const backHere = () => createOptionsScene(ctx, back, true, here);
-        return name === 'SAVE CODE' ? createSaveCodeScene(ctx, backHere) : createResetScene(ctx, backHere);
+        return createSaveCodeScene(ctx, () => createOptionsScene(ctx, back, true, here));
       }
       const setting = OPTION_ROWS.find(r => r === name);
       const step = setting && input.pressed.has('right') ? 1 : setting && input.pressed.has('left') ? -1 : 0;
       // Saved first, so an SFX change blips at its new level.
       if (setting && step !== 0) {
-        ctx.save(changeOption(ctx.settings, setting, step));
+        if (setting === 'DIFFICULTY') ctx.saveProfile({ ...ctx.profile, difficulty: nextDifficulty(ctx.profile.difficulty, step) });
+        else ctx.save(changeOption(ctx.settings, setting, step));
         // A little pulse says it's back on.
         if (setting === 'RUMBLE' && ctx.settings.rumble) ctx.rumble.pulse('tap');
       }
@@ -108,7 +110,7 @@ export function createOptionsScene(ctx: GameContext, back: () => Scene, fromHub 
       rows.forEach((name, i) => {
         const selected = i === row;
         const setting = OPTION_ROWS.find(r => r === name);
-        const t = art.text(setting ? optionRow(setting, ctx.settings) : name, 1, selected ? 'energyGold' : 'white', 'outline');
+        const t = art.text(setting ? optionRow(setting, ctx.settings, ctx.profile.difficulty) : name, 1, selected ? 'energyGold' : 'white', 'outline');
         const y = ROWS_Y + i * ROW_H;
         const left = Math.round(BASE_W / 2 - t.width / 2);
         g.drawImage(t, left, y);

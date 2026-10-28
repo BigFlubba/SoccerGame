@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { glyph } from '../art/font';
+import { newProfile } from '../meta/profile';
 import { DEFAULT_SETTINGS } from '../meta/settings';
-import { OPTION_ROWS, changeOption, createOptionsScene, optionRow } from './optionsScene';
+import { OPTION_ROWS, changeOption, createOptionsScene, nextDifficulty, optionRow } from './optionsScene';
 import type { Scene } from './scene';
 import { testContext } from './testContext';
 import { frame } from './testInput';
@@ -12,17 +13,29 @@ const BEHIND: Scene = { kind: 'hub', update: () => null, draw: () => {} };
 const context = () => testContext();
 
 describe('options', () => {
-  it('changes and saves difficulty', () => {
+  it("changes the save's difficulty and saves the save, not the settings", () => {
     const ctx = context();
     const s = createOptionsScene(ctx, () => BEHIND);
     expect(s.kind).toBe('options');
     s.update(frame(['right']), STEP);
-    expect(ctx.settings.difficulty).toBe('hard');
-    expect(ctx.savedSettings.at(-1)).toEqual({ ...DEFAULT_SETTINGS, difficulty: 'hard' });
+    expect(ctx.profile.difficulty).toBe('hard');
+    expect(ctx.savedProfiles.at(-1)?.difficulty).toBe('hard');
     s.update(frame(['right']), STEP);
-    expect(ctx.settings.difficulty).toBe('easy');
+    expect(ctx.profile.difficulty).toBe('easy');
     s.update(frame(['left']), STEP);
-    expect(ctx.savedSettings.map(x => x.difficulty)).toEqual(['hard', 'easy', 'hard']);
+    expect(ctx.savedProfiles.map(x => x.difficulty)).toEqual(['hard', 'easy', 'hard']);
+    expect(ctx.savedSettings).toEqual([]);
+  });
+
+  it('a change lands only in the save being played', () => {
+    const other = { ...newProfile(), name: 'OTHER', coins: 50 };
+    const ctx = context();
+    ctx.saves.write(1, other);
+    ctx.slot = 2;
+    ctx.saves.write(2, ctx.profile);
+    createOptionsScene(ctx, () => BEHIND).update(frame(['right']), STEP);
+    expect(ctx.saves.read(1)).toEqual(other);
+    expect(ctx.saves.read(2)?.difficulty).toBe('hard');
   });
 
   it('B goes back and keeps the change', () => {
@@ -30,7 +43,7 @@ describe('options', () => {
     const s = createOptionsScene(ctx, () => BEHIND);
     s.update(frame(['left']), STEP);
     expect(s.update(frame(['back']), STEP)).toBe(BEHIND);
-    expect(ctx.settings.difficulty).toBe('easy');
+    expect(ctx.profile.difficulty).toBe('easy');
   });
 
   it('Start or Esc goes back too, but Enter does not', () => {
@@ -40,16 +53,17 @@ describe('options', () => {
   });
 
   it('shows the difficulty row with arrows the font can draw', () => {
-    expect(optionRow('DIFFICULTY', { ...DEFAULT_SETTINGS })).toBe('DIFFICULTY  < NORMAL >');
+    expect(optionRow('DIFFICULTY', { ...DEFAULT_SETTINGS }, 'normal')).toBe('DIFFICULTY  < NORMAL >');
+    expect(optionRow('DIFFICULTY', { ...DEFAULT_SETTINGS }, 'easy')).toBe('DIFFICULTY  < EASY >');
     for (const ch of '<>') expect(glyph(ch)).not.toBe(glyph('?'));
   });
 
   it('shows every row', () => {
     expect(OPTION_ROWS).toEqual(['DIFFICULTY', 'MUSIC', 'SFX', 'RUMBLE']);
-    expect(optionRow('MUSIC', { ...DEFAULT_SETTINGS })).toBe('MUSIC  < 6 >');
-    expect(optionRow('SFX', { ...DEFAULT_SETTINGS })).toBe('SFX  < 8 >');
-    expect(optionRow('RUMBLE', { ...DEFAULT_SETTINGS })).toBe('RUMBLE  < ON >');
-    expect(optionRow('RUMBLE', { ...DEFAULT_SETTINGS, rumble: false })).toBe('RUMBLE  < OFF >');
+    expect(optionRow('MUSIC', { ...DEFAULT_SETTINGS }, 'normal')).toBe('MUSIC  < 6 >');
+    expect(optionRow('SFX', { ...DEFAULT_SETTINGS }, 'normal')).toBe('SFX  < 8 >');
+    expect(optionRow('RUMBLE', { ...DEFAULT_SETTINGS }, 'normal')).toBe('RUMBLE  < ON >');
+    expect(optionRow('RUMBLE', { ...DEFAULT_SETTINGS, rumble: false }, 'normal')).toBe('RUMBLE  < OFF >');
   });
 
   it('up and down move over the four rows, wrapping', () => {
@@ -64,7 +78,7 @@ describe('options', () => {
     s.update(frame(['down']), STEP);
     s.update(frame(['down']), STEP);
     s.update(frame(['right']), STEP);
-    expect(ctx.settings.difficulty).toBe('hard');
+    expect(ctx.profile.difficulty).toBe('hard');
     s.update(frame(['up']), STEP);
     s.update(frame(['left']), STEP);
     expect(ctx.settings.rumble).toBe(false);
@@ -85,8 +99,9 @@ describe('options', () => {
   });
 
   it('difficulty wraps both ways', () => {
-    expect(changeOption({ ...DEFAULT_SETTINGS, difficulty: 'hard' }, 'DIFFICULTY', 1).difficulty).toBe('easy');
-    expect(changeOption({ ...DEFAULT_SETTINGS, difficulty: 'easy' }, 'DIFFICULTY', -1).difficulty).toBe('hard');
+    expect(nextDifficulty('hard', 1)).toBe('easy');
+    expect(nextDifficulty('easy', -1)).toBe('hard');
+    expect(nextDifficulty('normal', 1)).toBe('hard');
   });
 
   it('turning rumble on gives a tap pulse', () => {
@@ -111,17 +126,13 @@ describe('options', () => {
   });
 });
 
-describe('options: save code and reset', () => {
-  it('from the Hub, Options has SAVE CODE and RESET SAVE', () => {
+describe('options: save code', () => {
+  it('from the Hub, Options has SAVE CODE last, and no RESET SAVE', () => {
     const ctx = testContext();
     const s = createOptionsScene(ctx, () => BEHIND, true);
-    expect(s.rows).toEqual([...OPTION_ROWS, 'SAVE CODE', 'RESET SAVE']);
-    s.update(frame(['up']), STEP);
+    expect(s.rows).toEqual([...OPTION_ROWS, 'SAVE CODE']);
     s.update(frame(['up']), STEP);
     expect(s.update(frame(['confirm']), STEP)?.kind).toBe('saveCode');
-    const r = createOptionsScene(ctx, () => BEHIND, true);
-    r.update(frame(['up']), STEP);
-    expect(r.update(frame(['confirm']), STEP)?.kind).toBe('reset');
   });
 
   it('from the pause menu, it does not', () => {
@@ -134,7 +145,6 @@ describe('options: save code and reset', () => {
   it('backing out of the save code screen returns to Options from the Hub, on the same row', () => {
     const ctx = testContext();
     const s = createOptionsScene(ctx, () => BEHIND, true);
-    s.update(frame(['up']), STEP);
     s.update(frame(['up']), STEP);
     const code = s.update(frame(['confirm']), STEP)!;
     const back = code.update(frame(['back']), STEP) as ReturnType<typeof createOptionsScene>;

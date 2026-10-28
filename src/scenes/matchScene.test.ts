@@ -342,7 +342,7 @@ describe('match scene: pause menu screens', () => {
     const options = pick(s, 'OPTIONS')!;
     options.update(frame(['right']), STEP);
     options.update(frame(['back']), STEP);
-    expect(ctx.settings.difficulty).toBe('hard');
+    expect(ctx.profile.difficulty).toBe('hard');
     expect(s.world.aimErrorDeg.away).toBe(DIFFICULTY.hard.aimErrorDeg);
     expect(s.difficulty).toBe('hard');
   });
@@ -376,7 +376,7 @@ describe('match scene: pause menu screens', () => {
     const options = pick(s, 'OPTIONS')!;
     options.update(frame(['right']), STEP);
     options.update(frame(['back']), STEP);
-    expect(ctx.settings.difficulty).toBe('hard');
+    expect(ctx.profile.difficulty).toBe('hard');
     expect(s.world.dog!.profile).toEqual(DOG_DIFFICULTY.hard);
   });
 
@@ -815,7 +815,7 @@ describe('match scene: the Park crew', () => {
     const options = s.update(frame(['confirm']), STEP)!;
     options.update(frame(['right']), STEP);
     options.update(frame(['back']), STEP);
-    expect(ctx.settings.difficulty).toBe('hard');
+    expect(ctx.profile.difficulty).toBe('hard');
     expect(s.world.maxProfile).toBe(CREW_PROFILES.leo.hard);
     expect(s.world.aimErrorDeg.away).toBe(CREW_PROFILES.leo.hard.aimErrorDeg);
   });
@@ -867,9 +867,16 @@ describe('match scene: the Park crew', () => {
     const options = s.update(frame(['confirm']), STEP)!;
     options.update(frame(['right']), STEP);
     options.update(frame(['back']), STEP);
-    expect(ctx.settings.difficulty).toBe('hard');
+    expect(ctx.profile.difficulty).toBe('hard');
     expect(s.world.maxProfile).toBe(SAM_PROFILES.hard);
     expect(s.world.away.handling).toBe(SAM_HANDLING);
+  });
+
+  it("plays at the save's difficulty, not the settings'", () => {
+    const ctx = testContext({ profile: { ...newProfile(), difficulty: 'easy' }, settings: { ...DEFAULT_SETTINGS, difficulty: 'hard' } });
+    const s = createMatchScene(ctx, 1);
+    expect(s.difficulty).toBe('easy');
+    expect(s.world.maxProfile).toBe(DIFFICULTY.easy);
   });
 
   it('a rung still builds Max at the rung, with his difficulty', () => {
@@ -1054,7 +1061,7 @@ describe('tricks in a match', () => {
     const options = pickIn(s, 'OPTIONS')!;
     options.update(frame(['right']), STEP);
     options.update(frame(['back']), STEP);
-    expect(ctx.settings.difficulty).toBe('hard');
+    expect(ctx.profile.difficulty).toBe('hard');
     expect(s.world.tricks).toEqual(trickSetup('hard', 'sam'));
     expect(s.world.away.handling).toBe(handling);
   });
