@@ -364,6 +364,52 @@ tests, so a change that breaks the
 lesson fails CI. The numbers are starting points, to revisit after
 Harrison plays.
 
+**As built (part 2, 2026-10-27).** `samTuning.test.ts` holds every band
+above on seeds 100–163, the scripted Harrisons at Speed 7, Power 5,
+Jump 4, Control 5:
+
+| | Racer | Matador | Gap |
+|---|---|---|---|
+| Easy | 0.188 | 0.922 | 0.73 |
+| Normal | 0.094 | 0.609 | 0.52 |
+| Hard | 0.109 | 0.422 | 0.31 |
+
+On 128 seeds (100–227) the racer measures 0.227 / 0.094 / 0.070 and
+the matador 0.938 / 0.625 / 0.508, so Hard's matador sits about at the
+top of its band. Sam's own goals are under a tenth of Harrison's (6–8%
+against the racer, 1% or less against the matador). No ball sits still
+for over 1.9 s.
+
+- **His numbers:** Speed 10, Power 1, Jump 3, Control 3. Pace factor 1.0 on
+  Easy (196 px/s flat out) and 1.08 on Normal and Hard (211 px/s, 1.2×
+  the tuning sprint). Brakes 650 px/s², so a stop from flat out takes
+  0.33 s and about 33 px, with the skid pose throughout. His touch is
+  1.5× a Control 3 push, about 31 px ahead at its furthest; his full
+  shot leaves at 237 px/s. Range-shot odds are 0.5 / 0.35 / 0.1.
+- **A faster Sam is an easier one.** His pace is what makes him
+  overshoot, so more pace or quicker reactions raised both scripted
+  Harrisons' win rates; Hard keeps Normal's pace.
+- **He waits for Harrison's kickoff shot** on every difficulty, 110 px
+  back and 8 px off the ball's line (10 on Hard). Rushing the wind-up
+  at his pace sent the shot back into Harrison's empty net. *Deviation,
+  for the parent:* the fair rule puts Hard on the ball's line, but on
+  the line the matador falls to about 0.06, below Hard's band.
+- **No brakes includes bodies.** A runner on soft brakes who meets a body
+  at speed brushes past its shoulder, keeping his speed, so a drag-back
+  as he arrives sends him flying past (36–80 px out on Normal). Nobody
+  overlaps, and both stay on the pitch and out of the goals.
+- **His ball between touches** is his only while he played it last; a
+  ball Harrison blocks, or that comes to rest at his feet, is Harrison's.
+- **Out of his own net:** coming back from behind the ball he goes round
+  it; near his own goal his touches shield it (Harrison's keep-out zone
+  and slide clear cover a player on soft brakes too); he heads only a
+  ball he faces upfield; and a challenger rushing at him gets the ball
+  knocked past him.
+- **Open, for the parent:** his long touch rolls about 260 px, so a touch
+  within that of Harrison's line rolls in unplayed. That is how most of
+  his goals go in: a slow roller Harrison can run down, like the range
+  shot. He never winds up a shot from beyond his range unless blocked.
+
 ## Measuring the crew
 
 Each crew kid gets a tuning test beside `maxTuning.test.ts`, built the same
@@ -435,6 +481,12 @@ Max measures E 0.875 / N 0.625 / H 0.016 on main and on the branch alike.
 - Against one fixed Harrison (Brick's level-up), Normal: Brick 0.594,
   Leo 0.609, Tia 0.422, Pete 0.313. Pete is tougher than Brick, as
   planned; Leo is level with Brick.
+- On 128 seeds (100–227), Easy / Normal / Hard: Brick 0.891 / 0.625 /
+  0.023, Leo 0.883 / 0.648 / 0.070, Tia 0.758 / 0.570 / 0.016, Pete
+  0.750 / 0.617 / 0.039. Part 2 leaves the crew exactly as measured
+  above. One thing changes for them: backing off from a powered-up
+  Harrison, no opponent goes faster than rung-10 Max, so Tia and Pete
+  backpedal a little slower than before.
 
 ## The save: profile version 4
 
