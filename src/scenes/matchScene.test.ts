@@ -1128,3 +1128,16 @@ describe('match scene: kit clashes', () => {
     expect(drawn.some(n => n.startsWith('art.opponents.max.sprites'))).toBe(true);
   });
 });
+
+describe('match scene: his art', () => {
+  it("warms every sprite set he could need on the first frame, so a power-up never bakes mid-play", () => {
+    let warmed = 0;
+    const art = new Proxy(fakeArt(), { get: (t, p) => (p === 'warm' ? () => void warmed++ : Reflect.get(t, p)) });
+    const s = createMatchScene(testContext({ art }), 1);
+    expect(warmed).toBe(0);
+    const { g } = recordingContext();
+    s.draw(g, 0);
+    s.draw(g, 0.1);
+    expect(warmed).toBe(1);
+  });
+});

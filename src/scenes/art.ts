@@ -73,6 +73,8 @@ export interface GameArt {
   readonly outfit: Outfit;
   /** Puts him in `o`: home, homePower, homeGolden and portraits follow from now on, baked once per outfit. */
   dress(o: Outfit): void;
+  /** Bakes all three of his sets in what he wears now, if they aren't yet, so a match never bakes one mid-play. */
+  warm(): void;
   /** His frame now: the baked canvas, or for an animated kit, a scratch canvas painted with its shader at nowS. */
   harrison(set: HomeSet, facing: 1 | -1, clip: AnimName, frame: number, nowS: number): HTMLCanvasElement;
   /** The same frame's logical pixels, facing right, for the effects. */
@@ -190,6 +192,9 @@ export function loadGameArt(): GameArt {
       if (outfitKey(o) === outfitKey(outfit)) return;
       outfit = o;
       backdropFx = new OutfitFx(o, BACKDROP_FX_SEED);
+    },
+    warm() {
+      for (const set of ['home', 'homePower', 'homeGolden'] as const) harrison.set(outfit, set);
     },
     harrison: (set, facing, clip, frame, nowS) => harrison.canvas(outfit, set, facing, clip, frame, nowS),
     harrisonImage: (set, clip, frame) => harrison.image(outfit, set, clip, frame),

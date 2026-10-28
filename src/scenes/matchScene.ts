@@ -199,6 +199,7 @@ export function createMatchScene(ctx: GameContext, seed: number, match: CareerMa
     ctx.audio.setCrowd('low');
   };
   const restart = () => createMatchScene(ctx, seed + 1, match);
+  let warmed = false;
   /** Saved at once, so closing the tab during the FULL TIME banner loses nothing. Called once, on the full-time tick. */
   const award = (result: NonNullable<World['match']['result']>) => {
     const { home, away } = world.match.score;
@@ -381,6 +382,11 @@ export function createMatchScene(ctx: GameContext, seed: number, match: CareerMa
       return results;
     },
     draw(g) {
+      // His first frame, a still kickoff, bakes every set he could need in what he wears, so his first power-up never does.
+      if (!warmed) {
+        art.warm();
+        warmed = true;
+      }
       drawMatch(g, world, cam, art, t, hud);
       if (pause) drawMenu(g, art, pause, BASE_W / 2, 70);
     },
