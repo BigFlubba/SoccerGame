@@ -87,16 +87,18 @@ describe('Help about Sam', () => {
 });
 
 describe('help for the tricks', () => {
-  it('CONTROLS has an RB line, drawn with the RB picture', () => {
-    const rb = HELP_PAGES[0]!.lines.find(l => l.startsWith('RB:'));
-    expect(rb).toContain('KEY D');
+  it('CONTROLS has a right stick line with its keys, drawn with the RS picture', () => {
+    const rs = HELP_PAGES[0]!.lines.find(l => l.startsWith('RS:'));
+    for (const phrase of ['UP', 'RAINBOW FLICK', 'DOWN', 'STEPOVER', 'F', 'D']) expect(rs).toContain(phrase);
     const { g, drawn } = recordingContext();
     createHelpScene(testContext({ art: fakeArt() }), () => BEHIND).draw(g, 0);
-    expect(drawn).toContain('art.buttons.RB');
+    expect(drawn).toContain('art.buttons.RS');
+    expect(drawn).not.toContain('art.buttons.RB');
   });
 
-  it('the TRICKS page says what RB does, when it works, and from what level', () => {
+  it('the TRICKS page says what the right stick does, when it works, and from what level', () => {
     const page = HELP_PAGES[3]!.lines.join(' ');
-    for (const phrase of ['RB DOES A STEPOVER', 'UP + RB', 'RAINBOW FLICK', 'CLOSE IN FRONT', 'FACING YOU', 'TOO FAR OFF OR TOO LATE FOOLS NOBODY', 'LEVEL 4']) expect(page).toContain(phrase);
+    expect(page).not.toContain('RB');
+    for (const phrase of ['RIGHT STICK DOWN', 'STEPOVER', 'RIGHT STICK UP', 'RAINBOW FLICK', 'KEYS D AND F', 'CLOSE IN FRONT', 'FACING YOU', 'TOO FAR OFF OR TOO LATE FOOLS NOBODY', 'LEVEL 4']) expect(page).toContain(phrase);
   });
 });

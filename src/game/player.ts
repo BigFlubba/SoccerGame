@@ -21,8 +21,8 @@ export interface PlayerIntent {
   sprint: boolean;
   /** Harrison's steal button, pressed this tick; the world resolves it. */
   steal: boolean;
-  /** Harrison's RB, pressed this tick: a stepover, or with the stick up a rainbow flick. Absent for the computer. */
-  skill?: boolean;
+  /** Harrison's trick, pressed this tick: the right stick down (a stepover) or up (a rainbow flick). Absent for the computer. */
+  trick?: TrickKind;
   /** Face this way whatever way he moves, as when backing off from someone. */
   faceX?: 1 | -1;
   /** Scales his run and sprint on the ground (the computer's pace factor); 1 when absent. */
@@ -127,7 +127,7 @@ export interface Player {
    * whether the ball is still his to carry. The world runs it.
    */
   trick: null | { kind: TrickKind; t: number; side: 1 | -1; sold: boolean; pace: number; onBall: boolean };
-  /** Time until RB can start another trick. */
+  /** Time until he can start another trick. */
   trickCooldownS: number;
   /**
    * Fooled by Harrison's trick: confused (a stepover) or stumbling (a

@@ -125,7 +125,7 @@ function venueCanvases(L: VenueLayers, joggers: readonly (readonly [IndexedImage
   };
 }
 
-const BUTTONS: readonly ButtonName[] = ['A', 'B', 'X', 'Y', 'LB', 'RB', 'RT', 'START'];
+const BUTTONS: readonly ButtonName[] = ['A', 'B', 'X', 'Y', 'LB', 'RS', 'RT', 'START'];
 const EXPRESSIONS: readonly Expression[] = ['neutral', 'celebrate', 'determined', 'disappointed'];
 
 /** Bakes and resolves every image the match needs, once, at boot. */

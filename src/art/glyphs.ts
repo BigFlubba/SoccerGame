@@ -2,10 +2,10 @@ import { M } from './colors';
 import { GLYPH_GAP, GLYPH_H, GLYPH_W, glyph, measureText } from './font';
 import { IndexedImage } from './indexedImage';
 
-export type ButtonName = 'A' | 'B' | 'X' | 'Y' | 'LB' | 'RB' | 'RT' | 'START';
+export type ButtonName = 'A' | 'B' | 'X' | 'Y' | 'LB' | 'RS' | 'RT' | 'START';
 
 /** Face colours as on an Xbox pad: A green, B red, X blue, Y yellow, the rest slate. */
-const FACE: Readonly<Record<ButtonName, number>> = { A: M.grassLight, B: M.red, X: M.blue, Y: M.gold, LB: M.slate, RB: M.slate, RT: M.slate, START: M.slate };
+const FACE: Readonly<Record<ButtonName, number>> = { A: M.grassLight, B: M.red, X: M.blue, Y: M.gold, LB: M.slate, RS: M.slate, RT: M.slate, START: M.slate };
 /** Letters are white, except on the light yellow Y, where a dark letter reads better. */
 const LABEL: Readonly<Partial<Record<ButtonName, number>>> = { Y: M.outline };
 /** Round buttons are this tall (and A, B and X this wide); longer labels stretch into a pill. */

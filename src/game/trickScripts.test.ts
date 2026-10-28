@@ -25,17 +25,15 @@ describe('the trickster', () => {
   it('presses once the defender is inside his trigger gap, and not before', () => {
     const memo = trickMemo(1, 'trickster');
     Object.assign(memo, { gap: 40, kind: 'stepover' });
-    expect(trickIntent(facing(60), 0, STEP, memo).skill).toBeFalsy();
-    const press = trickIntent(facing(38), 0, STEP, memo);
-    expect(press.skill).toBe(true);
-    expect(press.moveZ).toBeLessThan(0.5);
+    expect(trickIntent(facing(60), 0, STEP, memo).trick).toBeUndefined();
+    expect(trickIntent(facing(38), 0, STEP, memo).trick).toBe('stepover');
   });
 
   it('presses at most once an exchange', () => {
     const memo = trickMemo(1, 'trickster');
     Object.assign(memo, { gap: 40, kind: 'flick' });
-    expect(trickIntent(facing(38), 0, STEP, memo)).toMatchObject({ skill: true, moveZ: 1 });
-    expect(trickIntent(facing(30), STEP, STEP, memo).skill).toBeFalsy();
+    expect(trickIntent(facing(38), 0, STEP, memo).trick).toBe('flick');
+    expect(trickIntent(facing(30), STEP, STEP, memo).trick).toBeUndefined();
   });
 
   it('draws a new gap and trick for the next exchange, once the other side has had the ball', () => {
@@ -55,23 +53,23 @@ describe('the trickster', () => {
     Object.assign(memo, { gap: 40, kind: 'stepover' });
     const away = facing(30);
     away.away.facing = 1;
-    expect(trickIntent(away, 0, STEP, memo).skill).toBeFalsy();
+    expect(trickIntent(away, 0, STEP, memo).trick).toBeUndefined();
     const wide = facing(30);
     wide.away.z += 20;
-    expect(trickIntent(wide, 0, STEP, memo).skill).toBeFalsy();
+    expect(trickIntent(wide, 0, STEP, memo).trick).toBeUndefined();
   });
 });
 
 describe('the spammer', () => {
   it('presses whenever a trick could start, and not otherwise', () => {
     const memo = trickMemo(1, 'spammer');
-    expect(trickIntent(facing(200), 0, STEP, memo).skill).toBe(true);
+    expect(trickIntent(facing(200), 0, STEP, memo).trick).toBeDefined();
     const cooling = facing(200);
     cooling.home.trickCooldownS = 0.5;
-    expect(trickIntent(cooling, 0, STEP, memo).skill).toBeFalsy();
+    expect(trickIntent(cooling, 0, STEP, memo).trick).toBeUndefined();
     const loose = facing(200);
     loose.ball.x += 60;
-    expect(trickIntent(loose, 0, STEP, memo).skill).toBeFalsy();
+    expect(trickIntent(loose, 0, STEP, memo).trick).toBeUndefined();
   });
 });
 
@@ -84,7 +82,7 @@ describe('the plain script', () => {
 
   it('never presses RB', () => {
     const memo = trickMemo(1, 'plain');
-    expect(trickIntent(facing(30), 0, STEP, memo).skill).toBeFalsy();
+    expect(trickIntent(facing(30), 0, STEP, memo).trick).toBeUndefined();
     expect(trickMatch('max', 'normal', 100, 'plain').trickStats.tricks).toBe(0);
   });
 

@@ -425,6 +425,17 @@ What shipped, where it differs from the starting values above. The code
 (`src/game/tricks.ts`, `trickScripts.ts`, `trickTuning.test.ts`) is the
 authority for the numbers.
 
+**Controls (changed after the build, the parent's call 2026-10-28).**
+RB and stick up + RB were hard to do mid-dribble, so the tricks moved to
+the right stick, which nothing else uses: **flick it up for a rainbow
+flick, down for a stepover** (keys **F** and **D**). A push fires once
+it passes three-quarters of the way along its stronger axis (a push
+mostly sideways does nothing, left free for later tricks) and fires
+again only after the stick comes back near the middle. RB does nothing.
+The left stick no longer picks the trick. Facing his own goal in the
+keep-out zone, a flick is still a stepover. Help's CONTROLS line shows
+an RS picture, and the TRICKS page says right stick down and up.
+
 **The tricks.** Stepover 0.4 s, sold at 0.2 s, at half pace; the ball held
 8 px ahead. Rainbow flick 0.5 s: he stands while the ball rides from his
 foot up behind his heel (6 px back, 12 px up), and it leaves his heel at
@@ -432,7 +443,7 @@ foot up behind his heel (6 px back, 12 px up), and it leaves his heel at
 about 78 px up, clears a standing player 12-56 px ahead, lands about
 90 px on, and the backspin sits it down for him; at Speed 1-7 he is 8-18
 px behind it as it lands. Cooldown 1 s, wise 3 s, seeing range 120 px,
-lane 14 px. RB with the stick back is a stepover, not a drag-back.
+lane 14 px. A trick press with the stick back is the trick, not a drag-back.
 
 **Windows and times.** The windows are the spec's (Easy 12-56, Normal
 14-46, Hard 16-38 px). Base reaction times Easy 0.9 s, Normal 0.7 s,

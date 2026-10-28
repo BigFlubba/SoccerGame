@@ -1030,7 +1030,7 @@ describe('Speedy Sam: all gas, no brakes', () => {
 });
 
 describe('fooled by a trick', () => {
-  const RB: PlayerIntent = { ...NO_INTENT, skill: true };
+  const RB: PlayerIntent = { ...NO_INTENT, trick: 'stepover' };
   const SETUP = { profile: TRICK_DIFFICULTY.normal, scale: { stepover: 1, flick: 1 } };
 
   /** Harrison on the ball at x 300 in the deep half; Max coming at him from 55 px, his brain running, so he's squared up at the sell. */

@@ -8,11 +8,11 @@ import { FOOT_SPOT } from './steal';
 import type { World } from './world';
 
 /**
- * Harrison's skill moves, from level 4. RB with the ball at his feet is a
- * stepover, stick up + RB a rainbow flick. Either plays out in full once
- * started, the ball carried by the trick, and sells half way through: a
- * defender squared up to him then is fooled. The trick draws no random
- * numbers, so a match where RB is never pressed plays exactly as before.
+ * Harrison's skill moves, from level 4. With the ball at his feet, the
+ * right stick down is a stepover and up a rainbow flick. Either plays out
+ * in full once started, the ball carried by the trick, and sells half way
+ * through: a defender squared up to him then is fooled. The trick draws no
+ * random numbers, so a match without a trick press plays exactly as before.
  */
 
 export type TrickKind = 'stepover' | 'flick';
@@ -59,7 +59,7 @@ export const TRICK_DIFFICULTY: Record<Difficulty, TrickProfile> = {
  * Each style's reaction times as a share of the difficulty's: Pete bites
  * hardest, Brick barely moves for a stepover, Tia recovers quickly, and
  * Sam's soft brakes skid him on past. Sam stays ×1 (the parent's call,
- * 2026-10-28): at ×2 mashing RB beat him on Easy .906 to .672. Mutable,
+ * 2026-10-28): at ×2 mashing the tricks beat him on Easy .906 to .672. Mutable,
  * for headless sweeps.
  */
 export const TRICK_SCALE: Record<Style, TrickScale> = {
@@ -99,10 +99,8 @@ export const STEPOVER = { durationS: 0.4, sellS: 0.2, pace: 0.5, swayPx: 8 };
  */
 export const FLICK = { durationS: 0.5, sellS: 0.25, vx: 130, vy: 360, rideY: 12, behind: 6, spin: -6 };
 
-/** After a trick ends, RB does nothing for this long, s. */
+/** After a trick ends, a trick press does nothing for this long, s. */
 export const TRICK_COOLDOWN_S = 1;
-/** The stick pushed up at least this far on the press makes it a flick. */
-export const STICK_UP = 0.5;
 
 /** What the tricks did this tick. */
 export interface TrickEvents {
@@ -182,17 +180,17 @@ function facingOwnGoalNear(w: World): boolean {
 }
 
 /**
- * Starts a trick on RB when he has the tricks, is on his feet in play, not
+ * Starts the trick he pressed when he has the tricks, is on his feet in play, not
  * already in a trick, a drag-back or a stumble, the cooldown is over, no
  * wave is live, and the ball is his. Stick up makes it a flick, except
  * facing his own goal near it. The stepover dips toward the tighter side.
  */
 export function startTrick(w: World, intent: PlayerIntent): TrickKind | null {
   const { home } = w;
-  if (!w.tricks || !intent.skill || w.match.phase !== 'playing') return null;
+  if (!w.tricks || !intent.trick || w.match.phase !== 'playing') return null;
   const ready = home.state === 'ground' && home.y === 0 && home.turnS === 0 && home.stumbleS === 0 && home.trickCooldownS === 0 && home.trick === null;
   if (!ready || w.wave?.live || !ballIsHis(w)) return null;
-  const kind: TrickKind = intent.moveZ >= STICK_UP && !facingOwnGoalNear(w) ? 'flick' : 'stepover';
+  const kind: TrickKind = intent.trick === 'flick' && !facingOwnGoalNear(w) ? 'flick' : 'stepover';
   const side = home.z >= w.field.depth / 2 ? 1 : -1;
   home.trick = { kind, t: 0, side, sold: false, pace: kind === 'stepover' ? STEPOVER.pace : 0, onBall: true };
   w.ball.touchedBy = 'home';

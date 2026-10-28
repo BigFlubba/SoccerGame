@@ -73,7 +73,7 @@ export interface World {
   maxProfile: AiProfile | null;
   /** Fixed ticks so far; its parity decides who acts on the ball first. */
   tick: number;
-  /** Harrison's tricks against this opponent; null below level 4, when RB does nothing and the match plays exactly as before. */
+  /** Harrison's tricks against this opponent; null below level 4, when a trick press does nothing and the match plays exactly as before. */
   tricks: TrickSetup | null;
 }
 
@@ -265,7 +265,7 @@ export function stepWorld(w: World, homeIntent: PlayerIntent, awayIntent: Player
   if (wasReadying && w.power && waveReady(w.power)) power.ready = true;
   // Powered up, X only ever fires the wave: until it can (ready, with the ball, a clean line), the press does nothing.
   const waveDir = live && canFireWave(w) ? maxGoalDir(w) : live && (w.power?.activeS ?? 0) > 0 ? 'wait' : null;
-  // RB with the stick back is a stepover, not a drag-back.
+  // A trick press with the stick back is the trick, not a drag-back.
   const started = startTrick(w, homeIntent);
   if (startDragBack(w, homeIntent)) w.ball.touchedBy = 'home';
   // Winding up with the ball at his feet, he rolls it along with him in depth.

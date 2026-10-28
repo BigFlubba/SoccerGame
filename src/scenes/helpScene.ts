@@ -21,7 +21,7 @@ export const HELP_PAGES: readonly { title: string; lines: readonly string[] }[] 
       'B: CHIP WITH THE BALL, SLIDE TACKLE WITHOUT. KEY C',
       'Y: POWER UP WITH A FULL POWER METER. KEY V',
       'LB: STEAL THE BALL OFF MAX. KEY A',
-      'RB: STEPOVER. WITH UP: RAINBOW FLICK. KEY D',
+      'RS: UP FOR A RAINBOW FLICK, DOWN FOR A STEPOVER. KEYS F, D',
       'RT: SPRINT. KEY SHIFT',
       'START: PAUSE. KEY ENTER OR ESC',
       'MENUS: UP/DOWN TO CHOOSE, A TO PICK, B TO GO BACK',
@@ -63,8 +63,9 @@ export const HELP_PAGES: readonly { title: string; lines: readonly string[] }[] 
     title: 'TRICKS',
     lines: [
       'FROM LEVEL 4, WITH THE BALL AT YOUR FEET:',
-      'RB DOES A STEPOVER. UP + RB DOES A RAINBOW FLICK,',
-      'FLICKING THE BALL UP OVER YOUR HEAD.',
+      'RIGHT STICK DOWN DOES A STEPOVER. RIGHT STICK UP',
+      'DOES A RAINBOW FLICK, FLICKING THE BALL OVER YOUR HEAD.',
+      'ON THE KEYBOARD, KEYS D AND F.',
       'DO IT WHEN SOMEONE IS CLOSE IN FRONT, FACING YOU:',
       'A STEPOVER CONFUSES THEM, A FLICK TRIPS THEM UP.',
       'THEN TAKE THE BALL PAST THEM!',
@@ -97,7 +98,7 @@ const BUTTON_GAP = 4;
 /** The picture sits this far above the text's top, so their middles line up. */
 const BUTTON_RAISE = 2;
 const FOOTER_Y = BASE_H - 18;
-const BUTTON_LINE = /^(A|B|X|Y|LB|RB|RT|START): (.*)$/;
+const BUTTON_LINE = /^(A|B|X|Y|LB|RS|RT|START): (.*)$/;
 
 /** CONTROLS, THE MATCH, MOVES: left/right flip the pages (wrapping); B, Backspace, C, Esc or Start goes back. */
 export function createHelpScene(ctx: GameContext, back: () => Scene): HelpScene {

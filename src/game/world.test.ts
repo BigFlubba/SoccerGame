@@ -627,7 +627,7 @@ function scriptedEnd(seed: number, tricks: TrickSetup | null) {
 }
 
 describe('the tricks in a match', () => {
-  it('owning them changes nothing until he presses RB', () => {
+  it('owning them changes nothing until he does a trick', () => {
     const tricks: TrickSetup = { profile: TRICK_DIFFICULTY.normal, scale: { stepover: 1, flick: 1 } };
     for (let seed = 100; seed < 108; seed++) expect(scriptedEnd(seed, tricks), `seed ${seed}`).toEqual(scriptedEnd(seed, null));
   });

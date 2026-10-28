@@ -303,8 +303,8 @@ describe('dogThink', () => {
 });
 
 describe('fooled by a trick', () => {
-  const RB: PlayerIntent = { ...NO_INTENT, skill: true };
-  const FLICK_PRESS: PlayerIntent = { ...RB, moveZ: 1 };
+  const RB: PlayerIntent = { ...NO_INTENT, trick: 'stepover' };
+  const FLICK_PRESS: PlayerIntent = { ...NO_INTENT, trick: 'flick' };
 
   /** Harrison on the ball at x 300; the dog closing from 60 px, so he's squared up at the sell; stepped to the sell. */
   function tricked(press: PlayerIntent) {

@@ -1,4 +1,4 @@
-export type Action = 'left' | 'right' | 'up' | 'down' | 'jump' | 'shoot' | 'chip' | 'power' | 'steal' | 'skill' | 'sprint' | 'pause' | 'confirm' | 'back';
+export type Action = 'left' | 'right' | 'up' | 'down' | 'jump' | 'shoot' | 'chip' | 'power' | 'steal' | 'stepover' | 'flick' | 'sprint' | 'pause' | 'confirm' | 'back';
 
 export interface InputFrame {
   /** -1..1: deadzoned stick, D-pad or arrows. Up is -1. */
@@ -26,6 +26,28 @@ export const STICK_DEADZONE = 0.25;
 export const TRIGGER_THRESHOLD = 0.3;
 /** How far the stick must lean to count as a direction (menus). */
 const STICK_DIRECTION_THRESHOLD = 0.5;
+/** The right stick pushed this far, up or down its stronger way, does a trick: up a rainbow flick, down a stepover... */
+export const RIGHT_STICK_TRICK = 0.75;
+/** ...once a push: it fires again only after coming back inside this. */
+export const RIGHT_STICK_REARM = 0.3;
+/** Standard mapping: the right stick's axes. */
+const RIGHT_X = 2;
+const RIGHT_Y = 3;
+
+/** The right stick's trick, held from its push until the stick comes back to the middle, so a push fires once. */
+export interface StickLatch {
+  action: Action | null;
+}
+
+function rightStickAction(x: number, y: number, latch: StickLatch): Action | null {
+  if (latch.action) {
+    if (Math.hypot(x, y) <= RIGHT_STICK_REARM) latch.action = null;
+    return latch.action;
+  }
+  if (Math.abs(y) < Math.abs(x) || Math.abs(y) < RIGHT_STICK_TRICK) return null;
+  latch.action = y < 0 ? 'flick' : 'stepover';
+  return latch.action;
+}
 
 /** Xbox standard mapping: button index → actions. */
 const PAD_BUTTONS: Readonly<Record<number, readonly Action[]>> = {
@@ -34,7 +56,6 @@ const PAD_BUTTONS: Readonly<Record<number, readonly Action[]>> = {
   2: ['shoot'], // X
   3: ['power'], // Y
   4: ['steal'], // LB
-  5: ['skill'], // RB
   9: ['pause'], // Start
   12: ['up'],
   13: ['down'],
@@ -53,7 +74,8 @@ const KEYS: Readonly<Record<string, readonly Action[]>> = {
   KeyC: ['chip', 'back'],
   KeyV: ['power'],
   KeyA: ['steal'],
-  KeyD: ['skill'],
+  KeyD: ['stepover'],
+  KeyF: ['flick'],
   ShiftLeft: ['sprint'],
   ShiftRight: ['sprint'],
   Enter: ['pause', 'confirm'],
@@ -69,7 +91,8 @@ const axisFrom = (held: ReadonlySet<Action>, neg: Action, pos: Action): number =
 /** The value with the larger magnitude; ties keep the first. */
 const stronger = (a: number, b: number): number => (Math.abs(b) > Math.abs(a) ? b : a);
 
-export function padActions(pad: PadSnapshot | null): Actions {
+/** The pad's actions; `latch` carries the right stick's trick from one poll to the next. */
+export function padActions(pad: PadSnapshot | null, latch: StickLatch = { action: null }): Actions {
   const held = new Set<Action>();
   if (!pad) return { held, moveX: 0, moveY: 0 };
   pad.buttons.forEach((b, i) => {
@@ -85,6 +108,8 @@ export function padActions(pad: PadSnapshot | null): Actions {
   if (stickX >= STICK_DIRECTION_THRESHOLD) held.add('right');
   if (stickY <= -STICK_DIRECTION_THRESHOLD) held.add('up');
   if (stickY >= STICK_DIRECTION_THRESHOLD) held.add('down');
+  const trick = rightStickAction(pad.axes[RIGHT_X] ?? 0, pad.axes[RIGHT_Y] ?? 0, latch);
+  if (trick) held.add(trick);
   return { held, moveX, moveY };
 }
 
@@ -132,6 +157,7 @@ export function createInput(target: Window): {
 } {
   const keysDown = new Set<string>();
   const tracker = new InputTracker();
+  const rightStick: StickLatch = { action: null };
   let padLost = false;
   let textMode = false;
   let typed = '';
@@ -163,7 +189,7 @@ export function createInput(target: Window): {
   return {
     poll() {
       const pad = target.navigator.getGamepads?.().find(p => p?.connected) ?? null;
-      const merged = mergeActions(padActions(pad), keyActions(keysDown));
+      const merged = mergeActions(padActions(pad, rightStick), keyActions(keysDown));
       const text = typed;
       typed = '';
       return tracker.next(merged.held, merged.moveX, merged.moveY, text);

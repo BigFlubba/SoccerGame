@@ -956,9 +956,9 @@ describe('tricks in a match', () => {
     Object.assign(s.world.ball, { x: 308, y: BALL_REST_Y, z: 40, vx: 0, vy: 0, vz: 0 });
     return s;
   };
-  /** Presses RB and steps until the trick fools him. */
+  /** Flicks the right stick down for a stepover and steps until it fools him. */
   const fool = (s: MatchScene) => {
-    s.update(frame(['skill']), STEP);
+    s.update(frame(['stepover']), STEP);
     for (let i = 0; i < 30 && !s.world.away.fooled; i++) s.update(frame(), STEP);
     expect(s.world.away.fooled).toBeTruthy();
   };
@@ -968,17 +968,26 @@ describe('tricks in a match', () => {
     return s.update(frame(['confirm']), STEP);
   }
 
-  it('below level 4 there are no tricks, and RB does nothing', () => {
+  it('below level 4 there are no tricks, and the right stick does nothing', () => {
     const s = staged(at(3).s);
     expect(s.world.tricks).toBeNull();
-    s.update(frame(['skill']), STEP);
+    s.update(frame(['stepover']), STEP);
     expect(s.world.home.trick).toBeNull();
   });
 
   it("from level 4 the match has the tricks for this opponent and difficulty", () => {
     const { s } = at(4);
     expect(s.world.tricks).toEqual(trickSetup(s.difficulty, s.match.opponent));
-    s.update(frame(['skill']), STEP);
+    s.update(frame(['stepover']), STEP);
+  });
+
+  it('the right stick up does a rainbow flick, down a stepover', () => {
+    const up = staged(at(4).s);
+    up.update(frame(['flick']), STEP);
+    expect(up.world.home.trick?.kind).toBe('flick');
+    const down = staged(at(4).s);
+    down.update(frame(['stepover']), STEP);
+    expect(down.world.home.trick?.kind).toBe('stepover');
   });
 
   it('a trick that fools him shows STEPOVER! for a second', () => {
@@ -1010,7 +1019,7 @@ describe('tricks in a match', () => {
 
   it('pausing mid-stepover and resuming carries on from the same moment (Review Focus 3)', () => {
     const s = staged(at(4).s);
-    s.update(frame(['skill']), STEP);
+    s.update(frame(['stepover']), STEP);
     run(s, 0.05);
     const t = s.world.home.trick!.t;
     s.update(frame(['pause']), STEP);

@@ -12,16 +12,16 @@ import { NO_INTENT, type PlayerIntent } from './player';
 import { SAM_TUNING_STATS } from './samScripts';
 import { BASE_STATS, type Stats } from './stats';
 import { maxHasBall } from './steal';
-import { STICK_UP, TRICK_LANE, type TrickKind } from './tricks';
+import { TRICK_LANE, type TrickKind } from './tricks';
 import { createWorld, stepWorld, type World } from './world';
 
 /**
  * Scripted Harrisons for the tricks' tuning. `plain` is the opponent's own
  * tuning script (maxScripts' for the humans, the blocker for Biscuit), who
- * never presses RB. The `trickster` is plain plus one RB press an
+ * never does a trick. The `trickster` is plain plus one trick press an
  * exchange, once the defender in front of him, in his lane and facing him,
  * is inside a trigger gap he draws each exchange, so some are timed right
- * and some aren't. The `spammer` presses RB whenever a trick could start.
+ * and some aren't. The `spammer` presses a trick whenever one could start.
  * Either one, having fooled the defender, takes the opening as a player
  * would: on along his facing, round the defender on the roomier side,
  * until he's past him. Their draws come from their own seeded rng, never
@@ -96,8 +96,8 @@ function defenderAhead(w: World): number | null {
   return gap > 0 && Math.abs(away.z - home.z) <= TRICK_LANE && away.facing === -home.facing ? gap : null;
 }
 
-/** RB this tick, for `kind`: the stick up for a flick, never up for a stepover. */
-const press = (intent: PlayerIntent, kind: TrickKind): PlayerIntent => ({ ...intent, skill: true, moveZ: kind === 'flick' ? 1 : Math.min(intent.moveZ, 0) });
+/** The trick press this tick: the right stick up for a flick, down for a stepover. */
+const press = (intent: PlayerIntent, kind: TrickKind): PlayerIntent => ({ ...intent, trick: kind });
 
 /** Past a fooled defender: on along his facing, round him on the open side, until he's beyond him; null once that's done or off. */
 function takeOpening(w: World, dt: number, memo: TrickMemo): PlayerIntent | null {
@@ -114,7 +114,7 @@ function takeOpening(w: World, dt: number, memo: TrickMemo): PlayerIntent | null
   return { ...NO_INTENT, moveX: f.facing, moveZ: Math.abs(dz) > 1 ? Math.sign(dz) : 0 };
 }
 
-/** The plain script's intent, with the trickster's or spammer's RB on top. */
+/** The plain script's intent, with the trickster's or spammer's trick press on top. */
 export function trickIntent(w: World, t: number, dt: number, memo: TrickMemo): PlayerIntent {
   const plain = w.dog ? blockerIntent(w, t, memo.blocker) : harrisonIntent(w, t, dt, memo.plain);
   if (memo.script === 'plain') return plain;

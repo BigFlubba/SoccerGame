@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { InputTracker, createInput, keyActions, mergeActions, padActions, type PadSnapshot } from './input';
+import { InputTracker, createInput, keyActions, mergeActions, padActions, type PadSnapshot, type StickLatch } from './input';
 
 /** A 17-button standard-mapping pad: `buttons` pressed, `values` analog (triggers). */
 function fakePad(buttons: Record<number, boolean>, axes: number[] = [0, 0], values: Record<number, number> = {}): PadSnapshot {
@@ -51,9 +51,13 @@ describe('padActions', () => {
     expect([...keyActions(new Set(['KeyA'])).held]).toEqual(['steal']);
   });
 
-  it('RB on the pad and D on the keyboard do a skill move', () => {
-    expect([...padActions(fakePad({ 5: true })).held]).toEqual(['skill']);
-    expect([...keyActions(new Set(['KeyD'])).held]).toEqual(['skill']);
+  it('D on the keyboard does a stepover and F a rainbow flick', () => {
+    expect([...keyActions(new Set(['KeyD'])).held]).toEqual(['stepover']);
+    expect([...keyActions(new Set(['KeyF'])).held]).toEqual(['flick']);
+  });
+
+  it('RB does nothing', () => {
+    expect([...padActions(fakePad({ 5: true })).held]).toEqual([]);
   });
 
   it('a missing pad holds nothing', () => {
@@ -177,5 +181,47 @@ describe('createInput', () => {
     target.dispatchEvent(new Event('gamepaddisconnected'));
     expect(input.takePadLost()).toBe(true);
     expect(input.takePadLost()).toBe(false);
+  });
+});
+
+describe('the right stick', () => {
+  /** The right stick at (x, y), the left one centred; up is -1. */
+  const right = (x: number, y: number) => fakePad({}, [0, 0, x, y]);
+
+  it('pushed up past three-quarters is a rainbow flick, down a stepover', () => {
+    expect([...padActions(right(0, -0.9)).held]).toEqual(['flick']);
+    expect([...padActions(right(0, 0.9)).held]).toEqual(['stepover']);
+  });
+
+  it('a lighter push does nothing', () => {
+    expect([...padActions(right(0, -0.6)).held]).toEqual([]);
+  });
+
+  it('a diagonal takes the stronger direction, and a push mostly sideways does nothing', () => {
+    expect([...padActions(right(0.5, -0.8)).held]).toEqual(['flick']);
+    expect([...padActions(right(0.9, 0.5)).held]).toEqual([]);
+  });
+
+  it("doesn't move or aim him: the left stick and the menus don't see it", () => {
+    const a = padActions(right(0, -1));
+    expect([a.moveX, a.moveY]).toEqual([0, 0]);
+    expect(a.held.has('up')).toBe(false);
+  });
+
+  it('fires once a push: held, or wobbling round the line, it never repeats until it comes back to the middle', () => {
+    const latch: StickLatch = { action: null };
+    const t = new InputTracker();
+    const poll = (y: number) => t.next(padActions(right(0, y), latch).held, 0, 0).pressed.has('flick');
+    expect([-0.9, -0.95, -0.7, -0.8, -0.5].map(poll)).toEqual([true, false, false, false, false]);
+    expect(poll(-0.1)).toBe(false);
+    expect(poll(-0.9)).toBe(true);
+  });
+
+  it('flicked up then straight down without passing the middle fires only the first', () => {
+    const latch: StickLatch = { action: null };
+    const t = new InputTracker();
+    const pressed = (y: number) => [...t.next(padActions(right(0, y), latch).held, 0, 0).pressed];
+    expect(pressed(-0.9)).toEqual(['flick']);
+    expect(pressed(0.9)).toEqual([]);
   });
 });

@@ -99,7 +99,8 @@ function harrisonIntent(input: InputFrame): PlayerIntent {
     powerHeld: input.held.has('power'),
     sprint: input.held.has('sprint'),
     steal: input.pressed.has('steal'),
-    skill: input.pressed.has('skill'),
+    // The right stick (or F and D): up a rainbow flick, down a stepover.
+    ...(input.pressed.has('flick') ? { trick: 'flick' as const } : input.pressed.has('stepover') ? { trick: 'stepover' as const } : {}),
   };
 }
 

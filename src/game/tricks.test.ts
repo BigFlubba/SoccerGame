@@ -17,8 +17,8 @@ import { createWorld, stepWorld, type World } from './world';
 const STEP = 1 / 60;
 const ticks = (s: number) => Math.round(s / STEP);
 const SETUP: TrickSetup = { profile: TRICK_DIFFICULTY.normal, scale: { stepover: 1, flick: 1 } };
-const RB: PlayerIntent = { ...NO_INTENT, skill: true };
-const FLICK_PRESS: PlayerIntent = { ...RB, moveZ: 0.6 };
+const RB: PlayerIntent = { ...NO_INTENT, trick: 'stepover' };
+const FLICK_PRESS: PlayerIntent = { ...NO_INTENT, trick: 'flick' };
 const run = (moveX: number): PlayerIntent => ({ ...NO_INTENT, moveX });
 const TUNING: Stats = { speed: 7, power: 5, jump: 4, control: 5 };
 
@@ -61,33 +61,33 @@ function toRelease(w: World): number {
 }
 
 describe('starting a trick', () => {
-  it('RB with the ball at his feet starts a stepover', () => {
+  it('the stepover button with the ball at his feet starts a stepover', () => {
     const w = stage();
     stepWorld(w, RB, NO_INTENT, STEP);
     expect(w.events.trick.started).toBe('stepover');
     expect(w.home.trick?.kind).toBe('stepover');
   });
 
-  it('RB with the stick up starts a rainbow flick', () => {
+  it('the flick button starts a rainbow flick', () => {
     const w = stage();
     stepWorld(w, FLICK_PRESS, NO_INTENT, STEP);
     expect(w.events.trick.started).toBe('flick');
   });
 
-  it('the stick only half up is still a stepover', () => {
+  it("the left stick doesn't choose the trick: pushed up with the stepover button, it's still a stepover", () => {
     const w = stage();
-    stepWorld(w, { ...RB, moveZ: 0.4 }, NO_INTENT, STEP);
+    stepWorld(w, { ...RB, moveZ: 1 }, NO_INTENT, STEP);
     expect(w.events.trick.started).toBe('stepover');
   });
 
-  it("facing his own goal inside the keep-out zone, stick up + RB does a stepover", () => {
+  it("facing his own goal inside the keep-out zone, the flick button does a stepover", () => {
     const own = BACKYARD.goals[0];
     const w = stage({ x: own.lineX + KEEP_OUT_X - 20, facing: -1, max: 400 });
     stepWorld(w, FLICK_PRESS, NO_INTENT, STEP);
     expect(w.events.trick.started).toBe('stepover');
   });
 
-  it('outside the keep-out zone, or facing upfield inside it, stick up + RB flicks', () => {
+  it('outside the keep-out zone, or facing upfield inside it, the flick button flicks', () => {
     const own = BACKYARD.goals[0];
     for (const s of [{ x: own.lineX + KEEP_OUT_X + 20, facing: -1 as const }, { x: own.lineX + 60, facing: 1 as const }]) {
       const w = stage({ ...s, max: 400 });
@@ -112,7 +112,7 @@ describe('the stepover', () => {
     for (const stick of [NO_INTENT, run(-1), { ...NO_INTENT, moveX: 1, moveZ: -1 }]) {
       const w = stage();
       const z = w.home.z;
-      stepWorld(w, { ...stick, skill: true }, NO_INTENT, STEP);
+      stepWorld(w, { ...stick, trick: 'stepover' }, NO_INTENT, STEP);
       for (let i = 2; i < ticks(STEPOVER.durationS); i++) stepWorld(w, stick, NO_INTENT, STEP);
       expect(w.home.vx).toBeCloseTo(STEPOVER.pace * runSpeed(BASE_STATS), 0);
       expect(w.home.z).toBe(z);
@@ -214,7 +214,7 @@ describe('the cooldown', () => {
     expect(w.home.trickCooldownS).toBeCloseTo(TRICK_COOLDOWN_S, 5);
   });
 
-  it('RB during it does nothing, and the press is not saved for later', () => {
+  it('a trick press during it does nothing, and is not saved for later', () => {
     const w = stage();
     stepWorld(w, RB, NO_INTENT, STEP);
     for (let i = 1; i < ticks(STEPOVER.durationS + TRICK_COOLDOWN_S / 2); i++) stepWorld(w, NO_INTENT, NO_INTENT, STEP);
@@ -231,7 +231,7 @@ describe('the cooldown', () => {
   });
 });
 
-describe('RB when no trick can start (Review Focus 5)', () => {
+describe('a trick press when no trick can start (Review Focus 5)', () => {
   const cases: [string, () => World][] = [
     ['without the ball', () => stage({ bx: 360 })],
     ['in the air', () => {
@@ -329,7 +329,7 @@ describe('play stopping mid-trick (Review Focus 2)', () => {
 /** Harrison with the ball at his feet at x 300, Max standing `gap` px ahead in his lane facing him. */
 const facing = (gap: number, o: Stage = {}) => stage({ max: 300 + gap, ...o });
 
-/** Presses RB (or stick up + RB) and steps to the trick's sell; returns that tick's trick events. */
+/** Presses the stepover (or flick) and steps to the trick's sell; returns that tick's trick events. */
 function toSell(w: World, press: PlayerIntent = RB) {
   stepWorld(w, press, NO_INTENT, STEP);
   for (let i = 0; i < 60 && !w.home.trick?.sold; i++) stepWorld(w, NO_INTENT, NO_INTENT, STEP);
