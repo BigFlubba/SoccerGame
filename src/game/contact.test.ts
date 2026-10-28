@@ -446,3 +446,17 @@ describe('resolveContacts: handling', () => {
     expect(weak.vy / weak.vx).toBeCloseTo(normal.vy / normal.vx, 9);
   });
 });
+
+describe('resolveContacts: blocks', () => {
+  it('reports a ball bouncing off his body as a block, and a still player touching nothing as none', () => {
+    const { p, opp } = setup();
+    const b = ball({ x: 250, vx: 200 });
+    let blocked = false;
+    for (let t = 0; t < 60 && !blocked; t++) {
+      stepBall(b, STEP, BACKYARD);
+      blocked = contact(p, opp, b).blocked;
+    }
+    expect(blocked).toBe(true);
+    expect(contact(p, opp, ball({ x: 400 })).blocked).toBe(false);
+  });
+});

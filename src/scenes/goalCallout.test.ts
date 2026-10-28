@@ -4,7 +4,7 @@ import { BASE_STATS } from '../game/stats';
 import { createWorld, type World } from '../game/world';
 import { HAT_TRICK_GOALS, SCREAMER_PX, goalCallout, noteKick, type LastKick } from './goalCallout';
 
-const quiet = (): ContactEvents => ({ touched: false, kicked: null, perfect: false, tackledBall: false, trippedOpponent: false });
+const quiet = (): ContactEvents => ({ touched: false, blocked: false, kicked: null, perfect: false, tackledBall: false, trippedOpponent: false });
 
 /** A world whose last tick had these contact events, with the ball at x. */
 function world(home: Partial<ContactEvents>, away: Partial<ContactEvents> = {}, ballX = 500): World {

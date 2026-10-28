@@ -4,7 +4,7 @@ import { BASE_STATS } from '../game/stats';
 import { createWorld, type World } from '../game/world';
 import { HARD_KICK_SPEED, matchFeedback } from './matchFeedback';
 
-const quiet = (): ContactEvents => ({ touched: false, kicked: null, perfect: false, tackledBall: false, trippedOpponent: false });
+const quiet = (): ContactEvents => ({ touched: false, blocked: false, kicked: null, perfect: false, tackledBall: false, trippedOpponent: false });
 
 /** A world in play with no events; `home` and `away` set that tick's contact events. */
 function world(home: Partial<ContactEvents> = {}, away: Partial<ContactEvents> = {}): World {

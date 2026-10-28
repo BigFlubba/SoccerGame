@@ -156,6 +156,11 @@ describe('the matador', () => {
     expect(matadorIntent(w, 0, STEP, steady()).moveX).toBeGreaterThan(0.5);
   });
 
+  it("facing his own goal with Sam standing close by, not flying in, he turns back rather than standing on the ball", () => {
+    const w = stage({ harrison: [30, 6], sam: [42, 12], ball: [22, 6], touchedBy: 'home', facing: -1 });
+    expect(matadorIntent(w, 0, STEP, steady()).moveX).toBeGreaterThan(0.5);
+  });
+
   it('takes the kickoff shot', () => {
     const w = createWorld({ ...SAM_TUNING_STATS }, { ...SAM_STATS }, 1, { home: 0, away: 0 }, null, null, SAM_PROFILES.normal, SAM_HANDLING);
     w.match.phase = 'playing';

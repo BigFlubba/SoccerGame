@@ -156,15 +156,15 @@ function onTheBall(w: World, t: number, memo: MatadorMemo): PlayerIntent {
   const [me, sam, ball] = [w.home, w.away, w.ball];
   const gap = Math.hypot(sam.x - me.x, sam.z - me.z);
   const past = sam.x < me.x;
-  if (me.facing === -1) {
-    // Facing his own goal after a drag-back: once Sam has flown past (or is well off), he turns back to Sam's goal.
-    memo.seenS = null;
-    return past || gap > MATADOR.clear ? { ...NO_INTENT, moveX: 1 } : { ...NO_INTENT };
-  }
   const [dx, dz] = [ball.x - sam.x, ball.z - sam.z];
   const toBall = Math.hypot(dx, dz) || 1;
   const closing = (sam.vx * dx + sam.vz * dz) / toBall;
   const flyingIn = !past && toBall <= MATADOR.seeAt && closing > MATADOR.closing;
+  if (me.facing === -1) {
+    // Facing his own goal after a drag-back: he turns back to Sam's goal, unless Sam is still flying in at him.
+    memo.seenS = null;
+    return flyingIn ? { ...NO_INTENT } : { ...NO_INTENT, moveX: 1 };
+  }
   if (flyingIn && memo.seenS === null) {
     memo.seenS = t;
     memo.reactS = REACT_S.from + memo.rng() * REACT_S.spread;
@@ -225,7 +225,7 @@ export function matadorIntent(w: World, t: number, dt: number, memo: MatadorMemo
 export type SamScript = 'racer' | 'matador';
 
 export interface SamMatch extends MaxMatch {
-  /** Harrison's goals that went in off Sam: he played the ball last. */
+  /** Harrison's goals that went in off Sam's own touch, kick, header or slide, with nothing of Harrison's after it. */
   ownGoals: number;
 }
 
@@ -237,12 +237,18 @@ export function samMatch(d: Difficulty, seed: number, harrison: SamScript): SamM
   const memo = matadorMemo(seeded(seed ^ MATADOR_SEED));
   const racer = racerMemo(seeded(seed ^ MATADOR_SEED));
   let [t, stillS, longestStillS, ownGoals] = [0, 0, 0, 0];
+  /** Who last played the ball for the own-goal count: Sam by a touch, kick, header or slide; Harrison by any of those or by blocking it. A shot that goes in off Sam's body is Harrison's goal. */
+  let lastPlay: 'home' | 'away' | null = null;
   for (let i = 0; i < MAX_TICKS && w.match.result === null; i++) {
     const home = harrison === 'racer' ? racerIntent(w, t, racer) : matadorIntent(w, t, STEP, memo);
     const [x, y, z] = [w.ball.x, w.ball.y, w.ball.z];
     stepWorld(w, home, think(brain, w, w.away, w.home, STEP), STEP);
     t += STEP;
-    if (w.events.goal === 'home' && w.ball.touchedBy === 'away') ownGoals++;
+    const [h, a] = w.events.kicks;
+    if (h && (h.touched || h.blocked || h.kicked || h.tackledBall)) lastPlay = 'home';
+    if (a && (a.touched || a.kicked || a.tackledBall)) lastPlay = 'away';
+    if (w.events.goal === 'home' && lastPlay === 'away') ownGoals++;
+    if (w.events.goal) lastPlay = null;
     const still = Math.hypot(w.ball.x - x, w.ball.y - y, w.ball.z - z) < STILL_PX;
     stillS = w.match.phase === 'playing' && still ? stillS + STEP : 0;
     longestStillS = Math.max(longestStillS, stillS);

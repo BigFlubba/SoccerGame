@@ -10,6 +10,8 @@ import { ballIn, ballInBody, footZone, headZone, slideZone, touchPoint } from '.
 
 export interface ContactEvents {
   touched: boolean;
+  /** The ball bounced off his body. */
+  blocked: boolean;
   kicked: null | 'shot' | 'chip' | 'volley' | 'header';
   perfect: boolean;
   tackledBall: boolean;
@@ -217,7 +219,7 @@ function pop(ball: Ball, field: Field): void {
  * came from. A ball wedged between his body and a wall, a net or a post
  * pops up so it can't stay stuck.
  */
-function block(p: Player, ball: Ball, field: Field): void {
+function block(p: Player, ball: Ball, field: Field, ev: ContactEvents): void {
   if (!ballInBody(p, ball, BALL_R)) return;
   const { nx, nz } = bodyNormal(p, ball);
   const reach = PLAYER_R + BALL_R;
@@ -231,6 +233,7 @@ function block(p: Player, ball: Ball, field: Field): void {
   [ball.x, ball.z] = [x, z];
   ball.vx -= (1 + BODY_RESTITUTION) * closing * nx;
   ball.vz -= (1 + BODY_RESTITUTION) * closing * nz;
+  ev.blocked = true;
 }
 
 /**
@@ -287,7 +290,7 @@ export function resolveContacts(
     keepOut = false,
   }: { trips: boolean; squeeze: boolean; clearUpfield?: boolean; keepOut?: boolean } = { trips: true, squeeze: true },
 ): ContactEvents {
-  const ev: ContactEvents = { touched: false, kicked: null, perfect: false, tackledBall: false, trippedOpponent: false };
+  const ev: ContactEvents = { touched: false, blocked: false, kicked: null, perfect: false, tackledBall: false, trippedOpponent: false };
   // Flying through the air after a wave, he can't block, dribble or head it.
   if (p.state === 'blown') return ev;
   slide(p, opponent, ball, ev, trips, clearUpfield, field);
@@ -296,7 +299,7 @@ export function resolveContacts(
   if (ev.kicked || ev.tackledBall || onRoof(ball, field)) return ev;
   if (!squeeze || !squeezed(p, opponent, ball)) {
     dribble(p, ball, ev, keepOut, field);
-    block(p, ball, field);
+    block(p, ball, field, ev);
   }
   // Also catches a block that pushed the ball out into the other player.
   if (squeeze && squeezed(p, opponent, ball)) squirt(p, opponent, ball, rng, field);
