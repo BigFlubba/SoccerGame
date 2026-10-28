@@ -96,7 +96,8 @@ export function createSavesScene(ctx: GameContext, cursor: number, boxOpen = fal
         box = r.m;
         if (r.back || r.chosen === 'BACK') box = null;
         if (r.chosen === 'PLAY') {
-          openSave(ctx, slot, save);
+          // Read again: another tab may have played this save since the list was read.
+          openSave(ctx, slot, ctx.saves.read(slot) ?? save);
           return createHubScene(ctx);
         }
         if (r.chosen === 'DELETE') {

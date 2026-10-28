@@ -123,6 +123,15 @@ describe('saves', () => {
     expect(ctx.saves.lastPlayed()).toBe(2);
   });
 
+  it("PLAY plays another tab's newer copy, never the list's older one", () => {
+    const { ctx, s } = opening(2);
+    const newer = { ...TWO, coins: TWO.coins + 500 };
+    ctx.saves.write(2, newer);
+    step(s, A, A);
+    expect(ctx.profile).toEqual(newer);
+    expect(ctx.saves.read(2)).toEqual(newer);
+  });
+
   it('BACK, B and Esc close the box, keeping the cursor', () => {
     for (const close of [[frame(['down']), frame(['down']), A], [B], [ESC]]) {
       const { ctx, s } = opening(2);
