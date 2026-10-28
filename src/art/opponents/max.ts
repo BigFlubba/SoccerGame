@@ -1,6 +1,6 @@
 import type { HeadSprite } from '../body/head';
 import type { HeadFacing } from '../body/pose';
-import { ART_LEGEND, type LookColors } from '../colors';
+import { ART_LEGEND, EXTRA_COLORS, type LookColors } from '../colors';
 import { parseGrid } from '../indexedImage';
 import { KITS } from '../kits';
 import type { Point } from '../raster';
@@ -86,5 +86,6 @@ export function maxLook(): LookColors {
     BootShadow: 'silver',
     Boot: 'white',
     BootLight: 'white',
+    ...EXTRA_COLORS,
   };
 }

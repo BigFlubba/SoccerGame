@@ -1,7 +1,7 @@
 import type { HeadSprite } from './head';
 import type { IndexedImage } from '../indexedImage';
 import { clipsFor, type AnimationClip, type AnimName } from './animations';
-import { drawFigure } from './drawFigure';
+import { NO_BODY_EXTRAS, drawFigure, type BodyExtras } from './drawFigure';
 import { lerpPose, mirrorPose, type HeadFacing, type Pose } from './pose';
 import type { BodyProportions } from './proportions';
 
@@ -29,18 +29,18 @@ export function samplePoses(clip: AnimationClip): Pose[] {
   return mirrorHalf ? [...half, ...half.map(mirrorPose)] : half;
 }
 
-export function bakeClip(clip: AnimationClip, body: BodyProportions, heads: Record<HeadFacing, HeadSprite>): BakedClip {
+export function bakeClip(clip: AnimationClip, body: BodyProportions, heads: Record<HeadFacing, HeadSprite>, extras: BodyExtras = NO_BODY_EXTRAS): BakedClip {
   return {
     name: clip.name,
-    frames: samplePoses(clip).map(p => drawFigure(p, body, heads)),
+    frames: samplePoses(clip).map(p => drawFigure(p, body, heads, extras)),
     fps: clip.fps,
     loop: clip.loop,
   };
 }
 
-export function bakeAll(body: BodyProportions, heads: Record<HeadFacing, HeadSprite>): Record<AnimName, BakedClip> {
+export function bakeAll(body: BodyProportions, heads: Record<HeadFacing, HeadSprite>, extras: BodyExtras = NO_BODY_EXTRAS): Record<AnimName, BakedClip> {
   const clips = clipsFor(body);
-  const entries = (Object.keys(clips) as AnimName[]).map(name => [name, bakeClip(clips[name], body, heads)] as const);
+  const entries = (Object.keys(clips) as AnimName[]).map(name => [name, bakeClip(clips[name], body, heads, extras)] as const);
   return Object.fromEntries(entries) as Record<AnimName, BakedClip>;
 }
 

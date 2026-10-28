@@ -2,7 +2,7 @@ import type { CrewId } from '../../game/crew';
 import type { HeadSprite } from '../body/head';
 import type { HeadFacing } from '../body/pose';
 import { BRICK_BODY, HARRISON_BODY, type BodyProportions } from '../body/proportions';
-import { ART_LEGEND, type LookColors, type MasterColor } from '../colors';
+import { ART_LEGEND, EXTRA_COLORS, type LookColors, type MasterColor } from '../colors';
 import { parseGrid } from '../indexedImage';
 import { KITS, type KitId } from '../kits';
 import type { Point } from '../raster';
@@ -249,5 +249,5 @@ const LOOKS: Record<CrewId, { skin: Skin; hair: Hair; kit: KitId; boots: Boots }
 
 export function crewLook(id: CrewId): LookColors {
   const { skin, hair, kit, boots } = LOOKS[id];
-  return { Outline: 'outline', ...skin, EyeWhite: 'white', Iris: 'iris', Pupil: 'ink', ...hair, Fade: 'fade', Earring: 'white', ...KITS[kit], ...boots };
+  return { Outline: 'outline', ...skin, EyeWhite: 'white', Iris: 'iris', Pupil: 'ink', ...hair, Fade: 'fade', Earring: 'white', ...KITS[kit], ...boots, ...EXTRA_COLORS };
 }

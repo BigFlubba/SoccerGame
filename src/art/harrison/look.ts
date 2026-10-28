@@ -1,5 +1,5 @@
-import type { LookColors, MasterColor } from '../colors';
-import { KITS, VOLT_BOOTS, type KitId } from '../kits';
+import { EXTRA_COLORS, type LookColors, type MasterColor } from '../colors';
+import { KITS, VOLT_BOOTS, type KitId, type KitSlots } from '../kits';
 
 /** How Harrison looks while powered up. Only the hair changes colour. */
 export type PowerForm = 'base' | 'golden' | 'storm' | 'ultra';
@@ -21,7 +21,10 @@ const HAIR: Record<PowerForm, Record<HairSlots, MasterColor>> = {
   ultra: { HairShadow: 'violet', Hair: 'electric', HairLight: 'electricLight', HairTip: 'auraWhite' },
 };
 
-export function harrisonLook(kit: KitId = 'home', form: PowerForm = 'base'): LookColors {
+export type BootSlots = 'BootShadow' | 'Boot' | 'BootLight';
+
+/** Him in any kit and boots colours, in a power form. */
+export function lookIn(kit: Record<KitSlots, MasterColor>, boots: Record<BootSlots, MasterColor>, form: PowerForm = 'base'): LookColors {
   return {
     Outline: 'outline',
     SkinShadow: 'skinShadow',
@@ -35,7 +38,13 @@ export function harrisonLook(kit: KitId = 'home', form: PowerForm = 'base'): Loo
     ...HAIR[form],
     Fade: 'fade',
     Earring: 'white',
-    ...KITS[kit],
-    ...VOLT_BOOTS,
+    ...kit,
+    ...boots,
+    ...EXTRA_COLORS,
   };
+}
+
+/** Him in a club or opponents' kit with his volt boots: the sprite viewer's look. */
+export function harrisonLook(kit: KitId = 'home', form: PowerForm = 'base'): LookColors {
+  return lookIn(KITS[kit], VOLT_BOOTS, form);
 }

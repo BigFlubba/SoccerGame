@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { C } from '../colors';
 import { PORTRAIT_FACE_BOX, harrisonPortrait } from './portrait';
 
 const ALL = ['neutral', 'celebrate', 'determined', 'disappointed'] as const;
@@ -32,5 +33,24 @@ describe('harrisonPortrait', () => {
     const a = harrisonPortrait('neutral');
     a.set(0, 0, 1);
     expect(harrisonPortrait('neutral').get(0, 0)).toBe(0);
+  });
+
+  it.each(ALL)('no extras: %s unchanged', e => {
+    expect(harrisonPortrait(e, { glasses: false, headband: false }).data).toEqual(harrisonPortrait(e).data);
+  });
+
+  it('glasses: a glint on each lens', () => {
+    const p = harrisonPortrait('neutral', { glasses: true, headband: false });
+    expect([p.get(27, 25), p.get(36, 25)]).toEqual([C.GlassesGlint, C.GlassesGlint]);
+  });
+
+  it('glasses go on after the expression', () => {
+    expect(harrisonPortrait('celebrate', { glasses: true, headband: false }).get(21, 23)).toBe(C.GlassesRim);
+  });
+
+  it('the headband crosses the crown', () => {
+    const p = harrisonPortrait('neutral', { glasses: false, headband: true });
+    expect([p.get(17, 11), p.get(18, 11)]).toEqual([C.TrimShadow, C.Trim]);
+    for (let x = 16; x <= 51; x++) expect(p.get(x, 13), `x ${x}`).toBe(C.TrimShadow);
   });
 });

@@ -2,7 +2,8 @@ import { describe, expect, it } from 'vitest';
 import { C } from '../colors';
 import { HARRISON_HEADS } from '../harrison/head';
 import { opaqueBounds } from '../raster';
-import { drawFigure } from './drawFigure';
+import { bakeAll } from './bake';
+import { NO_BODY_EXTRAS, drawFigure, type BodyExtras } from './drawFigure';
 import { solvePose, standingPose } from './pose';
 import { HARRISON_BODY } from './proportions';
 
@@ -48,5 +49,44 @@ describe('drawFigure', () => {
 
   it('outlines the figure', () => {
     expect(fig().data.includes(C.Outline)).toBe(true);
+  });
+});
+
+describe('drawFigure extras', () => {
+  /** Every pixel the extras change on idle frame 0, as [was, now]. */
+  const changes = (extras: BodyExtras): [number, number][] => {
+    const plain = bakeAll(HARRISON_BODY, HARRISON_HEADS).idle.frames[0]!;
+    const dressed = bakeAll(HARRISON_BODY, HARRISON_HEADS, extras).idle.frames[0]!;
+    const out: [number, number][] = [];
+    plain.data.forEach((v, i) => {
+      if (dressed.data[i] !== v) out.push([v, dressed.data[i]!]);
+    });
+    return out;
+  };
+
+  it('without extras every frame is unchanged', () => {
+    const plain = bakeAll(HARRISON_BODY, HARRISON_HEADS);
+    const none = bakeAll(HARRISON_BODY, HARRISON_HEADS, NO_BODY_EXTRAS);
+    for (const name of Object.keys(plain) as (keyof typeof plain)[]) {
+      plain[name].frames.forEach((f, i) => expect(none[name].frames[i]!.data, `${name} ${i}`).toEqual(f.data));
+    }
+  });
+
+  it('wristbands only turn forearm skin into trim', () => {
+    const c = changes({ wristbands: true, armband: false });
+    expect(c.length).toBeGreaterThan(0);
+    for (const [was, now] of c) {
+      expect([C.Skin, C.SkinShadow]).toContain(was);
+      expect(now).toBe(was === C.Skin ? C.Trim : C.TrimShadow);
+    }
+  });
+
+  it('the armband only recolours the near sleeve, in Armband', () => {
+    const c = changes({ wristbands: false, armband: true });
+    expect(c.length).toBeGreaterThan(0);
+    for (const [was, now] of c) {
+      expect([C.JerseyLight, C.Trim]).toContain(was);
+      expect(now).toBe(C.Armband);
+    }
   });
 });

@@ -12,6 +12,17 @@ const SLEEVE_LENGTH = 0.5;
 const KNEE_SKIN = 1;
 const WAISTBAND = 3;
 const HAND = 2;
+/** The captain's armband covers this stretch of the upper arm, inside the sleeve; wristbands the forearm from WRISTBAND_FROM. */
+const ARMBAND = [0.22, 0.48] as const;
+const WRISTBAND_FROM = 0.6;
+
+/** The extras worn on the body (the head's are drawn into the heads). */
+export interface BodyExtras {
+  wristbands: boolean;
+  armband: boolean;
+}
+
+export const NO_BODY_EXTRAS: BodyExtras = { wristbands: false, armband: false };
 
 /** Colours for one side of the body: near limbs use base tones, far limbs shadow tones. */
 interface SideColors {
@@ -20,27 +31,32 @@ interface SideColors {
   shorts: number;
   socks: number;
   boot: number;
+  trim: number;
 }
 
 // The near sleeve is a lighter red so the arm reads against the jersey behind it.
-const NEAR: SideColors = { skin: C.Skin, sleeve: C.JerseyLight, shorts: C.Shorts, socks: C.Socks, boot: C.Boot };
+const NEAR: SideColors = { skin: C.Skin, sleeve: C.JerseyLight, shorts: C.Shorts, socks: C.Socks, boot: C.Boot, trim: C.Trim };
 const FAR: SideColors = {
   skin: C.SkinShadow,
   sleeve: C.JerseyShadow,
   shorts: C.ShortsShadow,
   socks: C.SocksShadow,
   boot: C.BootShadow,
+  trim: C.TrimShadow,
 };
 
 const round = (p: Point): Point => ({ x: Math.round(p.x), y: Math.round(p.y) });
 const lerpPt = (a: Point, b: Point, t: number): Point => ({ x: a.x + (b.x - a.x) * t, y: a.y + (b.y - a.y) * t });
 const dist = (a: Point, b: Point) => Math.hypot(b.x - a.x, b.y - a.y);
 
-/** Kit stripes (sleeve and shorts) are only drawn on the near side. */
-function drawArm(img: IndexedImage, shoulder: Point, elbow: Point, hand: Point, body: BodyProportions, c: SideColors, stripe: boolean): void {
-  drawSegment(img, shoulder, elbow, body.upperArmWidth, t => (t < SLEEVE_LENGTH ? c.sleeve : c.skin));
-  if (stripe) drawSegment(img, shoulder, round(lerpPt(shoulder, elbow, SLEEVE_LENGTH)), 1, () => C.Trim);
-  drawSegment(img, elbow, hand, body.forearmWidth, () => c.skin);
+const onArmband = (t: number) => t >= ARMBAND[0] && t < ARMBAND[1];
+
+/** Kit stripes (sleeve and shorts) and the armband are only drawn on the near side. */
+function drawArm(img: IndexedImage, shoulder: Point, elbow: Point, hand: Point, body: BodyProportions, c: SideColors, near: boolean, extras: BodyExtras): void {
+  const armband = near && extras.armband;
+  drawSegment(img, shoulder, elbow, body.upperArmWidth, t => (t < SLEEVE_LENGTH ? (armband && onArmband(t) ? C.Armband : c.sleeve) : c.skin));
+  if (near) drawSegment(img, shoulder, round(lerpPt(shoulder, elbow, SLEEVE_LENGTH)), 1, t => (armband && onArmband(t * SLEEVE_LENGTH) ? C.Armband : C.Trim));
+  drawSegment(img, elbow, hand, body.forearmWidth, t => (extras.wristbands && t >= WRISTBAND_FROM ? c.trim : c.skin));
   drawSegment(img, hand, hand, HAND, () => c.skin);
 }
 
@@ -70,20 +86,20 @@ function drawTorso(img: IndexedImage, hip: Point, shoulder: Point, body: BodyPro
 }
 
 /** Draws a posed, outlined figure into a FRAME_W×FRAME_H image of logical colours. */
-export function drawFigure(pose: Pose, body: BodyProportions, heads: Record<HeadFacing, HeadSprite>): IndexedImage {
+export function drawFigure(pose: Pose, body: BodyProportions, heads: Record<HeadFacing, HeadSprite>, extras: BodyExtras = NO_BODY_EXTRAS): IndexedImage {
   const img = new IndexedImage(FRAME_W, FRAME_H);
   const j = solvePose(pose, body);
   const hip = round(j.hip);
   const shoulder = round(j.shoulder);
   const neck = round(j.neck);
 
-  drawArm(img, shoulder, round(j.farArm.elbow), round(j.farArm.hand), body, FAR, false);
+  drawArm(img, shoulder, round(j.farArm.elbow), round(j.farArm.hand), body, FAR, false, extras);
   drawLeg(img, hip, round(j.farLeg.knee), round(j.farLeg.ankle), round(j.farLeg.toe), body, FAR, false);
   drawTorso(img, hip, shoulder, body);
   drawLeg(img, hip, round(j.nearLeg.knee), round(j.nearLeg.ankle), round(j.nearLeg.toe), body, NEAR, true);
   const head = heads[pose.head.facing];
   blit(img, head.image, neck.x - head.neck.x + Math.round(pose.head.dx), neck.y - head.neck.y + Math.round(pose.head.dy));
-  drawArm(img, shoulder, round(j.nearArm.elbow), round(j.nearArm.hand), body, NEAR, true);
+  drawArm(img, shoulder, round(j.nearArm.elbow), round(j.nearArm.hand), body, NEAR, true, extras);
 
   addOutline(img, C.Outline);
   return img;

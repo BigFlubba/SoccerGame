@@ -34,6 +34,10 @@ export const C = {
   BootShadow: 25,
   Boot: 26,
   BootLight: 27,
+  // The Locker Room's extras: the glasses' rim and glint, and the captain's armband.
+  GlassesRim: 28,
+  GlassesGlint: 29,
+  Armband: 30,
 } as const;
 
 export type Slot = Exclude<keyof typeof C, 'None'>;
@@ -106,6 +110,9 @@ export const MASTER = {
 
 export type MasterColor = keyof typeof MASTER;
 
+/** The extras' fixed colours, spread into every look. */
+export const EXTRA_COLORS = { GlassesRim: 'silver', GlassesGlint: 'white', Armband: 'energyGold' } as const satisfies Partial<Record<Slot, MasterColor>>;
+
 /**
  * Master colour ids for art drawn straight in master colours (scenery, ball,
  * goals) rather than in logical roles: 1-based, in MASTER key order.
@@ -167,4 +174,6 @@ export const ART_LEGEND: Readonly<Record<string, number>> = {
   q: C.JerseyLight,
   R: C.TrimShadow,
   r: C.Trim,
+  g: C.GlassesRim,
+  G: C.GlassesGlint,
 };

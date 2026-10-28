@@ -1,5 +1,6 @@
 import { ART_LEGEND } from '../colors';
 import { blit, parseGrid, type IndexedImage } from '../indexedImage';
+import { PORTRAIT_GLASSES, PORTRAIT_HEADBAND, overlay } from './extras';
 
 export type Expression = 'neutral' | 'celebrate' | 'determined' | 'disappointed';
 
@@ -110,9 +111,16 @@ const PATCHES: Record<Exclude<Expression, 'neutral'>, readonly Patch[]> = {
   ],
 };
 
-export function harrisonPortrait(expression: Expression): IndexedImage {
-  const img = parseGrid(BASE, ART_LEGEND);
-  if (expression === 'neutral') return img;
-  for (const p of PATCHES[expression]) blit(img, parseGrid(p.rows, ART_LEGEND), p.x, p.y);
+/** The extras his portrait shows: the glasses go on after any expression, the headband before them. */
+export interface PortraitExtras {
+  glasses: boolean;
+  headband: boolean;
+}
+
+export function harrisonPortrait(expression: Expression, extras: PortraitExtras = { glasses: false, headband: false }): IndexedImage {
+  let img = parseGrid(BASE, ART_LEGEND);
+  if (expression !== 'neutral') for (const p of PATCHES[expression]) blit(img, parseGrid(p.rows, ART_LEGEND), p.x, p.y);
+  if (extras.headband) img = overlay(img, PORTRAIT_HEADBAND.rows, PORTRAIT_HEADBAND.x, PORTRAIT_HEADBAND.y);
+  if (extras.glasses) img = overlay(img, PORTRAIT_GLASSES.rows, PORTRAIT_GLASSES.x, PORTRAIT_GLASSES.y);
   return img;
 }
