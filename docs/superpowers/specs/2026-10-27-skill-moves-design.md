@@ -418,3 +418,69 @@ the brain's wrong-footed handling).
   the targets against Biscuit.
 - The "?" mark; the Help lines instead of a one-time notice; the Results
   unlock line.
+
+## As built (2026-10-28)
+
+What shipped, where it differs from the starting values above. The code
+(`src/game/tricks.ts`, `trickScripts.ts`, `trickTuning.test.ts`) is the
+authority for the numbers.
+
+**The tricks.** Stepover 0.4 s, sold at 0.2 s, at half pace; the ball held
+8 px ahead. Rainbow flick 0.5 s: he stands while the ball rides from his
+foot up behind his heel (6 px back, 12 px up), and it leaves his heel at
+0.25 s at 130 px/s forward and 360 px/s up, with backspin (-6). It peaks
+about 78 px up, clears a standing player 12-56 px ahead, lands about
+90 px on, and the backspin sits it down for him; at Speed 1-7 he is 8-18
+px behind it as it lands. Cooldown 1 s, wise 3 s, seeing range 120 px,
+lane 14 px. RB with the stick back is a stepover, not a drag-back.
+
+**Windows and times.** The windows are the spec's (Easy 12-56, Normal
+14-46, Hard 16-38 px). Base reaction times Easy 0.9 s, Normal 0.7 s,
+**Hard 0.6 s** (from 0.5: at 0.5 only .53 of fooling tricks got him past
+Max on Hard, under the .55 floor). Scales as the spec's table: Max, Leo
+and Sam ×1, Brick ×0.3 / ×1.2, Tia ×0.6, Pete ×1.5. Biscuit's own
+profile starts as copies of these and was not changed.
+
+**Measured** (seeds 100-163 unless noted, the scripted trickster
+pressing once an exchange at a random gap, the spammer whenever he can):
+
+| | Easy | Normal | Hard |
+|---|---|---|---|
+| Fooling tricks that get past Max | .84 | .76 | .74 |
+| Wins vs Max: plain / trickster / spammer | .875 / .688 / .438 | .625 / .672 / .203 | .016 / .063 / .047 |
+| Wins vs Sam: plain / spammer | .672 / .719 | .516 / .500 | .281 / .422 |
+
+Against Biscuit on Normal: plain .625, trickster .656, spammer 0.
+Personalities (Normal, seeds 100-131): of fooling stepovers, the share
+that got past runs Max 1.00, Tia .57, Brick 0; Pete .87 over 64 seeds; a
+Sam fooled at speed ends 49.4 px past Harrison, a fooled Max 29.4.
+
+**The parent's calls on the checks** (2026-10-28): the beat share can't
+rank Pete above Max (fooled for 0.7 s or more, nearly every stepover
+beats him), so Pete has his own .7 floor over 64 seeds and the order
+check is Max ≥ Tia ≥ Brick. Sam is rarely fast when squared up at the
+sell, so his skid is checked on the Sams fooled at speed, at 1.5× a
+fooled Max. A trial of Pete and Sam at ×2 let mashing RB beat Sam on
+Easy .906 to .672, so they stayed at ×1.5 and ×1, and the tuning now
+guards Sam against the spammer on Easy and Normal.
+
+**Rules worth knowing.**
+- A fooled defender can't play the ball at all, and it's never a 50/50
+  with him: Harrison just plays it.
+- A trick whose ball is taken, or whose spot is behind a fence, post or
+  net, plays out without it and fools nobody.
+- A clean steal leaves Max wise for his wrong-footed beat.
+- A trick goal's meter gain comes from the match scene.
+- The trick callout draws over Harrison and clears when he scores.
+- The scripted trickster takes the opening after fooling someone, as a
+  player would; the beat counts only with the ball past the defender
+  and down.
+
+**Open for the parent.** After a stepover Harrison's first touch sends
+the ball straight on. Max sways out of the lane, so he carries it past,
+but a tilting Biscuit doesn't sway: the ball sits at his nose and he
+takes it when the tilt ends. On Hard, mashing RB still beats Sam (.422
+vs .281); no target covers it. Deferred minors from the final review:
+PERFECT, STEPOVER! and SHOOT! share a spot over Harrison; Biscuit's
+nosing-in dwell carries through his tilt; a defender who took the ball
+mid-trick isn't made wise; one tick of trick movement after the whistle.
