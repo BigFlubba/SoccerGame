@@ -19,6 +19,7 @@ const RICH: Profile = {
   powerMoves: { owned: ['energyWave'], equipped: 'energyWave' },
   powerForms: { owned: ['golden'], equipped: 'golden' },
   career: { stars: { 'backyard-1': 1, 'backyard-2': 1, 'backyard-3': 3, 'backyard-4': 2 }, milestonesPaid: 1, lossStreaks: { 'backyard-boss': 2 } },
+  locker: { bought: [], kit: 'home', boots: 'volt', extras: [], seen: [] },
 };
 
 /** The Park playtest's code, from a v4 build: Park 1-4 beaten, stats 7/5/4/5. */

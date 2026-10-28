@@ -8,7 +8,7 @@ import { memoryStore } from './testStore';
 const ZERO_TOTALS = { matches: 0, wins: 0, draws: 0, losses: 0, goalsFor: 0, goalsAgainst: 0, styleGoals: 0, xpEarned: 0 };
 
 /** A save as v4 wrote it: no name, difficulty or Stamina. */
-type V4Save = Omit<Profile, 'version' | 'name' | 'difficulty' | 'stats'> & { version: number; stats: Omit<Stats, 'stamina'> };
+type V4Save = Omit<Profile, 'version' | 'name' | 'difficulty' | 'stats' | 'locker'> & { version: number; stats: Omit<Stats, 'stamina'> };
 
 /** A v4 save with something in every field. */
 const SOME: V4Save = {
@@ -25,8 +25,11 @@ const SOME: V4Save = {
   career: { stars: { 'backyard-1': 1, 'backyard-2': 1, 'backyard-3': 2, 'backyard-4': 3 }, milestonesPaid: 0, lossStreaks: { 'backyard-boss': 2 } },
 };
 
+/** Only the starters, HOME and VOLT on. */
+const EMPTY_LOCKER: Profile['locker'] = { bought: [], kit: 'home', boots: 'volt', extras: [], seen: [] };
+
 /** SOME as it loads on Normal. */
-const LOADED: Profile = { ...SOME, version: 5, name: 'HARRISON', difficulty: 'normal', stats: { ...SOME.stats, stamina: 1 } };
+const LOADED: Profile = { ...SOME, version: 5, name: 'HARRISON', difficulty: 'normal', stats: { ...SOME.stats, stamina: 1 }, locker: EMPTY_LOCKER };
 /** A v5 save with its own name, difficulty and Stamina. */
 const OWN: Profile = { ...LOADED, name: 'NORMAL RUN', difficulty: 'hard', stats: { ...LOADED.stats, stamina: 7 } };
 
@@ -51,13 +54,14 @@ describe('profile', () => {
       powerMoves: NO_POWER,
       powerForms: NO_POWER,
       career: NO_CAREER,
+      locker: EMPTY_LOCKER,
     });
     expect(PROFILE_KEY.startsWith('harrisons-road-to-the-cup/')).toBe(true);
     expect(LADDER_MATCHES).toBe(10);
   });
 
   it('his live v4 save loads into v5 without loss', () => {
-    expect(profileFrom(SOME, 'easy')).toEqual({ ...SOME, version: 5, name: 'HARRISON', difficulty: 'easy', stats: { ...SOME.stats, stamina: 1 } });
+    expect(profileFrom(SOME, 'easy')).toEqual({ ...SOME, version: 5, name: 'HARRISON', difficulty: 'easy', stats: { ...SOME.stats, stamina: 1 }, locker: EMPTY_LOCKER });
   });
 
   it('a name loads cleaned, cut to 12, or as HARRISON when nothing is left', () => {
@@ -115,6 +119,7 @@ describe('profile', () => {
       powerMoves: NO_POWER,
       powerForms: NO_POWER,
       career: { ...SOME.career, stars: { ...tenRetro, ...SOME.career.stars } },
+      locker: EMPTY_LOCKER,
     });
   });
 
@@ -133,7 +138,7 @@ describe('profile', () => {
       dailyWinDate: '2026-10-24',
       totals: { matches: 12, wins: 7, draws: 2, losses: 3, goalsFor: 21, goalsAgainst: 11, styleGoals: 5, xpEarned: 480 },
     };
-    expect(profileFrom(v1, 'normal')).toEqual({ ...v1, version: 5, name: 'HARRISON', difficulty: 'normal', stats: { ...v1.stats, stamina: 1 }, powerMoves: NO_POWER, powerForms: NO_POWER, career: { ...NO_CAREER, stars: FOUR_RETRO } });
+    expect(profileFrom(v1, 'normal')).toEqual({ ...v1, version: 5, name: 'HARRISON', difficulty: 'normal', stats: { ...v1.stats, stamina: 1 }, powerMoves: NO_POWER, powerForms: NO_POWER, career: { ...NO_CAREER, stars: FOUR_RETRO }, locker: EMPTY_LOCKER });
   });
 
   it('a v2 save loads into v5 with retro stars for its ladder wins', () => {

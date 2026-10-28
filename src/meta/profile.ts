@@ -3,6 +3,7 @@ import { BASE_STATS, MAX_STAT_LEVEL, MIN_STAT_LEVEL, STAT_NAMES, type Stats } fr
 import { MATCH_IDS, grantRungStars } from './career';
 import { FORM_IDS, MOVE_IDS, grantForms } from './catalog';
 import { LADDER_MATCHES } from './ladder';
+import type { BootsItemId, ExtraId, KitItemId, LockerItemId } from './locker';
 import { isRecord } from './storage';
 
 export { LADDER_MATCHES } from './ladder';
@@ -38,6 +39,17 @@ export interface Career {
   lossStreaks: Record<string, number>;
 }
 
+/** His Locker Room: what he's bought and what he wears. */
+export interface Locker {
+  /** Items bought with coins. Starters and gifts are never stored here. */
+  bought: LockerItemId[];
+  kit: KitItemId;
+  boots: BootsItemId;
+  extras: ExtraId[];
+  /** Gifts whose NEW he's seen. */
+  seen: LockerItemId[];
+}
+
 /** Harrison's progress, versioned so every later build can read it. */
 export interface Profile {
   /** v5 adds the name, the difficulty and Stamina. */
@@ -61,6 +73,7 @@ export interface Profile {
   /** Granted by level. Stored, so a later change to an unlock level can't take one away. */
   powerForms: Owned<PowerFormId>;
   career: Career;
+  locker: Locker;
 }
 
 /** Game-specific, so it never clashes with other pages on the same site. */
@@ -106,6 +119,7 @@ export function newProfile(): Profile {
     powerMoves: { owned: [], equipped: null },
     powerForms: { owned: [], equipped: null },
     career: { stars: {}, milestonesPaid: 0, lossStreaks: {} },
+    locker: { bought: [], kit: 'home', boots: 'volt', extras: [], seen: [] },
   };
 }
 
@@ -180,5 +194,6 @@ export function profileFrom(v: unknown, fallbackDifficulty: Difficulty): Profile
     powerMoves: ownedFrom(v.powerMoves, MOVE_IDS),
     powerForms: ownedFrom(v.powerForms, FORM_IDS),
     career: careerFrom(v.career),
+    locker: d.locker,
   }));
 }
