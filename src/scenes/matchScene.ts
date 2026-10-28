@@ -1,4 +1,4 @@
-import { matchFeedback } from '../audio/matchFeedback';
+import { matchFeedback, speedMemo } from '../audio/matchFeedback';
 import type { InputFrame } from '../engine/input';
 import { BASE_W } from '../engine/viewport';
 import { createBrain, think, type Difficulty } from '../game/ai';
@@ -122,6 +122,8 @@ export function createMatchScene(ctx: GameContext, seed: number, match: CareerMa
     opponentHandling(human),
   );
   const brain = createBrain(thinking);
+  // Speedy Sam's whoosh past Harrison remembers when it last sounded.
+  const whoosh = speedMemo();
   const dogBrain = dog ? createDogBrain(DOG_DIFFICULTY[difficulty]) : null;
   const awayIntent = (dt: number): PlayerIntent => (dogBrain ? dogThink(dogBrain, world, dt) : think(brain, world, world.away, world.home, dt));
   const cam: Camera = { x: world.ball.x - BASE_W / 2 };
@@ -286,7 +288,7 @@ export function createMatchScene(ctx: GameContext, seed: number, match: CareerMa
       if (simDt > 0) {
         const prevPhase = world.match.phase;
         stepWorld(world, harrisonIntent(input), awayIntent(simDt), simDt);
-        const feedback = matchFeedback(world, prevPhase);
+        const feedback = matchFeedback(world, prevPhase, whoosh);
         for (const cue of feedback.cues) ctx.audio.play(cue);
         for (const kind of feedback.rumble) ctx.rumble.pulse(kind);
         world.events.kicks.forEach((k, i) => {

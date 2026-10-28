@@ -73,6 +73,14 @@ describe('help', () => {
 
 describe('Help about Biscuit', () => {
   it('THE MATCH page tells him how to beat the dog', () => {
-    expect(HELP_PAGES[1]!.lines.at(-1)).toBe("BISCUIT CAN'T SHOOT: BLOCK HIS WAY TO YOUR GOAL.");
+    expect(HELP_PAGES[1]!.lines).toContain("BISCUIT CAN'T SHOOT: BLOCK HIS WAY TO YOUR GOAL.");
+  });
+});
+
+describe('Help about Sam', () => {
+  it("THE MATCH page tells him how to beat Speedy Sam, after Biscuit's line", () => {
+    const lines = HELP_PAGES[1]!.lines;
+    expect(lines.at(-2)).toBe("BISCUIT CAN'T SHOOT: BLOCK HIS WAY TO YOUR GOAL.");
+    expect(lines.at(-1)).toBe("SPEEDY SAM CAN'T STOP: TURN AND LET HIM FLY PAST.");
   });
 });

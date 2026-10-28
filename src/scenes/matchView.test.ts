@@ -2,6 +2,9 @@ import { describe, expect, it } from 'vitest';
 import { DOG_DIFFICULTY } from '../game/dog';
 import { BASE_STATS } from '../game/stats';
 import { createWorld } from '../game/world';
+import { NO_INTENT, stepPlayer } from '../game/player';
+import { DIFFICULTY } from '../game/ai';
+import { SAM_HANDLING } from '../game/sam';
 import type { GameArt, SpriteSet } from './art';
 import { depthSorted } from './depthSort';
 import { arrowX, banner, calloutLine, drawLayers, homeClip, pitchDrawables, takeFlash, type MatchHud } from './matchView';
@@ -66,6 +69,27 @@ describe('pitchDrawables', () => {
     expect(zs.filter(z => z === 18)).toHaveLength(4);
     expect(zs.filter(z => z === 46)).toHaveLength(4);
     expect(zs).toHaveLength(11);
+  });
+
+  it("Sam's dust and speed lines are drawn just behind him; Max has none", () => {
+    const max = createWorld(BASE_STATS, BASE_STATS, 1, { home: 4, away: 6 });
+    expect(pitchDrawables(max, { x: 0 }, NO_ART)).toHaveLength(11);
+    const sam = createWorld(BASE_STATS, BASE_STATS, 1, { home: 4, away: 6 }, null, null, DIFFICULTY.normal, SAM_HANDLING);
+    const zs = pitchDrawables(sam, { x: 0 }, NO_ART).map(d => d.z);
+    expect(zs).toHaveLength(12);
+    expect(zs.filter(z => z > sam.away.z && z < sam.away.z + 0.01)).toHaveLength(1);
+  });
+
+  it('skidding, he is drawn facing the way he slides, leaning back against it, not the way he has turned to go', () => {
+    const w = createWorld(BASE_STATS, BASE_STATS, 1, { home: 4, away: 6 }, null, null, DIFFICULTY.normal, SAM_HANDLING);
+    Object.assign(w.away, { vx: 210, facing: 1 });
+    stepPlayer(w.away, { ...NO_INTENT, moveX: -1 }, 1 / 60, w.field, false);
+    expect([w.away.anim.name, w.away.facing]).toEqual(['skid', -1]);
+    const side = (s: string) => new Proxy({}, { get: (_, anim) => [named(`${s}.${String(anim)}.0`), named(`${s}.${String(anim)}.1`)] });
+    const away = { right: side('right'), left: side('left') } as unknown as SpriteSet;
+    const { g, drawn } = recorder();
+    for (const d of pitchDrawables(w, { x: 0 }, NO_ART, w.home.anim, undefined, away).filter(d => d.z === w.away.z)) d.draw(g);
+    expect(drawn.map(d => d.name)).toContain('right.skid.0');
   });
 
   it('with Biscuit carrying, the ball is in his frame, not drawn on its own', () => {

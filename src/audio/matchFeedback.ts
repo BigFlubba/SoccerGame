@@ -1,10 +1,26 @@
 import type { RumbleKind } from '../engine/rumble';
 import type { Phase } from '../game/match';
+import { DECEL } from '../game/player';
 import type { World } from '../game/world';
 import type { Cue } from './cues';
 
 /** Ball speed (px/s) after a kick at or above which it sounds hard. */
 export const HARD_KICK_SPEED = 350;
+
+/**
+ * A player on soft brakes (Speedy Sam) flying past Harrison within `within`
+ * px at over `speed` px/s whooshes, at most once per `cooldownS`.
+ */
+export const WHOOSH = { within: 14, speed: 170, cooldownS: 0.8 };
+/** Fixed ticks a second, for the whoosh's cooldown. */
+const TICKS_PER_S = 60;
+
+/** What the whoosh remembers between ticks: the tick it last sounded. */
+export interface SpeedMemo {
+  whooshTick: number;
+}
+
+export const speedMemo = (): SpeedMemo => ({ whooshTick: -Infinity });
 
 export interface MatchFeedback {
   cues: Cue[];
@@ -16,8 +32,10 @@ export interface MatchFeedback {
  * The rumble only ever reflects what Harrison feels. A ball resting against
  * the net reports a hit every tick, so the net only sounds on a goal.
  * Biscuit's grab (his touch) barks rather than taps, and he pants aloud.
+ * With `speed`, a soft-braking away player whooshes past and scrapes into
+ * each skid.
  */
-export function matchFeedback(w: World, prevPhase: Phase): MatchFeedback {
+export function matchFeedback(w: World, prevPhase: Phase, speed?: SpeedMemo): MatchFeedback {
   const cues = new Set<Cue>();
   const rumble = new Set<RumbleKind>();
   const { ball, kicks, goal, power, dog } = w.events;
@@ -64,6 +82,17 @@ export function matchFeedback(w: World, prevPhase: Phase): MatchFeedback {
   if (goal) {
     cues.add('net').add(goal === 'home' ? 'roar' : 'groan');
     rumble.add(goal === 'home' ? 'goal' : 'maxGoal');
+  }
+  const away = w.away;
+  if (speed && away.handling.decel < DECEL) {
+    // The skid's first tick: its animation clock has just started.
+    if (away.anim.name === 'skid' && away.animT === 0) cues.add('skid');
+    const close = Math.hypot(away.x - w.home.x, away.z - w.home.z) <= WHOOSH.within;
+    const ready = w.tick - speed.whooshTick >= WHOOSH.cooldownS * TICKS_PER_S;
+    if (close && ready && Math.hypot(away.vx, away.vz) > WHOOSH.speed) {
+      cues.add('whoosh');
+      speed.whooshTick = w.tick;
+    }
   }
   const phase = w.match.phase;
   if (prevPhase === 'kickoff' && phase === 'playing') cues.add('whistleShort');

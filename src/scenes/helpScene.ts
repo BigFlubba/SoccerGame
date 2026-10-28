@@ -38,6 +38,7 @@ export const HELP_PAGES: readonly { title: string; lines: readonly string[] }[] 
       "NOBODY SCORES IN 45 MORE SECONDS? IT'S A DRAW.",
       'PLAYERS ARE SOLID: GO ROUND MAX, NOT THROUGH HIM.',
       "BISCUIT CAN'T SHOOT: BLOCK HIS WAY TO YOUR GOAL.",
+      "SPEEDY SAM CAN'T STOP: TURN AND LET HIM FLY PAST.",
     ],
   },
   {

@@ -822,6 +822,49 @@ describe('match scene: the Park crew', () => {
     expect(crewMatch('park-2').s.world.away.handling).toEqual(NORMAL_HANDLING);
   });
 
+  it('pausing mid-skid and resuming carries the skid on where it was', () => {
+    const { s } = crewMatch('park-boss');
+    Object.assign(s.world.ball, { x: 100, z: 60 });
+    Object.assign(s.world.home, { x: 60, z: 60 });
+    Object.assign(s.world.away, { x: 400, z: 32, vx: -210, facing: -1 });
+    // Sam's brain decides what he does; stage him braking by sending him the other way for a tick.
+    s.world.away.vx = 210;
+    Object.assign(s.world.ball, { x: 300, z: 32 });
+    let n = 0;
+    while (s.world.away.anim.name !== 'skid' && n++ < 30) s.update(frame(), STEP);
+    expect(s.world.away.anim.name).toBe('skid');
+    const at = { x: s.world.away.x, vx: s.world.away.vx };
+    s.update(frame(['pause']), STEP);
+    for (let i = 0; i < 30; i++) s.update(frame(), STEP);
+    expect([s.world.away.x, s.world.away.vx, s.world.away.anim.name]).toEqual([at.x, at.vx, 'skid']);
+    s.update(frame(['pause']), STEP);
+    s.update(frame(), STEP);
+    expect(s.world.away.anim.name).toBe('skid');
+    expect(Math.abs(s.world.away.vx)).toBeLessThan(Math.abs(at.vx));
+  });
+
+  it('Sam flying past Harrison close by whooshes', () => {
+    const audio = recordingAudio();
+    const { s } = crewMatch('park-boss', testContext({ profile: PARK_OPEN, audio }));
+    Object.assign(s.world.home, { x: 300, z: 32 });
+    Object.assign(s.world.away, { x: 310, z: 38, vx: -210, facing: -1 });
+    Object.assign(s.world.ball, { x: 100, z: 60 });
+    s.update(frame(), STEP);
+    expect(audio.played).toContain('whoosh');
+  });
+
+  it("changing difficulty mid-match swaps Sam's profile and keeps his handling", () => {
+    const { s, ctx } = crewMatch('park-boss');
+    s.update(frame(['pause']), STEP);
+    for (let i = 0; i < PAUSE_ITEMS.indexOf('OPTIONS'); i++) s.update(frame(['down']), STEP);
+    const options = s.update(frame(['confirm']), STEP)!;
+    options.update(frame(['right']), STEP);
+    options.update(frame(['back']), STEP);
+    expect(ctx.settings.difficulty).toBe('hard');
+    expect(s.world.maxProfile).toBe(SAM_PROFILES.hard);
+    expect(s.world.away.handling).toBe(SAM_HANDLING);
+  });
+
   it('a rung still builds Max at the rung, with his difficulty', () => {
     const s = createMatchScene(testContext(), 1, matchById('backyard-4')!);
     expect(s.world.away.stats).toEqual(maxStats(4));

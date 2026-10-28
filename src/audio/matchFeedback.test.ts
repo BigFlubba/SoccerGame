@@ -2,7 +2,9 @@ import { describe, expect, it } from 'vitest';
 import type { ContactEvents } from '../game/contact';
 import { BASE_STATS } from '../game/stats';
 import { createWorld, type World } from '../game/world';
-import { HARD_KICK_SPEED, matchFeedback } from './matchFeedback';
+import { NO_INTENT, NORMAL_HANDLING, stepPlayer } from '../game/player';
+import { SAM_HANDLING } from '../game/sam';
+import { HARD_KICK_SPEED, WHOOSH, matchFeedback, speedMemo } from './matchFeedback';
 
 const quiet = (): ContactEvents => ({ touched: false, blocked: false, kicked: null, perfect: false, tackledBall: false, trippedOpponent: false });
 
@@ -152,5 +154,47 @@ describe('matchFeedback with Biscuit', () => {
     const w = world({ tackledBall: true });
     w.events.dog.dropped = true;
     expect(matchFeedback(w, 'playing')).toEqual({ cues: ['tackle'], rumble: ['tackle'] });
+  });
+});
+
+describe("Sam's whoosh and skid", () => {
+  /** Harrison standing at x 300; the away player at `x`, `dz` off his line, running left at `speed`, with `handling`. */
+  function passing(x: number, speed: number, handling = SAM_HANDLING, dz = 6): World {
+    const w = world();
+    Object.assign(w.home, { x: 300, z: 32 });
+    Object.assign(w.away, { x, z: 32 + dz, vx: -speed, handling });
+    return w;
+  }
+
+  it('flying past Harrison close by cues whoosh once, and not again inside the cooldown', () => {
+    const memo = speedMemo();
+    expect(matchFeedback(passing(304, 200), 'playing', memo).cues).toContain('whoosh');
+    const again = passing(296, 200);
+    again.tick += 10;
+    expect(matchFeedback(again, 'playing', memo).cues).not.toContain('whoosh');
+    const later = passing(304, 200);
+    later.tick += Math.ceil(WHOOSH.cooldownS * 60) + 1;
+    expect(matchFeedback(later, 'playing', memo).cues).toContain('whoosh');
+  });
+
+  it('no whoosh going by slowly, or wide of him', () => {
+    expect(matchFeedback(passing(304, WHOOSH.speed - 20), 'playing', speedMemo()).cues).not.toContain('whoosh');
+    expect(matchFeedback(passing(304, 200, SAM_HANDLING, WHOOSH.within + 6), 'playing', speedMemo()).cues).not.toContain('whoosh');
+  });
+
+  it("the skid's first tick cues skid, and only that tick", () => {
+    const w = passing(400, 210);
+    stepPlayer(w.away, { ...NO_INTENT, moveX: 1 }, 1 / 60, w.field, false);
+    expect(w.away.anim.name).toBe('skid');
+    expect(matchFeedback(w, 'playing', speedMemo()).cues).toContain('skid');
+    stepPlayer(w.away, { ...NO_INTENT, moveX: 1 }, 1 / 60, w.field, false);
+    expect(matchFeedback(w, 'playing', speedMemo()).cues).not.toContain('skid');
+  });
+
+  it('Max doing the same cues neither', () => {
+    expect(matchFeedback(passing(304, 200, NORMAL_HANDLING), 'playing', speedMemo()).cues).not.toContain('whoosh');
+    const w = passing(400, 210, NORMAL_HANDLING);
+    stepPlayer(w.away, { ...NO_INTENT, moveX: 1 }, 1 / 60, w.field, false);
+    expect(matchFeedback(w, 'playing', speedMemo()).cues).not.toContain('skid');
   });
 });

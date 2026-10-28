@@ -7,13 +7,14 @@ import { BASE_H } from '../engine/viewport';
 import { VIEW_W, offscreenArrow, project, type Camera } from '../game/camera';
 import { SWEET_SPOT } from '../game/kick';
 import { clockMinute, type Team } from '../game/match';
-import type { Player } from '../game/player';
+import { DECEL, type Player } from '../game/player';
 import { powerHint } from '../game/power';
 import type { World } from '../game/world';
 import type { VenueId } from '../meta/career';
 import type { GameArt, SpriteSet } from './art';
 import { depthSorted, type Drawable } from './depthSort';
 import { drawDog } from './dogView';
+import { drawSpeed, skidFacing } from './samView';
 import {
   POWER_METER_X0,
   auraStrength,
@@ -145,9 +146,10 @@ function drawShadow(g: CanvasRenderingContext2D, cam: Camera, x: number, z: numb
 
 type Clip = { name: AnimName; frame: number };
 
-/** The sprite canvas a player is drawn with this frame. */
+/** The sprite canvas a player is drawn with this frame. A skid faces the way he's still sliding. */
 function spriteFrame(p: Player, set: SpriteSet, clip: Clip): HTMLCanvasElement {
-  const frames = (p.facing === 1 ? set.right : set.left)[clip.name];
+  const facing = clip.name === 'skid' ? skidFacing(p) : p.facing;
+  const frames = (facing === 1 ? set.right : set.left)[clip.name];
   return frames[Math.min(clip.frame, frames.length - 1)]!;
 }
 
@@ -248,9 +250,12 @@ export function pitchDrawables(
           },
         ]
       : [];
+  // A player on soft brakes (Speedy Sam) kicks up dust and trails speed lines, just behind him.
+  const speed: Drawable[] = !w.dog && w.away.handling.decel < DECEL ? [{ z: w.away.z + BEHIND, draw: g => drawSpeed(g, cam, w.away, look.nowS) }] : [];
   return [
     ...goals,
     ...aura,
+    ...speed,
     { z: w.home.z, draw: g => drawPlayer(g, cam, w.home, art, home, art[look.set]) },
     { z: w.away.z, draw: g => drawAway(g, cam, w, art, look.nowS, away) },
     // Last among equals: at his feet, the ball is drawn over his boots.

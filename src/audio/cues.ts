@@ -28,6 +28,7 @@ export type Cue =
   | 'beam'
   | 'brace'
   | 'whoosh'
+  | 'skid'
   | 'star'
   | 'bark'
   | 'pant'
@@ -210,7 +211,9 @@ export const CUES: Readonly<Record<Cue, CueRecipe>> = {
     ],
     minGapS: 0.3,
   },
-  /** Max blown off his feet. */
+  /** Speedy Sam's skid: a gritty scrape of boots on grass, falling as he slows. By design, not by ear. */
+  skid: { voices: [{ wave: 'noise', dur: 0.32, gain: 0.18, attack: 0.02, freq: 1600, toFreq: 500, filter: { type: 'bandpass', q: 1.2 } }], minGapS: 0.4 },
+  /** Max blown off his feet, or Speedy Sam flying past. */
   whoosh: { voices: [{ wave: 'noise', dur: 0.35, gain: 0.3, attack: 0.08, freq: 600, toFreq: 2200, filter: { type: 'bandpass', q: 1.5 } }], minGapS: 0.3 },
   /** A star earned, or a bonus done: a short rising two-note chime, G then D above. By design, not by ear. */
   star: {
