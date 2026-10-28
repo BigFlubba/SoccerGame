@@ -171,6 +171,9 @@ export function bootParticles(boots: BootsItemId, frame: IndexedImage, dt: numbe
   return out;
 }
 
+/** Whether boots leave a trail when he sprints. */
+export const hasTrail = (b: BootsItemId): boolean => isTrail(b);
+
 /** Whether anything in `o` shines, burns or trails. */
 export const animates = (o: Outfit): boolean => kitShader(o.kit) !== null || isTrail(o.boots);
 
