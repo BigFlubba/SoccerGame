@@ -5,7 +5,7 @@ import { maxMatch } from './maxScripts';
 import { NORMAL_HANDLING } from './player';
 import { BASE_STATS } from './stats';
 import { FOOT_SPOT } from './steal';
-import { trickMatch, trickIntent, trickMemo } from './trickScripts';
+import { beatNow, trickMatch, trickIntent, trickMemo } from './trickScripts';
 import { trickSetup } from './opponents';
 import { createWorld, type World } from './world';
 
@@ -87,5 +87,28 @@ describe('the plain script', () => {
       const pick = ({ result, score, longestStillS }: { result: unknown; score: unknown; longestStillS: number }) => ({ result, score, longestStillS });
       expect(pick(trickMatch('max', 'normal', seed, 'plain')), `seed ${seed}`).toEqual(pick(maxMatch('normal', seed)));
     }
+  });
+});
+
+describe('the beat', () => {
+  /** Harrison 16 px past the defender along +x, the ball where given. */
+  const past = (ball: { x: number; y?: number }) => {
+    const w = facing(30);
+    Object.assign(w.home, { x: 316 });
+    Object.assign(w.away, { x: 300 });
+    Object.assign(w.ball, { x: ball.x, y: ball.y ?? BALL_REST_Y, z: 32 });
+    return w;
+  };
+
+  it('counts Harrison past him with the ball low at his feet', () => {
+    expect(beatNow(past({ x: 324 }), 1)).toBe(true);
+  });
+
+  it("doesn't count the ball left behind at the fooled defender's feet", () => {
+    expect(beatNow(past({ x: 296 }), 1)).toBe(false);
+  });
+
+  it("doesn't count a flick still up in the air", () => {
+    expect(beatNow(past({ x: 330, y: 70 }), 1)).toBe(false);
   });
 });

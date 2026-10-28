@@ -311,7 +311,8 @@ export function stepWorld(w: World, homeIntent: PlayerIntent, awayIntent: Player
     if (w.wave?.live || (p === home && (home.turnS > 0 || home.trick !== null)) || p.fooled) return quietContact();
     // Harrison, and a player on soft brakes who can't stop short of his own goal, never knock the ball at it near it.
     const guarded = p === home || p.handling.decel < DECEL;
-    const ev = resolveContacts(p, other, w.ball, w.aimErrorDeg[p.team], w.rng, w.field, { trips: true, squeeze, clearUpfield: guarded, keepOut: guarded });
+    // A fooled opponent can't contest the ball, so it's never a 50/50 with him.
+    const ev = resolveContacts(p, other, w.ball, w.aimErrorDeg[p.team], w.rng, w.field, { trips: true, squeeze: squeeze && !other.fooled, clearUpfield: guarded, keepOut: guarded });
     if (ev.touched || ev.kicked || ev.tackledBall) w.ball.touchedBy = p.team;
     return ev;
   };

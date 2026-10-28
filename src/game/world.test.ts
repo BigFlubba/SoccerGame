@@ -661,3 +661,20 @@ describe('a fooled defender in the world', () => {
     }
   });
 });
+
+describe('a 50/50 with a fooled defender', () => {
+  it("never squirts: a fooled defender can't contest the ball, so Harrison just plays it", () => {
+    let squirts = 0;
+    for (let k = 0; k < 20; k++) {
+      const w = createWorld(BASE_STATS, BASE_STATS, k, ERR, null, null, DIFFICULTY.normal, NORMAL_HANDLING, { profile: TRICK_DIFFICULTY.normal, scale: { stepover: 1, flick: 1 } });
+      w.match.phase = 'playing';
+      Object.assign(w.home, { x: 300, z: 32, facing: 1 });
+      Object.assign(w.away, { x: 310, z: 32, facing: -1, fooled: { kind: 'confused', leftS: 0.5, totalS: 0.7, swayZ: 32 } });
+      Object.assign(w.ball, { x: 305, y: BALL_REST_Y, z: 32, vx: 0, vy: 0, vz: 0 });
+      w.tick = k;
+      stepWorld(w, move(1), NO_INTENT, STEP);
+      if (w.ball.y > BALL_REST_Y + 1 || w.ball.vy > 0) squirts++;
+    }
+    expect(squirts).toBe(0);
+  });
+});

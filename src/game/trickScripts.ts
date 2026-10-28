@@ -139,7 +139,7 @@ export interface TrickStats {
   tricks: number;
   /** Tricks that fooled the defender, by kind... */
   fooled: Record<TrickKind, number>;
-  /** ...and of those, the ones that got him past the defender with the ball (BEAT's rule: 10 px past, ball within 24 px, inside 1.5 s). */
+  /** ...and of those, the ones that got him past the defender with the ball (beatNow, inside 1.5 s). */
   beats: Record<TrickKind, number>;
   /** How far behind Harrison, along his facing at the sell, each fooled defender was when his reaction ended, px. */
   pastPx: number[];
@@ -147,6 +147,23 @@ export interface TrickStats {
 
 export interface TrickMatch extends MaxMatch {
   trickStats: TrickStats;
+}
+
+/** A ball no higher than this is down and playable, px: a flick still in the air isn't his yet. */
+const LOW_BALL = 10;
+
+/**
+ * Harrison has got past the defender with the ball, along `facing`: BEAT.past
+ * px beyond him, the ball beyond the defender too, down, and within BEAT.keep
+ * of Harrison. A ball left at a fooled defender's feet, or a flick still in
+ * the air, isn't a beat yet.
+ */
+export function beatNow(w: World, facing: 1 | -1): boolean {
+  const { home, away, ball } = w;
+  const ahead = (home.x - away.x) * facing;
+  const ballPast = (ball.x - away.x) * facing > 0;
+  const kept = Math.hypot(ball.x - home.x, ball.z - home.z) <= BEAT.keep;
+  return ahead >= BEAT.past && ballPast && ball.y <= LOW_BALL && kept;
 }
 
 /** Harrison's stats for the opponent's own tuning. */
@@ -195,9 +212,7 @@ export function trickMatch(opponent: HumanOpponentId | 'biscuit', d: Difficulty,
       past = { facing: w.home.facing };
     } else if (beat) {
       beat.sinceS += STEP;
-      const ahead = (w.home.x - w.away.x) * beat.facing;
-      const kept = Math.hypot(w.ball.x - w.home.x, w.ball.z - w.home.z) <= BEAT.keep;
-      if (ahead >= BEAT.past && kept) {
+      if (beatNow(w, beat.facing)) {
         stats.beats[beat.kind]++;
         beat = null;
       } else if (beat.sinceS >= BEAT.forS || theirs(w) || w.match.phase !== 'playing') beat = null;
