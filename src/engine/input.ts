@@ -163,11 +163,13 @@ export function createInput(target: Window): {
   let typed = '';
   target.addEventListener('gamepaddisconnected', () => (padLost = true));
 
+  // A repeat never holds a key: one held across a text-mode switch (which lets go of every key) would be pressed again.
   target.addEventListener('keydown', e => {
     if (textMode) {
       if (e.ctrlKey || e.metaKey) return;
-      if (TEXT_MODE_KEYS.has(e.code)) keysDown.add(e.code);
-      else if (e.key === 'Backspace') typed += '\b';
+      if (TEXT_MODE_KEYS.has(e.code)) {
+        if (!e.repeat) keysDown.add(e.code);
+      } else if (e.key === 'Backspace') typed += '\b';
       else if (e.key.length === 1) typed += e.key;
       else return;
       e.preventDefault();
@@ -175,7 +177,7 @@ export function createInput(target: Window): {
     }
     if (!KEYS[e.code]) return;
     e.preventDefault();
-    keysDown.add(e.code);
+    if (!e.repeat) keysDown.add(e.code);
   });
   target.addEventListener('keyup', e => keysDown.delete(e.code));
   target.addEventListener('paste', e => {

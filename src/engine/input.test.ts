@@ -118,8 +118,8 @@ describe('createInput', () => {
   const fakeWindow = () => Object.assign(new EventTarget(), { navigator: { getGamepads: () => [] } }) as unknown as Window;
 
   /** A keydown with the fields createInput reads. */
-  const keydown = (code: string, key: string, mods: { ctrlKey?: boolean } = {}) =>
-    Object.assign(new Event('keydown', { cancelable: true }), { code, key, ctrlKey: false, metaKey: false, ...mods });
+  const keydown = (code: string, key: string, mods: { ctrlKey?: boolean; repeat?: boolean } = {}) =>
+    Object.assign(new Event('keydown', { cancelable: true }), { code, key, ctrlKey: false, metaKey: false, repeat: false, ...mods });
 
   it('in text mode Z, X, C and V type letters and act as nothing; Enter and Esc still act', () => {
     const target = fakeWindow();
@@ -173,6 +173,38 @@ describe('createInput', () => {
     const f = input.poll();
     expect(f.typed).toBe('');
     expect(f.held.size).toBe(0);
+  });
+
+  it("a key held into text mode isn't pressed again by its auto-repeat", () => {
+    const target = fakeWindow();
+    const input = createInput(target);
+    target.dispatchEvent(keydown('Enter', 'Enter'));
+    expect(input.poll().pressed.has('confirm')).toBe(true);
+    input.setTextMode(true);
+    input.poll();
+    target.dispatchEvent(keydown('Enter', 'Enter', { repeat: true }));
+    expect(input.poll().pressed.has('confirm')).toBe(false);
+  });
+
+  it("a key held out of text mode isn't pressed again by its auto-repeat", () => {
+    const target = fakeWindow();
+    const input = createInput(target);
+    input.setTextMode(true);
+    target.dispatchEvent(keydown('Escape', 'Escape'));
+    expect(input.poll().pressed.has('back')).toBe(true);
+    input.setTextMode(false);
+    input.poll();
+    target.dispatchEvent(keydown('Escape', 'Escape', { repeat: true }));
+    expect(input.poll().pressed.has('back')).toBe(false);
+  });
+
+  it('in text mode a held key still types its repeats', () => {
+    const target = fakeWindow();
+    const input = createInput(target);
+    input.setTextMode(true);
+    target.dispatchEvent(keydown('Backspace', 'Backspace'));
+    target.dispatchEvent(keydown('Backspace', 'Backspace', { repeat: true }));
+    expect(input.poll().typed).toBe('\b\b');
   });
 
   it('a paste in text mode arrives as typed text, and Ctrl+V is left to the browser', () => {
