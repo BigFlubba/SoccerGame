@@ -2,7 +2,7 @@ import { BASE_H, BASE_W } from '../engine/viewport';
 import { drawBackdrop, drawTitle } from './backdrop';
 import type { GameContext } from './context';
 import type { Scene } from './scene';
-import { createHubScene } from './hubScene';
+import { createSavesScene } from './savesScene';
 
 const BLINK_HZ = 2;
 const PRESS_START_FROM_BOTTOM = 22;
@@ -14,7 +14,7 @@ export interface PressStartScene extends Scene {
   readonly soundHint: boolean;
 }
 
-/** The first screen: the Backyard, Harrison juggling, the title and a blinking PRESS START. Start, A or Enter goes on. */
+/** The first screen: the Backyard, Harrison juggling, the title and a blinking PRESS START. Start, A or Enter goes on to SAVES, on the last save played. */
 export function createPressStartScene(ctx: GameContext): PressStartScene {
   ctx.audio.setCrowd('off');
   ctx.audio.playMusic('title');
@@ -28,7 +28,7 @@ export function createPressStartScene(ctx: GameContext): PressStartScene {
       const goOn = input.pressed.has('confirm') || (input.pressed.has('pause') && !input.pressed.has('back'));
       if (!goOn) return null;
       ctx.audio.play('menuConfirm');
-      return createHubScene(ctx);
+      return createSavesScene(ctx, ctx.saves.lastPlayed() ?? 1);
     },
     draw(g, nowS) {
       drawBackdrop(g, ctx.art, nowS);

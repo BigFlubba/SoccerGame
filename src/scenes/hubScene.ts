@@ -2,6 +2,7 @@ import { MASTER } from '../art/colors';
 import { STAT_NAMES, type StatName, type Stats } from '../game/stats';
 import { careerCardLines } from '../meta/career';
 import { xpToNext } from '../meta/economy';
+import type { Profile } from '../meta/profile';
 import { drawBackdrop } from './backdrop';
 import type { GameContext } from './context';
 import { createHelpScene } from './helpScene';
@@ -9,18 +10,20 @@ import { drawMenu, menuAudio, menuCue, stepMenu, type MenuState } from './menu';
 import { createOptionsScene } from './optionsScene';
 import { drawBar, drawCoins, drawPanel } from './panel';
 import { createRoadMapScene } from './roadMapScene';
+import { createSavesScene } from './savesScene';
 import type { Scene } from './scene';
 import { createShopScene } from './shopScene';
-import { createPressStartScene } from './titleScene';
 
 /** No QUIT: a web page can't close its own tab. */
-export const HUB_ITEMS = ['CAREER', 'SHOP', 'OPTIONS', 'HELP'] as const;
+export const HUB_ITEMS = ['CAREER', 'SHOP', 'OPTIONS', 'HELP', 'SAVES'] as const;
 
 const SHORT: Record<StatName, string> = { speed: 'SPD', power: 'PWR', jump: 'JMP', control: 'CTL', stamina: 'STA' };
-const CARD = { x: 16, y: 8, w: 288, h: 80 };
+export const CARD = { x: 16, y: 8, w: 288, h: 80 };
 const PORTRAIT_AT = { x: CARD.x + 6, y: CARD.y + 8 };
-const TEXT_X = CARD.x + 80;
-const XP_BAR = { gap: 6, w: 70, h: 4 };
+export const TEXT_X = CARD.x + 80;
+/** Short enough that LEVEL 999, the bar and a 12-letter name on NORMAL share the LEVEL row. */
+export const XP_BAR = { gap: 6, w: 40, h: 4 };
+const CARD_RIGHT = CARD.x + CARD.w - 8;
 const MENU_TOP = 98;
 /** Right of centre, so the backdrop's juggling Harrison (who drifts across the left and middle) is never hidden behind it. */
 const MENU_CX = 248;
@@ -30,11 +33,17 @@ export function statsLine(s: Stats): string {
   return STAT_NAMES.map(k => `${SHORT[k]} ${s[k]}`).join('  ');
 }
 
+/** The save's name and difficulty for the Hub card, e.g. HARRISON - EASY. */
+export function saveLabel(p: Profile): string {
+  return `${p.name} - ${p.difficulty.toUpperCase()}`;
+}
+
 /**
- * Harrison's card (portrait, level and XP, coins, stats, and what's next in
- * the career) over the drifting Backyard, with CAREER, SHOP, OPTIONS and
- * HELP. Up/down choose, A or Start confirms, B or Esc goes back to Press
- * Start.
+ * Harrison's card (portrait, level and XP, the save's name and
+ * difficulty, coins, stats, and what's next in the career) over the
+ * drifting Backyard, with CAREER, SHOP, OPTIONS, HELP and SAVES. Up/down
+ * choose, A or Start confirms, and SAVES, B or Esc goes back to SAVES on
+ * this save.
  */
 export function createHubScene(ctx: GameContext, index = 0): Scene {
   const { art } = ctx;
@@ -50,7 +59,7 @@ export function createHubScene(ctx: GameContext, index = 0): Scene {
       const cue = menuCue(menu, { ...r, chosen });
       if (cue) ctx.audio.play(cue);
       menu = r.m;
-      if (r.back) return createPressStartScene(ctx);
+      if (r.back || chosen === 'SAVES') return createSavesScene(ctx, ctx.slot);
       if (chosen === 'CAREER') return createRoadMapScene(ctx);
       if (chosen === 'SHOP') return createShopScene(ctx, backHere);
       if (chosen === 'HELP') return createHelpScene(ctx, backHere);
@@ -63,10 +72,12 @@ export function createHubScene(ctx: GameContext, index = 0): Scene {
       drawPanel(g, CARD.x, CARD.y, CARD.w, CARD.h);
       g.drawImage(art.portraits.neutral, PORTRAIT_AT.x, PORTRAIT_AT.y);
       g.drawImage(art.text('HARRISON', 2, 'energyGold', 'outline'), TEXT_X, CARD.y + 6);
-      drawCoins(g, art, `${p.coins}`, CARD.x + CARD.w - 8, CARD.y + 9);
+      drawCoins(g, art, `${p.coins}`, CARD_RIGHT, CARD.y + 9);
       const level = art.text(`LEVEL ${p.level}`, 1, 'white', 'outline');
       g.drawImage(level, TEXT_X, CARD.y + 26);
       drawBar(g, TEXT_X + level.width + XP_BAR.gap, CARD.y + 28, XP_BAR.w, XP_BAR.h, p.xp / xpToNext(p.level), MASTER.electric);
+      const label = art.text(saveLabel(p), 1, 'silver', 'outline');
+      g.drawImage(label, CARD_RIGHT - label.width, CARD.y + 26);
       g.drawImage(art.text(statsLine(p.stats), 1, 'white', 'outline'), TEXT_X, CARD.y + 38);
       const career = careerCardLines(p);
       g.drawImage(art.text(career.first, 1, 'energyGold', 'outline'), TEXT_X, CARD.y + 54);

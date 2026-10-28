@@ -4,8 +4,9 @@ import { measureText } from '../art/font';
 import { careerCardLines } from '../meta/career';
 import { maxStats } from '../meta/ladder';
 import { newProfile } from '../meta/profile';
-import { HUB_ITEMS, createHubScene, statsLine } from './hubScene';
+import { CARD, HUB_ITEMS, TEXT_X, XP_BAR, createHubScene, saveLabel, statsLine } from './hubScene';
 import type { MatchScene } from './matchScene';
+import type { SavesScene } from './savesScene';
 import { testContext } from './testContext';
 import { frame } from './testInput';
 import { createPressStartScene } from './titleScene';
@@ -17,9 +18,9 @@ function context(difficulty: Difficulty = 'normal') {
 }
 
 describe('press start screen', () => {
-  it('Press Start, A or Enter opens the Hub', () => {
+  it('Press Start, A or Enter opens SAVES', () => {
     for (const pressed of [['pause'], ['confirm'], ['pause', 'confirm']] as const) {
-      expect(createPressStartScene(context()).update(frame(pressed), STEP)?.kind, pressed.join('+')).toBe('hub');
+      expect(createPressStartScene(context()).update(frame(pressed), STEP)?.kind, pressed.join('+')).toBe('saves');
     }
   });
 
@@ -31,8 +32,8 @@ describe('press start screen', () => {
 });
 
 describe('hub', () => {
-  it('the Hub has CAREER, SHOP, OPTIONS, HELP and no quit', () => {
-    expect(HUB_ITEMS).toEqual(['CAREER', 'SHOP', 'OPTIONS', 'HELP']);
+  it('the Hub has CAREER, SHOP, OPTIONS, HELP, SAVES and no quit', () => {
+    expect(HUB_ITEMS).toEqual(['CAREER', 'SHOP', 'OPTIONS', 'HELP', 'SAVES']);
   });
 
   it('CAREER opens the road map, and A there then A plays the next match through the VS card', () => {
@@ -66,8 +67,20 @@ describe('hub', () => {
     expect(careerCardLines({ ...newProfile(), ladderWins: 4 })).toEqual({ first: 'NEXT: MAX - MATCH 5/10', second: 'MAX HAS BEEN TRAINING: SPEED UP' });
   });
 
-  it('B on the Hub goes back to Press Start', () => {
-    expect(createHubScene(context()).update(frame(['back']), STEP)?.kind).toBe('pressStart');
+  it('B on the Hub goes back to SAVES, on the save being played', () => {
+    const ctx = context();
+    ctx.slot = 3;
+    const s = createHubScene(ctx).update(frame(['back']), STEP) as SavesScene;
+    expect(s.kind).toBe('saves');
+    expect(s.cursor).toBe(3);
+  });
+
+  it('SAVES on the Hub opens SAVES, on the save being played', () => {
+    const ctx = context();
+    ctx.slot = 2;
+    const s = createHubScene(ctx, HUB_ITEMS.indexOf('SAVES')).update(frame(['confirm']), STEP) as SavesScene;
+    expect(s.kind).toBe('saves');
+    expect(s.cursor).toBe(2);
   });
 
   it('Start on the Hub starts the selected item, like A', () => {
@@ -75,8 +88,8 @@ describe('hub', () => {
     expect(createHubScene(context(), 3).update(frame(['pause']), STEP)?.kind).toBe('help');
   });
 
-  it('Esc on the Hub goes back to Press Start', () => {
-    expect(createHubScene(context()).update(frame(['pause', 'back']), STEP)?.kind).toBe('pressStart');
+  it('Esc on the Hub goes back to SAVES', () => {
+    expect(createHubScene(context()).update(frame(['pause', 'back']), STEP)?.kind).toBe('saves');
   });
 
   it('Enter on the Hub still confirms', () => {
@@ -84,8 +97,7 @@ describe('hub', () => {
   });
 
   it('HELP opens Help, and B there comes back to the Hub on HELP', () => {
-    const s = createHubScene(context());
-    s.update(frame(['up']), STEP);
+    const s = createHubScene(context(), HUB_ITEMS.indexOf('HELP'));
     const help = s.update(frame(['confirm']), STEP);
     expect(help?.kind).toBe('help');
     const back = help!.update(frame(['back']), STEP);
@@ -140,6 +152,15 @@ describe('hub', () => {
 
   it('shows his five stats in short', () => {
     expect(statsLine({ speed: 3, power: 2, jump: 1, control: 10, stamina: 4 })).toBe('SPD 3  PWR 2  JMP 1  CTL 10  STA 4');
+  });
+
+  it("labels the card with the save's name and difficulty", () => {
+    expect(saveLabel({ ...newProfile(), difficulty: 'easy' })).toBe('HARRISON - EASY');
+  });
+
+  it('LEVEL 999, the XP bar and a twelve-letter name on NORMAL fit the LEVEL row', () => {
+    const label = saveLabel({ ...newProfile(), name: 'MMMMMMMMMMMM', difficulty: 'normal' });
+    expect(TEXT_X + measureText('LEVEL 999') + XP_BAR.gap + XP_BAR.w + 4).toBeLessThanOrEqual(CARD.x + CARD.w - 8 - measureText(label));
   });
 
   it('the maxed stats line fits the card', () => {
