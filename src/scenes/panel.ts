@@ -1,4 +1,4 @@
-import { MASTER } from '../art/colors';
+import { MASTER, type MasterColor } from '../art/colors';
 import type { GameArt } from './art';
 
 const BUTTON_GAP = 4;
@@ -61,9 +61,9 @@ export function drawStars(g: CanvasRenderingContext2D, x: number, y: number, lit
   for (let i = 0; i < 3; i++) drawStar(g, x + i * STAR_GAP, y, i < lit);
 }
 
-/** A coin and an amount, e.g. the 210 he has, right-aligned to `right`. */
-export function drawCoins(g: CanvasRenderingContext2D, art: GameArt, label: string, right: number, y: number): void {
-  const t = art.text(label, 1, 'energyGold', 'outline');
+/** A coin and an amount, e.g. the 210 he has, right-aligned to `right`; a price he can't pay is in grey. */
+export function drawCoins(g: CanvasRenderingContext2D, art: GameArt, label: string, right: number, y: number, ink: MasterColor = 'energyGold'): void {
+  const t = art.text(label, 1, ink, 'outline');
   const x = right - t.width;
   g.drawImage(t, x, y);
   drawCoin(g, x - COIN_W - 2, y);
