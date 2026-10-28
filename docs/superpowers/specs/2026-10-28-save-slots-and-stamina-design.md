@@ -408,3 +408,45 @@ most a real Harrison can buy:
 
 A fully bought Harrison who races Sam wins about a third of the time on
 Normal, and half on Easy.
+
+## As built
+
+Built on 2026-10-28 and playtested in the browser with real key
+presses: his v4 save on EASY came up as save 1, `HARRISON`,
+`EASY - LEVEL 6`, with every coin, star and stat, and PLAY stored it as
+v5. The choices this spec left to the builder, and what changed on the
+way:
+
+- **The Hub card's XP bar is 40 px** (it was 70), so `LEVEL 999`, the
+  bar and a 12-letter name on `NORMAL` share the LEVEL row.
+- **The info box is 288 wide** (the mockup's was 252), so the maxed
+  stats line fits its text column. With the box open, the list behind
+  it drops its A PICK and B BACK hints, which would peek out under the
+  box's bottom edge.
+- **NEW SAVE shares the keyboard by letting the arrows through:** in
+  text mode the arrows move between the rows and type nothing, as Enter
+  and Esc already acted. Enter or A starts the save from any row, as
+  the mockup's `ENTER STARTS IT` says. Backspace types, so it never
+  leaves; B or Esc does.
+- **A key's auto-repeat never presses it again.** Switching text mode
+  lets go of every key, so before this an Enter held on an empty slot
+  opened NEW SAVE and then started a save. In text mode a repeat still
+  types, so a held Backspace clears a name.
+- **Start confirms on SAVES and in the info box**, as on the Hub.
+- **Backing out of DELETE SAVE** reopens the info box on DELETE, as the
+  Hub comes back on the item left. DELETE SAVE itself opens on NO.
+- **A refused delete** (a newer build's save in the slot) plays `nope`
+  and leaves the save where it is.
+- **PLAY reads the slot again** rather than playing the copy the list
+  read, so another tab's newer progress is never written over.
+- **The Stamina line on Help's MOVES page** sits above the footer, so
+  it stays.
+
+Left for later, from the final review:
+
+- After he deletes the save he's playing, the game still holds that
+  save until he plays or makes another. That's safe, because every way
+  to the Hub goes through PLAY or NEW SAVE, but nothing enforces it.
+- NEW SAVE has no test that the A which opened it doesn't act, as the
+  info box and DELETE SAVE have. It doesn't act: every screen reads
+  presses, not holds.
