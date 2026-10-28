@@ -1,6 +1,6 @@
 import type { InputFrame } from '../engine/input';
 
-export type SceneKind = 'pressStart' | 'hub' | 'roadMap' | 'venue' | 'vs' | 'match' | 'results' | 'shop' | 'help' | 'options' | 'saveCode';
+export type SceneKind = 'pressStart' | 'hub' | 'roadMap' | 'venue' | 'vs' | 'match' | 'results' | 'shop' | 'help' | 'options' | 'saveCode' | 'newSave';
 
 export interface Scene {
   /** Which screen this is, for routing tests and the dev playtest hook. */

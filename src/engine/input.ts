@@ -136,18 +136,18 @@ export class InputTracker {
   }
 }
 
-/** The keys that still act while typing: Enter submits, Esc leaves. */
-const TEXT_MODE_KEYS: ReadonlySet<string> = new Set(['Enter', 'Escape']);
+/** The keys that still act while typing: Enter submits, Esc leaves, the arrows move. */
+const TEXT_MODE_KEYS: ReadonlySet<string> = new Set(['Enter', 'Escape', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight']);
 
 /**
  * Polls the first connected gamepad and the keyboard once per frame. Keys
  * are released on window blur so alt-tabbing never leaves one stuck down.
  * takePadLost() reports, once, that a gamepad was disconnected.
  *
- * In text mode (for typing a save code) the keyboard types instead of
- * acting: every key but Enter and Esc becomes text, and pastes arrive as
- * text too. Ctrl and Cmd shortcuts are left to the browser, so pasting
- * works.
+ * In text mode (for typing a save code or a name) the keyboard types
+ * instead of acting: every key but Enter, Esc and the arrows becomes
+ * text, and pastes arrive as text too. Ctrl and Cmd shortcuts are left
+ * to the browser, so pasting works.
  */
 export function createInput(target: Window): {
   poll(): InputFrame;

@@ -147,6 +147,34 @@ describe('createInput', () => {
     expect(input.poll().typed).toBe('');
   });
 
+  it('in text mode the arrows act and type nothing', () => {
+    const target = fakeWindow();
+    const input = createInput(target);
+    input.setTextMode(true);
+    target.dispatchEvent(keydown('ArrowDown', 'ArrowDown'));
+    const f = input.poll();
+    expect(f.held.has('down')).toBe(true);
+    expect(f.typed).toBe('');
+  });
+
+  it('in text mode Space types a space', () => {
+    const target = fakeWindow();
+    const input = createInput(target);
+    input.setTextMode(true);
+    target.dispatchEvent(keydown('Space', ' '));
+    expect(input.poll().typed).toBe(' ');
+  });
+
+  it('in text mode Shift types nothing and holds nothing', () => {
+    const target = fakeWindow();
+    const input = createInput(target);
+    input.setTextMode(true);
+    target.dispatchEvent(keydown('ShiftLeft', 'Shift'));
+    const f = input.poll();
+    expect(f.typed).toBe('');
+    expect(f.held.size).toBe(0);
+  });
+
   it('a paste in text mode arrives as typed text, and Ctrl+V is left to the browser', () => {
     const target = fakeWindow();
     const input = createInput(target);
