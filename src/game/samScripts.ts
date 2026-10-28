@@ -231,10 +231,10 @@ export interface SamMatch extends MaxMatch {
   ownGoals: number;
 }
 
-/** Plays a whole match against Sam headlessly at the tuning stats, and reports it from Harrison's side. */
-export function samMatch(d: Difficulty, seed: number, harrison: SamScript): SamMatch {
+/** Plays a whole match against Sam headlessly, at the tuning stats unless `stats` says otherwise, and reports it from Harrison's side. */
+export function samMatch(d: Difficulty, seed: number, harrison: SamScript, stats: Readonly<Stats> = SAM_TUNING_STATS): SamMatch {
   const profile = SAM_PROFILES[d];
-  const w = createWorld({ ...SAM_TUNING_STATS }, { ...SAM_STATS }, seed, { home: HUMAN_AIM_ERROR_DEG, away: profile.aimErrorDeg }, null, null, profile, SAM_HANDLING);
+  const w = createWorld({ ...stats }, { ...SAM_STATS }, seed, { home: HUMAN_AIM_ERROR_DEG, away: profile.aimErrorDeg }, null, null, profile, SAM_HANDLING);
   const brain = createBrain(profile);
   const memo = matadorMemo(seeded(seed ^ MATADOR_SEED));
   const racer = racerMemo(seeded(seed ^ MATADOR_SEED));

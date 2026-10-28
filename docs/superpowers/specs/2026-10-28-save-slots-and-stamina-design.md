@@ -380,3 +380,31 @@ The build order, as amended by the roadmap, with this plan done:
    - The Locker Room, first round: kits, boots, accessories
    - Quick Match
    - 7c onward, unchanged.
+
+## As built: Stamina's measure
+
+Measured on 2026-10-28 with the boss tuning tests' seeds (32 for
+Biscuit, 64 for Sam), win rates Easy / Normal / Hard. The Stamina 1 runs
+reproduce today's numbers exactly.
+
+| Run | Stamina 1 | Stamina 10 |
+|---|---|---|
+| Chaser vs Biscuit | 0 / 0 / 0 | 0 / **0** / 0 |
+| Blocker vs Biscuit | .875 / .594 / .219 | .844 / .688 / .281 |
+| Racer vs Sam | .188 / .094 / .109 | .203 / **.141** / .156 |
+| Matador vs Sam | .922 / .609 / .422 | .984 / .781 / .547 |
+| Matador − racer | .734 / .516 / .313 | **.781 / .641 / .391** |
+
+Every bar holds at Stamina 10: the chaser wins 0 on Normal (≤ .15), the
+racer .141 on Normal (≤ .15), and the matador leads the racer by at
+least .391 (≥ .3). The racer's .141 is 9 wins in 64, one win under the
+bar. `staminaTuning.test.ts` guards all three.
+
+For information, not guarded, with **Speed 10 and Stamina 10**, the
+most a real Harrison can buy:
+
+- the chaser vs Biscuit: 0 / 0 / .031;
+- the racer vs Sam: .516 / .313 / .203.
+
+A fully bought Harrison who races Sam wins about a third of the time on
+Normal, and half on Easy.

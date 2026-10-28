@@ -4,7 +4,7 @@ import { DOG_DIFFICULTY, TUNING_STATS, type Difficulty } from './dog';
 import { createDogBrain, dogThink } from './dogAi';
 import { HUMAN_AIM_ERROR_DEG } from './kick';
 import { NO_INTENT, PLAYER_R, type PlayerIntent } from './player';
-import { BASE_STATS } from './stats';
+import { BASE_STATS, type Stats } from './stats';
 import { createWorld, stepWorld, type World } from './world';
 import { ballAtFeet } from './zones';
 
@@ -218,9 +218,9 @@ export interface BossMatch {
   longestStillS: number;
 }
 
-/** Plays a whole boss match headlessly at the tuning stats, and reports it from Harrison's side. */
-export function bossMatch(d: Difficulty, seed: number, harrison: ScriptedHarrison): BossMatch {
-  const w = createWorld({ ...TUNING_STATS }, { ...BASE_STATS }, seed, { home: HUMAN_AIM_ERROR_DEG, away: 0 }, null, DOG_DIFFICULTY[d]);
+/** Plays a whole boss match headlessly, at the tuning stats unless `stats` says otherwise, and reports it from Harrison's side. */
+export function bossMatch(d: Difficulty, seed: number, harrison: ScriptedHarrison, stats: Readonly<Stats> = TUNING_STATS): BossMatch {
+  const w = createWorld({ ...stats }, { ...BASE_STATS }, seed, { home: HUMAN_AIM_ERROR_DEG, away: 0 }, null, DOG_DIFFICULTY[d]);
   const brain = createDogBrain(DOG_DIFFICULTY[d]);
   const memo = blockerMemo(seeded(seed ^ BLOCKER_SEED));
   let [t, stillS, longestStillS] = [0, 0, 0];
