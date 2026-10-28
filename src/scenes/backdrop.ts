@@ -6,6 +6,7 @@ import { project, type Camera } from '../game/camera';
 import type { VenueId } from '../meta/career';
 import type { GameArt } from './art';
 import { drawLayers } from './matchView';
+import type { WorldPoint } from './outfitView';
 
 /** Where Harrison does his keepy-uppies, in world units. */
 const JUGGLER = { x: 170, z: 26 };
@@ -35,7 +36,12 @@ export function drawBackdrop(g: CanvasRenderingContext2D, art: GameArt, nowS: nu
   const frame = Math.floor(nowS * JUGGLE_FPS) % JUGGLE_FRAMES;
   const feet = project(JUGGLER.x, 0, JUGGLER.z, cam.x);
   shadow(g, feet.sx, feet.sy);
-  g.drawImage(art.home.right.juggle[frame]!, Math.round(feet.sx) - ANCHOR.x, Math.round(feet.sy) - ANCHOR.y);
+  const toScreen = (p: WorldPoint) => {
+    const s = project(p.x, p.y, p.z, cam.x);
+    return { x: s.sx, y: s.sy };
+  };
+  art.backdropFx.draw(g, nowS, art.harrisonImage('home', 'juggle', frame), { x: JUGGLER.x, y: 0, z: JUGGLER.z }, 1, false, toScreen);
+  g.drawImage(art.harrison('home', 1, 'juggle', frame, nowS), Math.round(feet.sx) - ANCHOR.x, Math.round(feet.sy) - ANCHOR.y);
 
   // The ball leaves his foot on the kick frame and drops back onto it one loop later.
   const loopS = JUGGLE_FRAMES / JUGGLE_FPS;

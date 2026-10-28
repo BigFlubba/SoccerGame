@@ -7,9 +7,7 @@ import { HARRISON_BODY, type BodyProportions } from '../art/body/proportions';
 import { C, masterPalette, resolvePalette, type LookColors, type MasterColor, type ResolvedPalette } from '../art/colors';
 import { renderText, textPalette } from '../art/font';
 import { buttonGlyph, type ButtonName } from '../art/glyphs';
-import { HARRISON_HEADS, HARRISON_POWER_HEADS } from '../art/harrison/head';
-import { harrisonLook } from '../art/harrison/look';
-import { harrisonPortrait, type Expression } from '../art/harrison/portrait';
+import type { Expression } from '../art/harrison/portrait';
 import { IndexedImage, blit, flipX } from '../art/indexedImage';
 import { BISCUIT_FACE, BISCUIT_FRAMES, type DogAnim } from '../art/opponents/biscuit';
 import { CREW_BODY, CREW_HEADS, crewLook } from '../art/opponents/crew';
@@ -19,9 +17,15 @@ import { addOutline } from '../art/raster';
 import { backyardLayers, goalSprites, type GoalArt, type VenueLayers } from '../art/venues/backyard';
 import { JOGGERS, joggerFrames, parkLayers } from '../art/venues/park';
 import type { OpponentId, VenueId } from '../meta/career';
+import { DEFAULT_OUTFIT, outfitKey, type Outfit } from '../meta/locker';
 import { toCanvas } from '../engine/bitmaps';
 import type { CrewId } from '../game/crew';
 import { SpriteCache, type FacingFrames } from '../engine/sprites';
+import { HarrisonArt } from './harrisonArt';
+import { OutfitFx } from './outfitView';
+
+/** Harrison's three sprite sets: his own hair, powered up, and in Golden Form's gold. */
+export type HomeSet = 'home' | 'homePower' | 'homeGolden';
 
 export interface SpriteSet {
   right: Record<AnimName, HTMLCanvasElement[]>;
@@ -58,15 +62,31 @@ export interface GameArt {
   ball: HTMLCanvasElement[];
   /** Controller button pictures, for Help. */
   buttons: Record<ButtonName, HTMLCanvasElement>;
-  home: SpriteSet;
-  /** Harrison with his hair lifted by the power-up, in his own colours... */
-  homePower: SpriteSet;
+  /** Harrison in what he wears (see dress)... */
+  readonly home: SpriteSet;
+  /** ...with his hair lifted by the power-up, in his own colours... */
+  readonly homePower: SpriteSet;
   /** ...and in Golden Form's gold. */
-  homeGolden: SpriteSet;
+  readonly homeGolden: SpriteSet;
+  /** What he wears now: the default until a save is played. */
+  readonly outfit: Outfit;
+  /** Puts him in `o`: home, homePower, homeGolden and portraits follow from now on, baked once per outfit. */
+  dress(o: Outfit): void;
+  /** His frame now: the baked canvas, or for an animated kit, a scratch canvas painted with its shader at nowS. */
+  harrison(set: HomeSet, facing: 1 | -1, clip: AnimName, frame: number, nowS: number): HTMLCanvasElement;
+  /** The same frame's logical pixels, facing right, for the effects. */
+  harrisonImage(set: HomeSet, clip: AnimName, frame: number): IndexedImage;
+  /** Him in any outfit, facing right (the Locker Room's try-on); animated kits painted at nowS. */
+  preview(o: Outfit, clip: AnimName, frame: number, nowS: number): HTMLCanvasElement;
+  previewImage(o: Outfit, clip: AnimName, frame: number): IndexedImage;
+  /** Portraits in any outfit (each save's info box). */
+  portraitsOf(o: Outfit): Record<Expression, HTMLCanvasElement>;
+  /** The juggler's effects on the backdrop, remade by dress(). */
+  readonly backdropFx: OutfitFx;
   /** Every human opponent: their sprites, and their face, front on and outlined, for the venue panel and the boss node. */
   opponents: Record<HumanOpponent, OpponentArt>;
-  /** Harrison's portrait in each expression, in the home kit. */
-  portraits: Record<Expression, HTMLCanvasElement>;
+  /** Harrison's portrait in each expression, in what he wears. */
+  readonly portraits: Record<Expression, HTMLCanvasElement>;
   /** Biscuit the Dog, the Backyard's boss. */
   biscuit: DogSprites;
   /** His face, front on and outlined, for the boss node and the VS card. */
@@ -126,9 +146,10 @@ function venueCanvases(L: VenueLayers, joggers: readonly (readonly [IndexedImage
 }
 
 const BUTTONS: readonly ButtonName[] = ['A', 'B', 'X', 'Y', 'LB', 'RS', 'RT', 'START'];
-const EXPRESSIONS: readonly Expression[] = ['neutral', 'celebrate', 'determined', 'disappointed'];
+/** The backdrop's juggler gives off his effects on these random numbers. */
+const BACKDROP_FX_SEED = 12;
 
-/** Bakes and resolves every image the match needs, once, at boot. */
+/** Bakes and resolves every image the match needs at boot; Harrison's, per outfit, when first asked for. */
 export function loadGameArt(): GameArt {
   const master = masterPalette();
   const cache = new SpriteCache();
@@ -141,16 +162,43 @@ export function loadGameArt(): GameArt {
     return { sprites: spriteSet(cache, id, heads, look, body), face: faceCanvas(heads.front, look) };
   };
   const texts = new Map<string, HTMLCanvasElement>();
+  const harrison = new HarrisonArt(cache);
+  let outfit = DEFAULT_OUTFIT;
+  let backdropFx = new OutfitFx(outfit, BACKDROP_FX_SEED);
   return {
     venues: { backyard: venueCanvases(backyardLayers(), [], master), park: venueCanvases(parkLayers(), parkJoggers, master) },
     goal: { left: goalCanvases(goalSprites('left'), master), right: goalCanvases(goalSprites('right'), master) },
     ball: ballFrames().map(f => toCanvas(f, master)),
     buttons: Object.fromEntries(BUTTONS.map(b => [b, toCanvas(buttonGlyph(b), master)])) as Record<ButtonName, HTMLCanvasElement>,
-    home: spriteSet(cache, 'harrison', HARRISON_HEADS, harrisonLook('home')),
-    homePower: spriteSet(cache, 'harrison-power', HARRISON_POWER_HEADS, harrisonLook('home')),
-    homeGolden: spriteSet(cache, 'harrison-golden', HARRISON_POWER_HEADS, harrisonLook('home', 'golden')),
+    get home() {
+      return harrison.set(outfit, 'home');
+    },
+    get homePower() {
+      return harrison.set(outfit, 'homePower');
+    },
+    get homeGolden() {
+      return harrison.set(outfit, 'homeGolden');
+    },
+    get outfit() {
+      return outfit;
+    },
+    dress(o) {
+      if (outfitKey(o) === outfitKey(outfit)) return;
+      outfit = o;
+      backdropFx = new OutfitFx(o, BACKDROP_FX_SEED);
+    },
+    harrison: (set, facing, clip, frame, nowS) => harrison.canvas(outfit, set, facing, clip, frame, nowS),
+    harrisonImage: (set, clip, frame) => harrison.image(outfit, set, clip, frame),
+    preview: (o, clip, frame, nowS) => harrison.preview(o, clip, frame, nowS),
+    previewImage: (o, clip, frame) => harrison.previewImage(o, clip, frame),
+    portraitsOf: o => harrison.portraitsOf(o),
+    get backdropFx() {
+      return backdropFx;
+    },
     opponents: Object.fromEntries((Object.keys(OPPONENT_LOOKS) as HumanOpponent[]).map(id => [id, opponentArt(id)])) as Record<HumanOpponent, OpponentArt>,
-    portraits: Object.fromEntries(EXPRESSIONS.map(e => [e, toCanvas(harrisonPortrait(e), resolvePalette(harrisonLook('home')))])) as Record<Expression, HTMLCanvasElement>,
+    get portraits() {
+      return harrison.portraitsOf(outfit);
+    },
     biscuit: Object.fromEntries(
       Object.entries(BISCUIT_FRAMES).map(([name, frames]) => [name, cache.frames(`biscuit/${name}`, () => ({ frames: [...frames], palette: master }))]),
     ) as DogSprites,

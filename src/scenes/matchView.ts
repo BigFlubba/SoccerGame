@@ -11,7 +11,8 @@ import { DECEL, type Player } from '../game/player';
 import { powerHint } from '../game/power';
 import type { World } from '../game/world';
 import type { VenueId } from '../meta/career';
-import type { GameArt, SpriteSet } from './art';
+import type { GameArt, HomeSet, SpriteSet } from './art';
+import type { OutfitFx } from './outfitView';
 import { depthSorted, type Drawable } from './depthSort';
 import { drawDog } from './dogView';
 import { drawSpeed, skidFacing } from './samView';
@@ -60,6 +61,8 @@ export interface MatchHud {
   venue: VenueId;
   /** The away player's sprites: Max, or the Park kid playing. Unused against Biscuit. */
   readonly awaySprites: SpriteSet;
+  /** Harrison's flashy kit and boots effects for this match, or null when nothing he wears animates. */
+  fx: OutfitFx | null;
 }
 
 /**
@@ -149,18 +152,31 @@ function drawShadow(g: CanvasRenderingContext2D, cam: Camera, x: number, z: numb
 
 type Clip = { name: AnimName; frame: number };
 
-/** The sprite canvas a player is drawn with this frame. A skid faces the way he's still sliding. */
+/** The way a player's sprite faces this frame. A skid faces the way he's still sliding. */
+const spriteFacing = (p: Player, clip: Clip): 1 | -1 => (clip.name === 'skid' ? skidFacing(p) : p.facing);
+
+/** The sprite canvas a player is drawn with this frame. */
 function spriteFrame(p: Player, set: SpriteSet, clip: Clip): HTMLCanvasElement {
-  const facing = clip.name === 'skid' ? skidFacing(p) : p.facing;
-  const frames = (facing === 1 ? set.right : set.left)[clip.name];
+  const frames = (spriteFacing(p, clip) === 1 ? set.right : set.left)[clip.name];
   return frames[Math.min(clip.frame, frames.length - 1)]!;
 }
 
-function drawPlayer(g: CanvasRenderingContext2D, cam: Camera, p: Player, art: GameArt, clip: Clip = p.anim, set?: SpriteSet, flat = false): void {
-  const frame = spriteFrame(p, set ?? (p.team === 'home' ? art.home : art.opponents.max.sprites), clip);
+/** A player's frame at his feet, hopping on the celebration's up frame. */
+function drawSprite(g: CanvasRenderingContext2D, cam: Camera, p: Player, clip: Clip, frame: HTMLCanvasElement): void {
   const s = screen(cam, p.x, p.y, p.z);
   const hop = clip.name === 'celebrate' && clip.frame === 1 ? CELEBRATE_HOP_PX : 0;
-  g.drawImage(flat ? silhouette(frame) : frame, s.x - ANCHOR.x, s.y - ANCHOR.y - hop);
+  g.drawImage(frame, s.x - ANCHOR.x, s.y - ANCHOR.y - hop);
+}
+
+function drawPlayer(g: CanvasRenderingContext2D, cam: Camera, p: Player, art: GameArt, clip: Clip = p.anim, set?: SpriteSet, flat = false): void {
+  const frame = spriteFrame(p, set ?? art.opponents.max.sprites, clip);
+  drawSprite(g, cam, p, clip, flat ? silhouette(frame) : frame);
+}
+
+/** Harrison in what he wears, an animated kit painted live; a silhouette comes from the baked set. */
+function drawHome(g: CanvasRenderingContext2D, cam: Camera, p: Player, art: GameArt, clip: Clip, look: HomeLook, flat = false): void {
+  const frame = flat ? silhouette(spriteFrame(p, art[look.set], clip)) : art.harrison(look.set, spriteFacing(p, clip), clip.name, clip.frame, look.nowS);
+  drawSprite(g, cam, p, clip, frame);
 }
 
 /** The away side: a human opponent in `set` (Max's when not given), or Biscuit when he's the opponent. */
@@ -208,9 +224,11 @@ function drawBall(g: CanvasRenderingContext2D, w: World, cam: Camera, art: GameA
 
 /** Harrison's look this frame: which sprite set, and how strongly his aura burns (0 for none). */
 export interface HomeLook {
-  set: 'home' | 'homePower' | 'homeGolden';
+  set: HomeSet;
   aura: number;
   nowS: number;
+  /** His kit and boots effects, or null for none. */
+  fx: OutfitFx | null;
 }
 
 /** Just behind him in the depth sort, so his aura and debris are drawn before him. */
@@ -227,7 +245,7 @@ export function pitchDrawables(
   cam: Camera,
   art: GameArt,
   home: Clip = w.home.anim,
-  look: HomeLook = { set: 'home', aura: 0, nowS: 0 },
+  look: HomeLook = { set: 'home', aura: 0, nowS: 0, fx: null },
   away?: SpriteSet,
 ): Drawable[] {
   const goals = w.field.goals.flatMap(goal => {
@@ -253,13 +271,27 @@ export function pitchDrawables(
           },
         ]
       : [];
+  // His flashy kit's and boots' particles, also just behind him.
+  const fx = look.fx;
+  const effects: Drawable[] = fx
+    ? [
+        {
+          z: w.home.z + BEHIND,
+          draw: g => {
+            const at = { x: w.home.x, y: w.home.y, z: w.home.z };
+            fx.draw(g, look.nowS, art.harrisonImage(look.set, home.name, home.frame), at, spriteFacing(w.home, home), w.home.anim.name === 'sprint', p => screen(cam, p.x, p.y, p.z));
+          },
+        },
+      ]
+    : [];
   // A player on soft brakes (Speedy Sam) kicks up dust and trails speed lines, just behind him.
   const speed: Drawable[] = !w.dog && w.away.handling.decel < DECEL ? [{ z: w.away.z + BEHIND, draw: g => drawSpeed(g, cam, w.away, look.nowS) }] : [];
   return [
     ...goals,
     ...aura,
+    ...effects,
     ...speed,
-    { z: w.home.z, draw: g => drawPlayer(g, cam, w.home, art, home, art[look.set]) },
+    { z: w.home.z, draw: g => drawHome(g, cam, w.home, art, home, look) },
     { z: w.away.z, draw: g => drawAway(g, cam, w, art, look.nowS, away) },
     // Last among equals: at his feet, the ball is drawn over his boots.
     ...(w.dog?.carrying ? [] : [{ z: w.ball.z, draw: (g: CanvasRenderingContext2D) => drawBall(g, w, cam, art) }]),
@@ -358,7 +390,7 @@ function drawImpact(g: CanvasRenderingContext2D, w: World, cam: Camera, art: Gam
   ink(g, 'white');
   g.fillRect(-8, -8, VIEW_W + 16, BASE_H + 16);
   drawAway(g, cam, w, art, look.nowS, away, true);
-  drawPlayer(g, cam, w.home, art, home, art[look.set], true);
+  drawHome(g, cam, w.home, art, home, look, true);
   if (!w.dog?.carrying) drawBall(g, w, cam, art, true);
 }
 
@@ -375,7 +407,7 @@ export function drawMatch(g: CanvasRenderingContext2D, w: World, cam: Camera, ar
   // Decided before this frame uses up an impact frame, so the flash comes on the frame after the last one.
   const flash = takeFlash(hud);
   const home = homeClip(w, moment);
-  const look: HomeLook = { set: homeSprites(w, hud), aura: auraStrength(w, hud, nowS), nowS };
+  const look: HomeLook = { set: homeSprites(w, hud), aura: auraStrength(w, hud, nowS), nowS, fx: hud.fx };
   g.save();
   g.translate(shake.dx, shake.dy);
   drawLayers(g, cam, art, hud.venue, nowS);

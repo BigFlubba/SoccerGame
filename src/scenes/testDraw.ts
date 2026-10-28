@@ -10,7 +10,7 @@ const SIZE = 10;
 /**
  * Stand-in art for draw tests: every property is more art, every call
  * (art.text) returns more, named with its arguments, every image is SIZE
- * px square, and every list has one entry.
+ * px square at 0, 0, and every list has one entry.
  */
 export function fakeArt(path = 'art'): GameArt {
   const target = () => undefined;
@@ -18,7 +18,11 @@ export function fakeArt(path = 'art'): GameArt {
     get(_, prop) {
       if (prop === 'name') return path;
       if (prop === 'width' || prop === 'height') return SIZE;
+      // An origin's coordinates (a goal's), so a whole match can be drawn.
+      if (prop === 'x' || prop === 'y') return 0;
       if (prop === 'length') return 1;
+      // Passed back into art (an image to a draw call), it names itself.
+      if (prop === Symbol.toPrimitive) return () => path;
       if (typeof prop === 'symbol') return undefined;
       return fakeArt(`${path}.${prop}`);
     },

@@ -19,6 +19,7 @@ const hudWith = (h: Partial<MatchHud> = {}): MatchHud => ({
   awayName: 'MAX',
   venue: 'backyard',
   awaySprites: {} as SpriteSet,
+  fx: null,
   ...h,
 });
 

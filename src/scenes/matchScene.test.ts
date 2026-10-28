@@ -14,12 +14,13 @@ import { BASE_STATS } from '../game/stats';
 import { WAVE_READY_S } from '../game/power';
 import { matchById } from '../meta/career';
 import { maxStats } from '../meta/ladder';
+import { EXTRA_IDS, GIFTS, LOCKER_ITEMS, itemPrice } from '../meta/locker';
 import { newProfile } from '../meta/profile';
 import { DEFAULT_SETTINGS } from '../meta/settings';
 import { BONUS_CALLOUT, BONUS_SHOW_S, PAUSE_ITEMS, TRICK_CALLOUT_S, createMatchScene, type MatchScene } from './matchScene';
 import { trickSetup } from '../game/opponents';
 import type { Scene } from './scene';
-import { fakeArt, type Named } from './testDraw';
+import { fakeArt, recordingContext, type Named } from './testDraw';
 import { testContext } from './testContext';
 import { frame } from './testInput';
 
@@ -1064,5 +1065,46 @@ describe('tricks in a match', () => {
     expect(ctx.profile.difficulty).toBe('hard');
     expect(s.world.tricks).toEqual(trickSetup('hard', 'sam'));
     expect(s.world.away.handling).toBe(handling);
+  });
+});
+
+describe('match scene: cosmetics', () => {
+  const plain = newProfile();
+  const dressed = {
+    ...plain,
+    career: { ...plain.career, milestonesPaid: 4 },
+    locker: {
+      bought: LOCKER_ITEMS.flatMap(i => (itemPrice(i.id) === null ? [] : [i.id])),
+      kit: 'inferno' as const,
+      boots: 'fire' as const,
+      extras: [...EXTRA_IDS],
+      seen: [...GIFTS],
+    },
+  };
+
+  it('cosmetics never change play', () => {
+    const scenes = [plain, dressed].map(profile => createMatchScene(testContext({ profile, art: fakeArt() }), 5, matchById('backyard-3')!));
+    for (const s of scenes) s.world.match.phase = 'playing';
+    const { g } = recordingContext();
+    for (let i = 0; i < 600; i++) {
+      const held: Parameters<typeof frame>[1] = i % 120 < 70 ? ['sprint'] : i % 120 < 100 ? ['shoot'] : [];
+      const input = { ...frame([], held), moveX: i % 240 < 120 ? 1 : -1, moveY: i % 90 < 30 ? 1 : 0 };
+      for (const s of scenes) {
+        s.update(input, STEP);
+        s.draw(g, i * STEP);
+      }
+    }
+    const [a, b] = scenes.map(s => s.world);
+    expect(JSON.stringify(b)).toBe(JSON.stringify(a));
+    // The same random numbers come next: the effects drew none of the match's.
+    expect([b!.rng(), b!.rng()]).toEqual([a!.rng(), a!.rng()]);
+  });
+
+  it('Harrison is drawn through art.harrison', () => {
+    const s = createMatchScene(testContext({ art: fakeArt() }), 1);
+    const { g, drawn } = recordingContext();
+    s.draw(g, 0);
+    expect(drawn.some(n => n.startsWith('art.harrison(home,1,idle,0,'))).toBe(true);
+    expect(drawn.some(n => n.startsWith('art.home.'))).toBe(false);
   });
 });

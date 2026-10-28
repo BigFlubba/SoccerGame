@@ -3,12 +3,15 @@ import { BISCUIT_ANCHOR } from '../art/opponents/biscuit';
 import { MASTER } from '../art/colors';
 import { BASE_W } from '../engine/viewport';
 import type { Camera } from '../game/camera';
+import { animates } from '../art/harrison/outfitFx';
 import { VENUES, type CareerMatch } from '../meta/career';
+import { outfitOf } from '../meta/locker';
 import { BONUSES } from '../meta/objectives';
 import type { Profile } from '../meta/profile';
 import type { GameContext } from './context';
 import { createMatchScene, newSeed } from './matchScene';
 import { drawLayers } from './matchView';
+import { OutfitFx, type WorldPoint } from './outfitView';
 import { drawButtonHint } from './panel';
 import type { Scene } from './scene';
 
@@ -32,6 +35,8 @@ const LINE_COLOURS = ['energyGold', 'white', 'white', 'volt'] as const;
 /** The two of them stand facing each other on the pitch line. */
 const PITCH_Y = 150;
 const HOME_X = 110;
+/** Harrison's effects on the card run on these random numbers. */
+const FX_SEED = 31;
 const AWAY_X = 210;
 const HINT_Y = 160;
 
@@ -54,6 +59,8 @@ export function vsLines(match: CareerMatch, p: Profile): string[] {
  */
 export function createVsScene(ctx: GameContext, match: CareerMatch, back: () => Scene): VsScene {
   const { art } = ctx;
+  const outfit = outfitOf(ctx.profile);
+  const fx = animates(outfit) ? new OutfitFx(outfit, FX_SEED) : null;
   const lines = vsLines(match, ctx.profile);
   const boss = match.kind === 'boss';
   if (boss) ctx.audio.play('bossSting');
@@ -87,7 +94,8 @@ export function createVsScene(ctx: GameContext, match: CareerMatch, back: () => 
         const text = art.text(line, LINE_SCALES[i] ?? 1, LINE_COLOURS[i] ?? 'white', 'outline');
         g.drawImage(text, Math.round(BASE_W / 2 - text.width / 2), LINE_YS[i] ?? HINT_Y);
       });
-      g.drawImage(art.home.right.idle[0]!, HOME_X - ANCHOR.x, PITCH_Y - ANCHOR.y);
+      fx?.draw(g, nowS, art.harrisonImage('home', 'idle', 0), { x: HOME_X, y: 0, z: 0 }, 1, false, (p: WorldPoint) => ({ x: p.x, y: PITCH_Y - p.y - p.z }));
+      g.drawImage(art.harrison('home', 1, 'idle', 0, nowS), HOME_X - ANCHOR.x, PITCH_Y - ANCHOR.y);
       if (match.opponent === 'biscuit') {
         // He faces Harrison: left, so the anchor column mirrors.
         const dog = art.biscuit.idle.left[0]!;

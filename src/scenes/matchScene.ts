@@ -16,6 +16,8 @@ import { BASE_STATS } from '../game/stats';
 import { clockMinute, endGoalPause } from '../game/match';
 import { nextCareerMatch, type CareerMatch } from '../meta/career';
 import { hasSkillMoves, powerKit } from '../meta/catalog';
+import { animates } from '../art/harrison/outfitFx';
+import { outfitOf } from '../meta/locker';
 import type { GoalRecord, StyleKind } from '../meta/economy';
 import { BONUSES } from '../meta/objectives';
 import { applyMatch, type MatchReward } from '../meta/progress';
@@ -25,6 +27,7 @@ import { HAT_TRICK_GOALS, TRICK_CALLOUT, goalCallout, noteKick, noteTrick, trick
 import { createGoalMoment, simScale, stepGoalMoment, type GoalMoment } from './goalMoment';
 import { stepTrail, type TrailPoint } from './shotTrail';
 import { drawMatch, type MatchHud } from './matchView';
+import { OutfitFx } from './outfitView';
 import { BRACE_SHAKE, WAVE_SHAKE } from './powerView';
 import type { Scene } from './scene';
 import { createHelpScene } from './helpScene';
@@ -78,6 +81,9 @@ const HAT_TRICK_ROAR_S = 1.2;
 const IMPACT_FRAMES = 2;
 /** A trick that fools someone is called out over Harrison for this long. */
 export const TRICK_CALLOUT_S = 1;
+
+/** His effects run on their own random numbers, seeded off the match's so a replay looks the same. */
+const FX_SEED_OFFSET = 7919;
 
 /** A fresh seed per match so every game plays differently. */
 export const newSeed = (): number => Math.floor(Math.random() * 2 ** 32);
@@ -151,6 +157,7 @@ export function createMatchScene(ctx: GameContext, seed: number, match: CareerMa
     get awaySprites() {
       return art.opponents[human].sprites;
     },
+    fx: animates(outfitOf(ctx.profile)) ? new OutfitFx(outfitOf(ctx.profile), seed + FX_SEED_OFFSET) : null,
   };
   let lastKick: LastKick | null = null;
   /** A goal now would be a trick goal. */

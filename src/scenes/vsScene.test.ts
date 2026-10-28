@@ -79,6 +79,7 @@ describe('the Park on the VS card', () => {
     const { g, drawn } = recordingContext();
     createVsScene(ctx, matchById('park-1')!, back).draw(g, 0);
     expect(drawn).toContain('art.opponents.brick.sprites.left.idle.0');
+    expect(drawn.some(n => n.startsWith('art.harrison(home,1,idle,0,'))).toBe(true);
     expect(drawn).toContain('art.venues.park.layers.far');
     expect(drawn.some(n => n.startsWith('art.biscuit'))).toBe(false);
   });

@@ -225,7 +225,18 @@ describe('saves', () => {
     s.update(A, STEP);
     const box = recordingContext();
     s.draw(box.g, 0);
-    expect(box.drawn).toEqual(expect.arrayContaining(['art.text(TWO,2,energyGold,outline)', 'art.text(SAVE 2  -  HARD,1,silver,outline)', 'art.portraits.neutral']));
+    expect(box.drawn).toEqual(expect.arrayContaining(['art.text(TWO,2,energyGold,outline)', 'art.text(SAVE 2  -  HARD,1,silver,outline)']));
+  });
+
+  it("the info box shows the save's own portrait", () => {
+    const ctx = testContext({ art: fakeArt() });
+    ctx.saves.write(2, TWO);
+    const s = createSavesScene(ctx, 2);
+    s.update(A, STEP);
+    const box = recordingContext();
+    s.draw(box.g, 0);
+    expect(box.drawn.some(n => n.startsWith('art.portraitsOf(') && n.endsWith('.neutral'))).toBe(true);
+    expect(box.drawn).not.toContain('art.portraits.neutral');
   });
 
   it("the list's PICK and BACK hints hide behind the info box", () => {

@@ -181,6 +181,7 @@ describe('calloutLine', () => {
       awayName: 'MAX',
       venue: 'backyard' as const,
       awaySprites: {} as SpriteSet,
+      fx: null,
     });
     expect(calloutLine(hud(0.3))).toBeNull();
     expect(calloutLine(hud(0.7))).toBe('HEADER!');
@@ -191,7 +192,7 @@ describe('calloutLine', () => {
 
 describe('takeFlash', () => {
   it('a flash owed while impact frames run waits for them to finish', () => {
-    const hud: MatchHud = { perfect: null, moment: null, callout: null, trail: [], flash: true, shake: null, impactFrames: 1, goldenCelebration: false, bonusCallout: null, trickCallout: null, awayName: 'MAX', venue: 'backyard', awaySprites: {} as SpriteSet };
+    const hud: MatchHud = { perfect: null, moment: null, callout: null, trail: [], flash: true, shake: null, impactFrames: 1, goldenCelebration: false, bonusCallout: null, trickCallout: null, awayName: 'MAX', venue: 'backyard', awaySprites: {} as SpriteSet, fx: null };
     expect(takeFlash(hud)).toBe(false);
     expect(hud.flash).toBe(true);
     hud.impactFrames = 0;
@@ -199,7 +200,7 @@ describe('takeFlash', () => {
   });
 
   it('takeFlash is true once, then false', () => {
-    const hud: MatchHud = { perfect: null, moment: null, callout: null, trail: [], flash: true, shake: null, impactFrames: 0, goldenCelebration: false, bonusCallout: null, trickCallout: null, awayName: 'MAX', venue: 'backyard', awaySprites: {} as SpriteSet };
+    const hud: MatchHud = { perfect: null, moment: null, callout: null, trail: [], flash: true, shake: null, impactFrames: 0, goldenCelebration: false, bonusCallout: null, trickCallout: null, awayName: 'MAX', venue: 'backyard', awaySprites: {} as SpriteSet, fx: null };
     expect(takeFlash(hud)).toBe(true);
     expect(takeFlash(hud)).toBe(false);
   });

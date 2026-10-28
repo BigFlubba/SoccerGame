@@ -4,6 +4,7 @@ import { createInput, type InputFrame } from '../engine/input';
 import { createStepper, startLoop } from '../engine/loop';
 import { createRumble } from '../engine/rumble';
 import { createScreen } from '../engine/screen';
+import { outfitOf } from '../meta/locker';
 import { newProfile } from '../meta/profile';
 import { createSaveSlots } from '../meta/saveSlots';
 import { localDate } from '../meta/progress';
@@ -60,6 +61,7 @@ export function startGame(canvas: HTMLCanvasElement): void {
     saveProfile(p) {
       ctx.profile = p;
       saves.write(ctx.slot, p);
+      ctx.art.dress(outfitOf(p));
     },
     today: () => localDate(new Date()),
     audio,
@@ -76,7 +78,11 @@ export function startGame(canvas: HTMLCanvasElement): void {
   };
   audio.setVolumes(ctx.settings.musicVolume, ctx.settings.sfxVolume);
   rumble.enabled = ctx.settings.rumble;
-  saves.follow(window, () => ctx.slot, p => (ctx.profile = p));
+  // Another tab changed this save: take it, and wear what it wears.
+  saves.follow(window, () => ctx.slot, p => {
+    ctx.profile = p;
+    ctx.art.dress(outfitOf(p));
+  });
   // Browsers only allow sound after a key press, click or tap. Chrome doesn't count a gamepad press.
   const unlock = () => audio.unlock();
   window.addEventListener('keydown', unlock);

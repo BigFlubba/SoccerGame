@@ -3,6 +3,7 @@ import type { InputFrame } from '../engine/input';
 import { BASE_W } from '../engine/viewport';
 import { careerCardLines, careerStars } from '../meta/career';
 import { xpToNext } from '../meta/economy';
+import { outfitOf } from '../meta/locker';
 import type { Profile } from '../meta/profile';
 import { SLOT_COUNT } from '../meta/saveSlots';
 import { drawBackdrop } from './backdrop';
@@ -153,7 +154,7 @@ export function createSavesScene(ctx: GameContext, cursor: number, boxOpen = fal
       g.fillRect(0, 0, BASE_W, g.canvas.height);
       g.restore();
       drawPanel(g, BOX.x, BOX.y, BOX.w, BOX.h);
-      g.drawImage(art.portraits.neutral, BOX_PORTRAIT.x, BOX_PORTRAIT.y);
+      g.drawImage(art.portraitsOf(outfitOf(save)).neutral, BOX_PORTRAIT.x, BOX_PORTRAIT.y);
       g.drawImage(art.text(save.name, 2, 'energyGold', 'outline'), BOX_TEXT_X, BOX_ROWS.name);
       g.drawImage(art.text(`SAVE ${list.index + 1}  -  ${save.difficulty.toUpperCase()}`, 1, 'silver', 'outline'), BOX_TEXT_X, BOX_ROWS.slot);
       const level = art.text(`LEVEL ${save.level}`, 1, 'white', 'outline');

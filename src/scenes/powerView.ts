@@ -6,7 +6,7 @@ import { BRACE_S, BRACE_SKID_SPEED, type Player } from '../game/player';
 import { POWERED_S, WAVE_READY_S, waveReady, type PowerState } from '../game/power';
 import { WAVE_LINGER_S, type Wave } from '../game/wave';
 import type { World } from '../game/world';
-import type { GameArt } from './art';
+import type { GameArt, HomeSet } from './art';
 import type { MatchHud } from './matchView';
 
 /**
@@ -78,7 +78,7 @@ function screen(cam: Camera, x: number, y: number, z: number): { x: number; y: n
 const poweredUp = (w: World): boolean => (w.power?.activeS ?? 0) > 0;
 
 /** Which of Harrison's sprite sets to draw: the power heads while powered up and striking, gold in Golden Form and its celebration. */
-export function homeSprites(w: World, hud: MatchHud): 'home' | 'homePower' | 'homeGolden' {
+export function homeSprites(w: World, hud: MatchHud): HomeSet {
   if (hud.goldenCelebration) return 'homeGolden';
   if (!poweredUp(w) && w.home.state !== 'unleashing') return 'home';
   return w.power?.golden ? 'homeGolden' : 'homePower';
