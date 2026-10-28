@@ -1,3 +1,4 @@
+import { DIFFICULTIES, type Difficulty } from '../game/ai';
 import { BASE_STATS, MAX_STAT_LEVEL, MIN_STAT_LEVEL, STAT_NAMES, type Stats } from '../game/stats';
 import { MATCH_IDS, grantRungStars } from './career';
 import { FORM_IDS, MOVE_IDS, grantForms } from './catalog';
@@ -39,8 +40,12 @@ export interface Career {
 
 /** Harrison's progress, versioned so every later build can read it. */
 export interface Profile {
-  /** v4 adds no fields: it exists so a v3 tab, which drops ids it doesn't know, can't write over Park stars. */
-  version: 4;
+  /** v5 adds the name, the difficulty and Stamina. */
+  version: 5;
+  /** 1 to NAME_MAX of A-Z, 0-9 and space. */
+  name: string;
+  /** Each save has its own: picked when it's made, changed in Options. */
+  difficulty: Difficulty;
   coins: number;
   /** Stored, never worked out from XP, so a change to the curve can't take a level away. */
   level: number;
@@ -60,7 +65,10 @@ export interface Profile {
 
 /** Game-specific, so it never clashes with other pages on the same site. */
 export const PROFILE_KEY = 'harrisons-road-to-the-cup/profile';
-const VERSION = 4;
+export const PROFILE_VERSION = 5;
+/** What a save without a name is called: his live save, from before there were names. */
+export const DEFAULT_NAME = 'HARRISON';
+export const NAME_MAX = 12;
 
 /** Ceilings on loaded counts, so a tampered save can't make levelling run forever. */
 export const MAX_LOADED = { level: 999, xp: 1_000_000, count: 999_999_999, stars: 3, milestones: 4, streak: 99 };
@@ -68,9 +76,26 @@ export const MAX_LOADED = { level: 999, xp: 1_000_000, count: 999_999_999, stars
 export const TOTAL_NAMES: readonly (keyof Totals)[] = ['matches', 'wins', 'draws', 'losses', 'goalsFor', 'goalsAgainst', 'styleGoals', 'xpEarned'];
 const DATE = /^\d{4}-\d{2}-\d{2}$/;
 
+/** Uppercased, keeping only A-Z, 0-9 and spaces. */
+export function nameChars(text: string): string {
+  return text.toUpperCase().replace(/[^A-Z0-9 ]/g, '');
+}
+
+/** nameChars, trimmed, at most NAME_MAX; '' when nothing's left. */
+export function cleanName(text: string): string {
+  return nameChars(text).trim().slice(0, NAME_MAX).trim();
+}
+
+/** A record with a numeric version ≥ 1: anything else in a slot means it's empty. */
+export function isSave(v: unknown): v is Record<string, unknown> & { version: number } {
+  return isRecord(v) && typeof v.version === 'number' && v.version >= 1;
+}
+
 export function newProfile(): Profile {
   return {
-    version: VERSION,
+    version: PROFILE_VERSION,
+    name: DEFAULT_NAME,
+    difficulty: 'normal',
     coins: 0,
     level: 1,
     xp: 0,
@@ -134,15 +159,17 @@ function ownedFrom<T extends string>(v: unknown, known: readonly T[]): Owned<T> 
 /**
  * Reads a profile field by field, so one bad value falls back to its own
  * default and the rest load. A v1 save loads with no power moves, a v1 or v2
- * save with no career but the stars its ladder wins earn; a newer build's
- * save is read as best it can be. Anything that isn't a save at all is a
- * new profile.
+ * save with no career but the stars its ladder wins earn, and a save before
+ * v5 as HARRISON on `fallbackDifficulty`; a newer build's save is read as
+ * best it can be. Anything that isn't a save at all is a new profile.
  */
-export function profileFrom(v: unknown): Profile {
+export function profileFrom(v: unknown, fallbackDifficulty: Difficulty): Profile {
   const d = newProfile();
-  if (!isRecord(v) || typeof v.version !== 'number' || !(v.version >= 1)) return d;
+  if (!isSave(v)) return d;
   return grantRungStars(grantForms({
-    version: VERSION,
+    version: PROFILE_VERSION,
+    name: (typeof v.name === 'string' && cleanName(v.name)) || DEFAULT_NAME,
+    difficulty: DIFFICULTIES.find(x => x === v.difficulty) ?? fallbackDifficulty,
     coins: wholeOr(v.coins, d.coins, 0, MAX_LOADED.count),
     level: wholeOr(v.level, d.level, 1, MAX_LOADED.level),
     xp: wholeOr(v.xp, d.xp, 0, MAX_LOADED.xp),
@@ -156,8 +183,8 @@ export function profileFrom(v: unknown): Profile {
   }));
 }
 
-export function loadProfile(store: KeyValueStore | null): Profile {
-  return profileFrom(readStored(store, PROFILE_KEY));
+export function loadProfile(store: KeyValueStore | null, fallbackDifficulty: Difficulty): Profile {
+  return profileFrom(readStored(store, PROFILE_KEY), fallbackDifficulty);
 }
 
 /**
@@ -167,10 +194,11 @@ export function loadProfile(store: KeyValueStore | null): Profile {
 export function followProfile(
   target: { addEventListener(type: 'storage', cb: (e: { key: string | null }) => void): void },
   store: KeyValueStore | null,
+  fallbackDifficulty: Difficulty,
   apply: (p: Profile) => void,
 ): void {
   target.addEventListener('storage', e => {
-    if (e.key === PROFILE_KEY) apply(loadProfile(store));
+    if (e.key === PROFILE_KEY) apply(loadProfile(store, fallbackDifficulty));
   });
 }
 

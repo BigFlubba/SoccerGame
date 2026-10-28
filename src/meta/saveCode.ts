@@ -1,3 +1,4 @@
+import { DIFFICULTIES } from '../game/ai';
 import type { StatName } from '../game/stats';
 import { BACKYARD, BOSS_ID, PARK, PARK_BOSS_ID } from './career';
 import { FORM_IDS, MOVE_IDS } from './catalog';
@@ -153,17 +154,25 @@ export function encodeSaveCode(p: Profile): string {
     // v4: the Park's stars in match order, and Sam's loss streak.
     ...PARK.matches.map(m => p.career.stars[m.id] ?? 0),
     p.career.lossStreaks[PARK_BOSS_ID] ?? 0,
+    // v5: Stamina, then the difficulty (1 easy, 2 normal, 3 hard; 0 is none). The name stays with the save.
+    p.stats.stamina,
+    DIFFICULTIES.indexOf(p.difficulty) + 1,
   ]);
 }
 
-/** The profile in a typed or pasted code, through the same field-by-field loader as a save; null if it doesn't decode. */
-export function decodeSaveCode(text: string): Profile | null {
+/**
+ * The progress in a typed or pasted code, through the same field-by-field
+ * loader as a save, onto the save `onto`: it keeps onto's name, and onto's
+ * difficulty unless the code carries one. Null if it doesn't decode.
+ */
+export function decodeSaveCode(text: string, onto: Profile): Profile | null {
   const f = decodeFields(text);
   if (!f || !(f[0] >= 1)) return null;
   let i = 0;
   const next = (): number | undefined => f[i++];
   const record = {
     version: next(),
+    name: onto.name,
     coins: next(),
     level: next(),
     xp: next(),
@@ -183,5 +192,8 @@ export function decodeSaveCode(text: string): Profile | null {
   // v4, read after every v3 field, in the order they were written.
   Object.assign(record.career.stars, Object.fromEntries(PARK.matches.map(m => [m.id, next()])));
   Object.assign(record.career.lossStreaks, { [PARK_BOSS_ID]: next() });
-  return profileFrom(record);
+  // v5, after every v4 field: Stamina, then the difficulty, where 0, missing or out of range is none.
+  Object.assign(record.stats, { stamina: next() });
+  Object.assign(record, { difficulty: DIFFICULTIES[(next() ?? 0) - 1] });
+  return profileFrom(record, onto.difficulty);
 }

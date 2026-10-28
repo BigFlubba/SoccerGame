@@ -90,6 +90,11 @@ describe('the shop', () => {
     expect(after.coins).toBe(0);
   });
 
+  it("buying keeps the save's name and difficulty", () => {
+    const after = buyStat({ ...newProfile(), name: 'ZED', difficulty: 'hard', coins: 150 }, 'speed')!;
+    expect([after.name, after.difficulty]).toEqual(['ZED', 'hard']);
+  });
+
   it('Stamina is bought like any stat', () => {
     const after = buyStat({ ...newProfile(), coins: 150 }, 'stamina')!;
     expect(after.stats.stamina).toBe(2);

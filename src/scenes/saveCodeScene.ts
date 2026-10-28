@@ -30,7 +30,7 @@ const LOADED = 'SAVE LOADED!';
 export const BAD_CODE = "THAT CODE DOESN'T WORK";
 const SHOW_ITEMS = ['ENTER A CODE', 'BACK'] as const;
 const CONFIRM_ITEMS = ['NO', 'YES'] as const;
-/** Longer than any code (135 characters at the loader's ceilings), so a paste of junk can't grow the entry without end. */
+/** Longer than any code (138 characters at the loader's ceilings), so a paste of junk can't grow the entry without end. */
 export const MAX_ENTRY = 140;
 
 const PANEL = { x: 8, y: 6, w: 304, h: 168 };
@@ -135,7 +135,7 @@ export function createSaveCodeScene(ctx: GameContext, back: () => Scene): SaveCo
           return null;
         }
         if (input.pressed.has('confirm')) {
-          decoded = decodeSaveCode(entry);
+          decoded = decodeSaveCode(entry, ctx.profile);
           if (!decoded) {
             status = BAD_CODE;
             ctx.audio.play('nope');

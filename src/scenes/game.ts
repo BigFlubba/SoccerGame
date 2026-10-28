@@ -42,16 +42,17 @@ export function startGame(canvas: HTMLCanvasElement): void {
   const store = browserStore();
   const audio = createAudio(typeof AudioContext === 'undefined' ? null : () => new AudioContext());
   const rumble = createRumble(() => navigator.getGamepads?.() ?? []);
+  const settings = loadSettings(store);
   const ctx: GameContext = {
     art: loadGameArt(),
-    settings: loadSettings(store),
+    settings,
     save(s) {
       ctx.settings = s;
       saveSettings(store, s);
       audio.setVolumes(s.musicVolume, s.sfxVolume);
       rumble.enabled = s.rumble;
     },
-    profile: loadProfile(store),
+    profile: loadProfile(store, settings.difficulty),
     saveProfile(p) {
       ctx.profile = p;
       storeProfile(store, p);
@@ -71,7 +72,7 @@ export function startGame(canvas: HTMLCanvasElement): void {
   };
   audio.setVolumes(ctx.settings.musicVolume, ctx.settings.sfxVolume);
   rumble.enabled = ctx.settings.rumble;
-  followProfile(window, store, p => (ctx.profile = p));
+  followProfile(window, store, settings.difficulty, p => (ctx.profile = p));
   // Browsers only allow sound after a key press, click or tap. Chrome doesn't count a gamepad press.
   const unlock = () => audio.unlock();
   window.addEventListener('keydown', unlock);

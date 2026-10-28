@@ -13,6 +13,11 @@ const boss = matchById(BOSS_ID)!;
 const labels = (p: Profile, s: MatchSummary, match: CareerMatch, today = TODAY) => applyMatch(p, s, match, today).reward.lines.map(l => l.label);
 
 describe('applyMatch', () => {
+  it("keeps the save's name and difficulty", () => {
+    const { profile } = applyMatch({ ...newProfile(), name: 'ZED', difficulty: 'hard' }, win30, rung(1), TODAY);
+    expect([profile.name, profile.difficulty]).toEqual(['ZED', 'hard']);
+  });
+
   it('a first win pays, levels and advances the ladder', () => {
     const { profile, reward } = applyMatch(newProfile(), win30, rung(1), TODAY);
     expect(reward.lines.map(l => [l.label, l.coins])).toEqual([

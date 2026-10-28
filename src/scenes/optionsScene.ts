@@ -1,6 +1,6 @@
 import { MASTER } from '../art/colors';
 import { BASE_W } from '../engine/viewport';
-import type { Difficulty } from '../game/ai';
+import { DIFFICULTIES } from '../game/ai';
 import { VOLUME_MAX, type Settings } from '../meta/settings';
 import { drawBackdrop } from './backdrop';
 import type { GameContext } from './context';
@@ -19,7 +19,6 @@ export interface OptionsScene extends Scene {
   readonly row: number;
 }
 
-const DIFFICULTIES: readonly Difficulty[] = ['easy', 'normal', 'hard'];
 const PANEL = { w: 200, h: 100 };
 const PANEL_TOP = 40;
 const TITLE_Y = PANEL_TOP + 8;

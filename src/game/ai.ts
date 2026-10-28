@@ -12,6 +12,7 @@ import type { World } from './world';
 import { REACH_Z } from './zones';
 
 export type Difficulty = 'easy' | 'normal' | 'hard';
+export const DIFFICULTIES: readonly Difficulty[] = ['easy', 'normal', 'hard'];
 
 /** How an opponent plays, beyond its numbers: Max all round, each of the Park crew's personalities, and Speedy Sam. */
 export type Style = 'allRound' | 'blocker' | 'shooter' | 'dribbler' | 'presser' | 'speedster';

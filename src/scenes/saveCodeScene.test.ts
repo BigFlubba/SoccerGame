@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { InputFrame } from '../engine/input';
 import { newProfile, type Profile } from '../meta/profile';
-import { encodeSaveCode } from '../meta/saveCode';
+import { decodeFields, encodeFields, encodeSaveCode } from '../meta/saveCode';
 import { BACKYARD, PARK } from '../meta/career';
 import { MAX_ENTRY, codeLines, createSaveCodeScene } from './saveCodeScene';
 import type { Scene } from './scene';
@@ -26,8 +26,8 @@ const OTHER: Profile = {
 const typing = (text: string): InputFrame => ({ ...frame(), typed: text });
 
 /** Opens the screen and goes to the entry stage. */
-function entering() {
-  const ctx = testContext();
+function entering(profile = newProfile()) {
+  const ctx = testContext({ profile });
   const s = createSaveCodeScene(ctx, () => BEHIND);
   s.update(frame(['confirm']), STEP);
   return { ctx, s };
@@ -75,6 +75,27 @@ describe('save code screen', () => {
     expect(s.stage).toBe('show');
     expect(s.code).toBe(encodeSaveCode(OTHER));
     expect(s.status).toBe('SAVE LOADED!');
+  });
+
+  /** Types `code`, then Enter and YES. */
+  const apply = (s: Scene, code: string) => {
+    s.update(typing(code), STEP);
+    s.update(frame(['confirm']), STEP);
+    s.update(frame(['down']), STEP);
+    s.update(frame(['confirm']), STEP);
+  };
+
+  it("a code takes its difficulty and keeps the save's name", () => {
+    const { ctx, s } = entering({ ...newProfile(), name: 'ZED', difficulty: 'easy' });
+    apply(s, encodeSaveCode({ ...OTHER, difficulty: 'hard' }));
+    expect(ctx.profile).toEqual({ ...OTHER, name: 'ZED', difficulty: 'hard' });
+  });
+
+  it("a v4 code keeps the save's difficulty", () => {
+    const { ctx, s } = entering({ ...newProfile(), name: 'ZED', difficulty: 'easy' });
+    const f = decodeFields(encodeSaveCode(OTHER))!;
+    apply(s, encodeFields([4, ...f.slice(1, 41)]));
+    expect([ctx.profile.name, ctx.profile.difficulty, ctx.profile.coins]).toEqual(['ZED', 'easy', OTHER.coins]);
   });
 
   it('NO is pre-selected, and confirming it changes nothing', () => {
@@ -135,6 +156,8 @@ describe('codeLines', () => {
   it('the longest code the loader can hold still fits on the screen and in the entry', () => {
     const max: Profile = {
       ...OTHER,
+      difficulty: 'hard',
+      stats: { speed: 10, power: 10, jump: 10, control: 10, stamina: 10 },
       coins: 999_999_999,
       xp: 1_000_000,
       level: 999,
@@ -146,6 +169,7 @@ describe('codeLines', () => {
     const shown = codeLines(encodeSaveCode(max));
     expect(shown.scale).toBe(1);
     expect(shown.lines.length).toBeLessThanOrEqual(4);
+    expect(normaliseLength(encodeSaveCode(max))).toBe(138);
     expect(normaliseLength(encodeSaveCode(max))).toBeLessThanOrEqual(MAX_ENTRY);
   });
 });

@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
+import type { Stats } from '../game/stats';
 import { addXp } from './economy';
-import { LADDER_MATCHES, MAX_LOADED, PROFILE_KEY, followProfile, loadProfile, newProfile, saveProfile, type Profile } from './profile';
+import { LADDER_MATCHES, MAX_LOADED, PROFILE_KEY, cleanName, followProfile, isSave, loadProfile, nameChars, newProfile, profileFrom, saveProfile, type Profile } from './profile';
 import { writeUnlessNewer, type KeyValueStore } from './storage';
 
 /** An in-memory store, standing in for localStorage. */
@@ -22,13 +23,16 @@ const stored = (v: unknown) => memoryStore({ [PROFILE_KEY]: JSON.stringify(v) })
 
 const ZERO_TOTALS = { matches: 0, wins: 0, draws: 0, losses: 0, goalsFor: 0, goalsAgainst: 0, styleGoals: 0, xpEarned: 0 };
 
-/** A save with something in every field. */
-const SOME: Profile = {
+/** A save as v4 wrote it: no name, difficulty or Stamina. */
+type V4Save = Omit<Profile, 'version' | 'name' | 'difficulty' | 'stats'> & { version: number; stats: Omit<Stats, 'stamina'> };
+
+/** A v4 save with something in every field. */
+const SOME: V4Save = {
   version: 4,
   coins: 420,
   level: 3,
   xp: 35,
-  stats: { speed: 3, power: 2, jump: 1, control: 4, stamina: 1 },
+  stats: { speed: 3, power: 2, jump: 1, control: 4 },
   ladderWins: 4,
   dailyWinDate: '2026-10-22',
   totals: { matches: 9, wins: 5, draws: 1, losses: 3, goalsFor: 17, goalsAgainst: 9, styleGoals: 4, xpEarned: 610 },
@@ -37,6 +41,11 @@ const SOME: Profile = {
   career: { stars: { 'backyard-1': 1, 'backyard-2': 1, 'backyard-3': 2, 'backyard-4': 3 }, milestonesPaid: 0, lossStreaks: { 'backyard-boss': 2 } },
 };
 
+/** SOME as it loads on Normal. */
+const LOADED: Profile = { ...SOME, version: 5, name: 'HARRISON', difficulty: 'normal', stats: { ...SOME.stats, stamina: 1 } };
+/** A v5 save with its own name, difficulty and Stamina. */
+const OWN: Profile = { ...LOADED, name: 'NORMAL RUN', difficulty: 'hard', stats: { ...LOADED.stats, stamina: 7 } };
+
 const NO_POWER = { owned: [], equipped: null };
 const NO_CAREER = { stars: {}, milestonesPaid: 0, lossStreaks: {} };
 /** The retro stars for four ladder wins. */
@@ -44,9 +53,11 @@ const FOUR_RETRO = { 'backyard-1': 1, 'backyard-2': 1, 'backyard-3': 1, 'backyar
 
 describe('profile', () => {
   it('a missing save is a new profile under a game-specific key', () => {
-    expect(loadProfile(memoryStore())).toEqual(newProfile());
+    expect(loadProfile(memoryStore(), 'normal')).toEqual(newProfile());
     expect(newProfile()).toEqual({
-      version: 4,
+      version: 5,
+      name: 'HARRISON',
+      difficulty: 'normal',
       coins: 0,
       level: 1,
       xp: 0,
@@ -64,12 +75,43 @@ describe('profile', () => {
 
   it('round-trips every field', () => {
     const store = memoryStore();
-    saveProfile(store, SOME);
-    expect(loadProfile(store)).toEqual(SOME);
+    saveProfile(store, OWN);
+    expect(loadProfile(store, 'normal')).toEqual(OWN);
+  });
+
+  it('his live v4 save loads into v5 without loss', () => {
+    expect(profileFrom(SOME, 'easy')).toEqual({ ...SOME, version: 5, name: 'HARRISON', difficulty: 'easy', stats: { ...SOME.stats, stamina: 1 } });
+  });
+
+  it('a name loads cleaned, cut to 12, or as HARRISON when nothing is left', () => {
+    expect(profileFrom({ ...OWN, name: 'bob the 2nd!' }, 'normal').name).toBe('BOB THE 2ND');
+    expect(profileFrom({ ...OWN, name: 'ABCDEFGHIJKLMNOPQRST' }, 'normal').name).toBe('ABCDEFGHIJKL');
+    for (const name of ['!!!', '   ', 7, undefined]) expect(profileFrom({ ...OWN, name }, 'normal').name, String(name)).toBe('HARRISON');
+  });
+
+  it("a difficulty loads, or falls back to the loader's", () => {
+    expect(profileFrom({ ...OWN, difficulty: 'hard' }, 'easy').difficulty).toBe('hard');
+    for (const difficulty of ['insane', 3, undefined]) expect(profileFrom({ ...OWN, difficulty }, 'easy').difficulty, String(difficulty)).toBe('easy');
+  });
+
+  it('Stamina loads from 1 to 10', () => {
+    const at = (stamina: unknown) => profileFrom({ ...OWN, stats: { ...OWN.stats, stamina } }, 'normal').stats.stamina;
+    expect([at(10), at(11), at(0), at('x')]).toEqual([10, 10, 1, 1]);
+  });
+
+  it('name helpers keep capitals, digits and spaces', () => {
+    expect(nameChars('ab c-1!')).toBe('AB C1');
+    expect(cleanName('  harrison  ')).toBe('HARRISON');
+    expect(cleanName('abcdefghijklmnop')).toBe('ABCDEFGHIJKL');
+  });
+
+  it('isSave: a record with a numeric version of 1 or more', () => {
+    expect(isSave({ version: 1 })).toBe(true);
+    for (const v of [{ version: 0 }, { version: '4' }, [], null, 'x']) expect(isSave(v), JSON.stringify(v)).toBe(false);
   });
 
   it('each bad field falls back alone', () => {
-    const store = stored({
+    const bad = {
       ...SOME,
       coins: 'lots',
       level: 0,
@@ -80,10 +122,12 @@ describe('profile', () => {
       totals: null,
       powerMoves: 'all',
       powerForms: { owned: 'golden', equipped: 3 },
-    });
+    };
     const tenRetro = Object.fromEntries([...Array(10)].map((_, i) => [`backyard-${i + 1}`, 1]));
-    expect(loadProfile(store)).toEqual({
-      version: 4,
+    expect(profileFrom(bad, 'normal')).toEqual({
+      version: 5,
+      name: 'HARRISON',
+      difficulty: 'normal',
       coins: 0,
       level: 1,
       xp: 0,
@@ -98,68 +142,69 @@ describe('profile', () => {
   });
 
   it('negative coins fall back to 0', () => {
-    expect(loadProfile(stored({ ...SOME, coins: -5 })).coins).toBe(0);
+    expect(profileFrom({ ...SOME, coins: -5 }, 'normal').coins).toBe(0);
   });
 
-  it('a full v1 save loads into v4 with every field kept', () => {
+  it('a full v1 save loads into v5 with every field kept', () => {
     const v1 = {
       version: 1,
       coins: 640,
       level: 4,
       xp: 30,
-      stats: { speed: 3, power: 2, jump: 2, control: 1, stamina: 1 },
+      stats: { speed: 3, power: 2, jump: 2, control: 1 },
       ladderWins: 4,
       dailyWinDate: '2026-10-24',
       totals: { matches: 12, wins: 7, draws: 2, losses: 3, goalsFor: 21, goalsAgainst: 11, styleGoals: 5, xpEarned: 480 },
     };
-    expect(loadProfile(stored(v1))).toEqual({ ...v1, version: 4, powerMoves: NO_POWER, powerForms: NO_POWER, career: { ...NO_CAREER, stars: FOUR_RETRO } });
+    expect(profileFrom(v1, 'normal')).toEqual({ ...v1, version: 5, name: 'HARRISON', difficulty: 'normal', stats: { ...v1.stats, stamina: 1 }, powerMoves: NO_POWER, powerForms: NO_POWER, career: { ...NO_CAREER, stars: FOUR_RETRO } });
   });
 
-  it('a v2 save loads into v4 with retro stars for its ladder wins', () => {
+  it('a v2 save loads into v5 with retro stars for its ladder wins', () => {
     const v2 = { ...SOME, version: 2, career: undefined };
     delete (v2 as { career?: unknown }).career;
-    expect(loadProfile(stored(v2))).toEqual({ ...SOME, version: 4, career: { stars: FOUR_RETRO, milestonesPaid: 0, lossStreaks: {} } });
+    expect(profileFrom(v2, 'normal')).toEqual({ ...LOADED, career: { stars: FOUR_RETRO, milestonesPaid: 0, lossStreaks: {} } });
   });
 
   it("Harrison's champion save unlocks Biscuit with ten stars", () => {
-    const champ = loadProfile(stored({ ...SOME, version: 2, ladderWins: 10, career: undefined }));
+    const champ = profileFrom({ ...SOME, version: 2, ladderWins: 10, career: undefined }, 'normal');
     expect(Object.keys(champ.career.stars)).toHaveLength(10);
     expect(Object.values(champ.career.stars).every(s => s === 1)).toBe(true);
     expect(champ.career.stars['backyard-boss']).toBeUndefined();
   });
 
   it('retro stars never lower a better star', () => {
-    expect(loadProfile(stored(SOME)).career.stars['backyard-4']).toBe(3);
+    expect(profileFrom(SOME, 'normal').career.stars['backyard-4']).toBe(3);
   });
 
   it('career junk falls back field by field: unknown ids drop, stars clamp to 3, streaks to 99, paid to 4', () => {
-    const p = loadProfile(stored({ ...SOME, career: { stars: { 'backyard-2': 9, 'school-1': 2, 'backyard-boss': -1, nonsense: 3 }, milestonesPaid: 40, lossStreaks: { 'backyard-boss': 500, x: 1 } } }));
+    const p = profileFrom({ ...SOME, career: { stars: { 'backyard-2': 9, 'school-1': 2, 'backyard-boss': -1, nonsense: 3 }, milestonesPaid: 40, lossStreaks: { 'backyard-boss': 500, x: 1 } } }, 'normal');
     expect(p.career).toEqual({ stars: { 'backyard-1': 1, 'backyard-2': 3, 'backyard-3': 1, 'backyard-4': 1 }, milestonesPaid: 4, lossStreaks: { 'backyard-boss': 99 } });
-    expect(loadProfile(stored({ ...SOME, career: 'none' })).career).toEqual({ stars: FOUR_RETRO, milestonesPaid: 0, lossStreaks: {} });
+    expect(profileFrom({ ...SOME, career: 'none' }, 'normal').career).toEqual({ stars: FOUR_RETRO, milestonesPaid: 0, lossStreaks: {} });
     expect(MAX_LOADED).toMatchObject({ stars: 3, milestones: 4, streak: 99 });
   });
 
   it('a v1 save at level 5 or more loads with Golden Form owned and equipped', () => {
     const { powerMoves: _m, powerForms: _f, ...v1 } = { ...SOME, version: 1, level: 6 };
-    const p = loadProfile(stored(v1));
+    const p = profileFrom(v1, 'normal');
     expect(p.powerForms).toEqual({ owned: ['golden'], equipped: 'golden' });
     expect(p.powerMoves).toEqual(NO_POWER);
   });
 
   it('unknown, duplicate and unowned power entries are dropped', () => {
-    const p = loadProfile(
-      stored({
+    const p = profileFrom(
+      {
         ...SOME,
         powerMoves: { owned: ['energyWave', 'energyWave', 'blazeShot'], equipped: 'blazeShot' },
         powerForms: { owned: ['storm'], equipped: 'golden' },
-      }),
+      },
+      'normal',
     );
     expect(p.powerMoves).toEqual({ owned: ['energyWave'], equipped: null });
     expect(p.powerForms).toEqual(NO_POWER);
   });
 
   it('absurd counts are capped so loading and levelling finish', () => {
-    const p = loadProfile(stored({ ...SOME, xp: 1e300, coins: 1e300, level: 1e9, totals: { ...SOME.totals, goalsFor: 1e300 } }));
+    const p = profileFrom({ ...SOME, xp: 1e300, coins: 1e300, level: 1e9, totals: { ...SOME.totals, goalsFor: 1e300 } }, 'normal');
     expect(p.xp).toBe(MAX_LOADED.xp);
     expect(p.coins).toBe(MAX_LOADED.count);
     expect(p.level).toBe(MAX_LOADED.level);
@@ -168,12 +213,12 @@ describe('profile', () => {
   });
 
   it('a bad total falls back alone too', () => {
-    const p = loadProfile(stored({ ...SOME, totals: { ...SOME.totals, wins: 'many', goalsFor: -1 } }));
+    const p = profileFrom({ ...SOME, totals: { ...SOME.totals, wins: 'many', goalsFor: -1 } }, 'normal');
     expect(p.totals).toEqual({ ...SOME.totals, wins: 0, goalsFor: 0 });
   });
 
   it('counts are whole numbers', () => {
-    const p = loadProfile(stored({ ...SOME, coins: 12.7, level: 2.5, stats: { ...SOME.stats, speed: 3.9 } }));
+    const p = profileFrom({ ...SOME, coins: 12.7, level: 2.5, stats: { ...SOME.stats, speed: 3.9 } }, 'normal');
     expect(p.coins).toBe(12);
     expect(p.level).toBe(2);
     expect(p.stats.speed).toBe(3);
@@ -181,59 +226,58 @@ describe('profile', () => {
 
   it('a v3 save keeps Park stars, because Park ids are catalog ids', () => {
     const v3 = { ...SOME, version: 3, career: { ...SOME.career, stars: { ...SOME.career.stars, 'park-2': 3 }, lossStreaks: { 'park-boss': 1 } } };
-    const p = loadProfile(stored(v3));
-    expect(p.version).toBe(4);
+    const p = profileFrom(v3, 'normal');
+    expect(p.version).toBe(5);
     expect(p.career.stars['park-2']).toBe(3);
     expect(p.career.lossStreaks).toEqual({ 'park-boss': 1 });
   });
 
   it('a v3 save without Park ids loads with no Park stars', () => {
-    const p = loadProfile(stored({ ...SOME, version: 3 }));
-    expect(p.version).toBe(4);
+    const p = profileFrom({ ...SOME, version: 3 }, 'normal');
+    expect(p.version).toBe(5);
     expect(Object.keys(p.career.stars).filter(id => id.startsWith('park-'))).toEqual([]);
   });
 
-  it('a v4 save writes over a stored v3 one', () => {
-    const store = stored({ ...SOME, version: 3, coins: 1 });
-    saveProfile(store, SOME);
-    expect(JSON.parse(store.data[PROFILE_KEY]!)).toMatchObject({ version: 4, coins: SOME.coins });
+  it('a v5 save writes over a stored v4 one', () => {
+    const store = stored({ ...SOME, coins: 1 });
+    saveProfile(store, LOADED);
+    expect(JSON.parse(store.data[PROFILE_KEY]!)).toMatchObject({ version: 5, name: 'HARRISON', coins: SOME.coins });
   });
 
-  it('a v3 tab left open cannot write over a v4 save with Park stars', () => {
-    const v4 = { ...SOME, career: { ...SOME.career, stars: { ...SOME.career.stars, 'park-1': 2 } } };
-    const store = stored(v4);
+  it('a v4 tab left open cannot write over a v5 save', () => {
+    const store = stored(OWN);
     const before = store.data[PROFILE_KEY];
-    writeUnlessNewer(store, PROFILE_KEY, { ...SOME, version: 3 });
+    writeUnlessNewer(store, PROFILE_KEY, SOME);
     expect(store.data[PROFILE_KEY]).toBe(before);
   });
 
   it('a newer save is read best-effort and never written over', () => {
-    const store = stored({ ...SOME, version: 5, coins: 300, gems: 5 });
+    const store = stored({ ...SOME, version: 6, coins: 300, gems: 5 });
     const before = store.data[PROFILE_KEY];
-    expect(loadProfile(store).coins).toBe(300);
+    expect(loadProfile(store, 'normal').coins).toBe(300);
     saveProfile(store, { ...newProfile(), coins: 0 });
     expect(store.data[PROFILE_KEY]).toBe(before);
   });
 
   it('not a save at all loads a new profile', () => {
     for (const raw of ['[]', 'null', '{"version":"1"}', '{"version":0,"coins":50}', '{"coins":', '"hello"']) {
-      expect(loadProfile(memoryStore({ [PROFILE_KEY]: raw })), raw).toEqual(newProfile());
+      expect(loadProfile(memoryStore({ [PROFILE_KEY]: raw }), 'normal'), raw).toEqual(newProfile());
     }
   });
 
   it('survives a store that throws', () => {
-    expect(loadProfile(throwing)).toEqual(newProfile());
-    expect(() => saveProfile(throwing, SOME)).not.toThrow();
-    expect(loadProfile(null)).toEqual(newProfile());
-    expect(() => saveProfile(null, SOME)).not.toThrow();
+    expect(loadProfile(throwing, 'normal')).toEqual(newProfile());
+    expect(() => saveProfile(throwing, LOADED)).not.toThrow();
+    expect(loadProfile(null, 'normal')).toEqual(newProfile());
+    expect(() => saveProfile(null, LOADED)).not.toThrow();
   });
 
   it('returns a fresh copy', () => {
     const store = stored(SOME);
-    const a = loadProfile(store);
+    const a = loadProfile(store, 'normal');
     a.stats.speed = 9;
     a.totals.wins = 99;
-    expect(loadProfile(store)).toEqual(SOME);
+    expect(loadProfile(store, 'normal')).toEqual(LOADED);
     const n = newProfile();
     n.stats.power = 7;
     n.totals.matches = 3;
@@ -256,16 +300,16 @@ describe('followProfile', () => {
     const store = memoryStore();
     const win = fakeWindow();
     const seen: Profile[] = [];
-    followProfile(win, store, p => seen.push(p));
-    saveProfile(store, SOME);
+    followProfile(win, store, 'normal', p => seen.push(p));
+    saveProfile(store, OWN);
     win.fire(PROFILE_KEY);
-    expect(seen).toEqual([SOME]);
+    expect(seen).toEqual([OWN]);
   });
 
   it('ignores other keys and a cleared store', () => {
     const win = fakeWindow();
     const seen: Profile[] = [];
-    followProfile(win, memoryStore(), p => seen.push(p));
+    followProfile(win, memoryStore(), 'normal', p => seen.push(p));
     win.fire('harrisons-road-to-the-cup/settings');
     win.fire(null);
     expect(seen).toEqual([]);
