@@ -141,14 +141,18 @@ export interface TrickStats {
   fooled: Record<TrickKind, number>;
   /** ...and of those, the ones that got him past the defender with the ball (beatNow, inside 1.5 s). */
   beats: Record<TrickKind, number>;
-  /** How far behind Harrison, along his facing at the sell, each fooled defender was when his reaction ended, px. */
+  /** How far behind Harrison, along his facing at the sell, each fooled defender was when his reaction ended, px... */
   pastPx: number[];
+  /** ...and the same for those fooled at speed (over AT_SPEED px/s at the sell). */
+  pastAtSpeedPx: number[];
 }
 
 export interface TrickMatch extends MaxMatch {
   trickStats: TrickStats;
 }
 
+/** A defender fooled faster than this, px/s, was coming at him at speed. */
+const AT_SPEED = 120;
 /** A ball no higher than this is down and playable, px: a flick still in the air isn't his yet. */
 const LOW_BALL = 10;
 
@@ -192,10 +196,10 @@ export function trickMatch(opponent: HumanOpponentId | 'biscuit', d: Difficulty,
   const brain: AiBrain | null = dog ? null : createBrain(profile);
   const dogBrain: DogBrain | null = dog ? createDogBrain(DOG_DIFFICULTY[d]) : null;
   const memo = trickMemo(seed, script);
-  const stats: TrickStats = { tricks: 0, fooled: { stepover: 0, flick: 0 }, beats: { stepover: 0, flick: 0 }, pastPx: [] };
+  const stats: TrickStats = { tricks: 0, fooled: { stepover: 0, flick: 0 }, beats: { stepover: 0, flick: 0 }, pastPx: [], pastAtSpeedPx: [] };
   /** A fooled defender being watched for the beat, and for where he is when his reaction ends. */
   let beat: { kind: TrickKind; facing: 1 | -1; sinceS: number } | null = null;
-  let past: { facing: 1 | -1 } | null = null;
+  let past: { facing: 1 | -1; fast: boolean } | null = null;
   let [t, stillS, longestStillS] = [0, 0, 0];
   for (let i = 0; i < MAX_TICKS && w.match.result === null; i++) {
     const home = trickIntent(w, t, STEP, memo);
@@ -209,7 +213,7 @@ export function trickMatch(opponent: HumanOpponentId | 'biscuit', d: Difficulty,
     if (ev.fooled) {
       stats.fooled[ev.fooled]++;
       beat = { kind: ev.fooled, facing: w.home.facing, sinceS: 0 };
-      past = { facing: w.home.facing };
+      past = { facing: w.home.facing, fast: Math.hypot(w.away.vx, w.away.vz) > AT_SPEED };
     } else if (beat) {
       beat.sinceS += STEP;
       if (beatNow(w, beat.facing)) {
@@ -218,7 +222,11 @@ export function trickMatch(opponent: HumanOpponentId | 'biscuit', d: Difficulty,
       } else if (beat.sinceS >= BEAT.forS || theirs(w) || w.match.phase !== 'playing') beat = null;
     }
     if (past && wasFooled && w.away.fooled === null) {
-      if (w.match.phase === 'playing') stats.pastPx.push((w.home.x - w.away.x) * past.facing);
+      if (w.match.phase === 'playing') {
+        const px = (w.home.x - w.away.x) * past.facing;
+        stats.pastPx.push(px);
+        if (past.fast) stats.pastAtSpeedPx.push(px);
+      }
       past = null;
     }
     const still = Math.hypot(w.ball.x - x, w.ball.y - y, w.ball.z - z) < STILL_PX;

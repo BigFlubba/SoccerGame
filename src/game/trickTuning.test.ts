@@ -69,8 +69,18 @@ describe('the personalities show (Normal, 32 seeds)', () => {
     expect(beatShare(matches('pete', 'normal', 'trickster'), ['stepover'])).toBeGreaterThanOrEqual(0.7);
   });
 
-  it('a fooled Sam ends up at least twice as far past Harrison as a fooled Max', () => {
-    expect(meanPast(matches('sam', 'normal', 'trickster', PERSONALITY_SEEDS))).toBeGreaterThanOrEqual(2 * meanPast(matches('max', 'normal', 'trickster', PERSONALITY_SEEDS)));
+  // The parent's call (2026-10-28): Sam stays x1, so mashing RB can't beat him, and his skid is checked where it happens,
+  // on the Sams fooled at speed, over all 64 seeds since few are: at least 1.5x as far past as a fooled Max.
+  it('a Sam fooled at speed ends up at least 1.5 times as far past Harrison as a fooled Max (64 seeds)', () => {
+    const fast = matches('sam', 'normal', 'trickster').flatMap(m => m.trickStats.pastAtSpeedPx);
+    expect(fast.length).toBeGreaterThan(8);
+    expect(fast.reduce((a, b) => a + b, 0) / fast.length).toBeGreaterThanOrEqual(1.5 * meanPast(matches('max', 'normal', 'trickster')));
+  });
+});
+
+describe('mashing RB does not beat Speedy Sam (not too easy)', () => {
+  it.each(['easy', 'normal'] as const)('on %s the spammer wins no more than 0.06 above the plain script', d => {
+    expect(winRate(matches('sam', d, 'spammer'))).toBeLessThanOrEqual(winRate(matches('sam', d, 'plain')) + 0.06);
   });
 });
 

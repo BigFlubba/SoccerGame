@@ -465,10 +465,10 @@ describe("each opponent's reaction time", () => {
   const base = TRICK_DIFFICULTY.normal;
   it.each([
     ['brick', 'stepover', 0.3 * base.confusedS],
-    ['pete', 'stepover', 2 * base.confusedS],
+    ['pete', 'stepover', 1.5 * base.confusedS],
     ['tia', 'stepover', 0.6 * base.confusedS],
     ['leo', 'stepover', base.confusedS],
-    ['sam', 'stepover', 2 * base.confusedS],
+    ['sam', 'stepover', base.confusedS],
     ['brick', 'flick', 1.2 * base.stumbleS],
   ] as [HumanOpponentId, 'stepover' | 'flick', number][])('%s: a %s fools him for %f s', (id, kind, s) => {
     const w = facing(30, { tricks: trickSetup('normal', id) });

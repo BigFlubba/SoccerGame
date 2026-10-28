@@ -76,6 +76,12 @@ describe('the spammer', () => {
 });
 
 describe('the plain script', () => {
+  it('records how far past a defender fooled at speed ends up, and nobody else', () => {
+    const m = trickMatch('sam', 'normal', 100, 'trickster');
+    expect(m.trickStats.pastAtSpeedPx.length).toBeLessThanOrEqual(m.trickStats.pastPx.length);
+    expect(trickMatch('max', 'normal', 100, 'trickster').trickStats.pastAtSpeedPx).toEqual([]);
+  });
+
   it('never presses RB', () => {
     const memo = trickMemo(1, 'plain');
     expect(trickIntent(facing(30), 0, STEP, memo).skill).toBeFalsy();

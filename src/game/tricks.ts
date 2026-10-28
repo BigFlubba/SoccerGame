@@ -43,9 +43,11 @@ export interface TrickSetup {
  * fooling tricks that beat Max E/N/H .84/.76/.74; trickster wins vs Max
  * E/N/H .688/.672/.063 (plain .875/.625/.016); spammer wins E/N/H
  * .438/.203/.047; vs Biscuit on Normal plain .625, trickster .656, spammer
- * 0. Personalities (Normal, seeds 100-131): fooling stepovers that beat
- * Max 1.00, Tia .57, Brick 0 (Pete .92 over 64 seeds); a fooled Sam ends
- * 82.4 px past Harrison, Max 29.6. Mutable, for headless sweeps.
+ * 0; vs Sam, plain/spammer E .672/.719, N .516/.500. Personalities
+ * (Normal, seeds 100-131): fooling stepovers that beat Max 1.00, Tia .57,
+ * Brick 0 (Pete .87 over 64 seeds); a Sam fooled at speed ends 49.4 px
+ * past Harrison, a fooled Max 29.4 (64 seeds). Mutable, for headless
+ * sweeps.
  */
 export const TRICK_DIFFICULTY: Record<Difficulty, TrickProfile> = {
   easy: { near: 12, far: 56, confusedS: 0.9, stumbleS: 0.9 },
@@ -54,19 +56,19 @@ export const TRICK_DIFFICULTY: Record<Difficulty, TrickProfile> = {
 };
 
 /**
- * Each style's reaction times as a share of the difficulty's: Pete and Sam
- * bite hardest (Sam skids a long way past), Brick barely moves for a
- * stepover, Tia recovers quickly. Pete and Sam went from ×1.5 and ×1 to ×2
- * on the parent's call after the tuning (2026-10-28). Mutable, for headless
- * sweeps.
+ * Each style's reaction times as a share of the difficulty's: Pete bites
+ * hardest, Brick barely moves for a stepover, Tia recovers quickly, and
+ * Sam's soft brakes skid him on past. Sam stays ×1 (the parent's call,
+ * 2026-10-28): at ×2 mashing RB beat him on Easy .906 to .672. Mutable,
+ * for headless sweeps.
  */
 export const TRICK_SCALE: Record<Style, TrickScale> = {
   allRound: { stepover: 1, flick: 1 },
   blocker: { stepover: 0.3, flick: 1.2 },
   shooter: { stepover: 1, flick: 1 },
   dribbler: { stepover: 0.6, flick: 0.6 },
-  presser: { stepover: 2, flick: 2 },
-  speedster: { stepover: 2, flick: 2 },
+  presser: { stepover: 1.5, flick: 1.5 },
+  speedster: { stepover: 1, flick: 1 },
 };
 
 /** Biscuit's own window and times. Mutable, for headless sweeps. */
