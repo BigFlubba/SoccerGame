@@ -17,7 +17,8 @@ import { addOutline } from '../art/raster';
 import { backyardLayers, goalSprites, type GoalArt, type VenueLayers } from '../art/venues/backyard';
 import { JOGGERS, joggerFrames, parkLayers } from '../art/venues/park';
 import type { OpponentId, VenueId } from '../meta/career';
-import { DEFAULT_OUTFIT, outfitKey, type Outfit } from '../meta/locker';
+import { DEFAULT_OUTFIT, outfitKey, type ChangeKit, type Outfit } from '../meta/locker';
+import { changeLook } from '../art/kits';
 import { toCanvas } from '../engine/bitmaps';
 import type { CrewId } from '../game/crew';
 import { SpriteCache, type FacingFrames } from '../engine/sprites';
@@ -85,6 +86,8 @@ export interface GameArt {
   readonly backdropFx: OutfitFx;
   /** Every human opponent: their sprites, and their face, front on and outlined, for the venue panel and the boss node. */
   opponents: Record<HumanOpponent, OpponentArt>;
+  /** An opponent in a change kit, for a match whose kits clash: baked the first time it's asked for. */
+  opponentIn(id: HumanOpponent, change: ChangeKit): SpriteSet;
   /** Harrison's portrait in each expression, in what he wears. */
   readonly portraits: Record<Expression, HTMLCanvasElement>;
   /** Biscuit the Dog, the Backyard's boss. */
@@ -163,6 +166,7 @@ export function loadGameArt(): GameArt {
   };
   const texts = new Map<string, HTMLCanvasElement>();
   const harrison = new HarrisonArt(cache);
+  const changed = new Map<string, SpriteSet>();
   let outfit = DEFAULT_OUTFIT;
   let backdropFx = new OutfitFx(outfit, BACKDROP_FX_SEED);
   return {
@@ -196,6 +200,16 @@ export function loadGameArt(): GameArt {
       return backdropFx;
     },
     opponents: Object.fromEntries((Object.keys(OPPONENT_LOOKS) as HumanOpponent[]).map(id => [id, opponentArt(id)])) as Record<HumanOpponent, OpponentArt>,
+    opponentIn(id, change) {
+      const { heads, look, body } = OPPONENT_LOOKS[id];
+      const key = `${id}-${change}`;
+      let set = changed.get(key);
+      if (!set) {
+        set = spriteSet(cache, key, heads, changeLook(look, change), body);
+        changed.set(key, set);
+      }
+      return set;
+    },
     get portraits() {
       return harrison.portraitsOf(outfit);
     },

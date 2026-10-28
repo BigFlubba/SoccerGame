@@ -96,3 +96,24 @@ describe('the Park on the VS card', () => {
     expect(drawn).toContain('art.opponents.sam.sprites.left.idle.0');
   });
 });
+
+describe('VS card: kit clashes', () => {
+  const drawnBy = (kit: 'ice' | 'home') => {
+    const profile = { ...newProfile(), locker: { ...newProfile().locker, bought: kit === 'ice' ? ['kit:ice' as const] : [], kit } };
+    const ctx = testContext({ profile, art: fakeArt() });
+    const s = createVsScene(ctx, matchById('backyard-2')!, () => createHubScene(ctx));
+    const { g, drawn } = recordingContext();
+    s.draw(g, 0);
+    return drawn;
+  };
+
+  it('Max changes into black when Harrison wears ICE', () => {
+    expect(drawnBy('ice')).toContain('art.opponentIn(max,black).left.idle.0');
+  });
+
+  it('and not in HOME', () => {
+    const drawn = drawnBy('home');
+    expect(drawn).toContain('art.opponents.max.sprites.left.idle.0');
+    expect(drawn.some(n => n.startsWith('art.opponentIn('))).toBe(false);
+  });
+});

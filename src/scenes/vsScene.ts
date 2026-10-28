@@ -5,7 +5,7 @@ import { BASE_W } from '../engine/viewport';
 import type { Camera } from '../game/camera';
 import { animates } from '../art/harrison/outfitFx';
 import { VENUES, type CareerMatch } from '../meta/career';
-import { outfitOf } from '../meta/locker';
+import { changeKitFor, outfitOf } from '../meta/locker';
 import { BONUSES } from '../meta/objectives';
 import type { Profile } from '../meta/profile';
 import type { GameContext } from './context';
@@ -61,6 +61,8 @@ export function createVsScene(ctx: GameContext, match: CareerMatch, back: () => 
   const { art } = ctx;
   const outfit = outfitOf(ctx.profile);
   const fx = animates(outfit) ? new OutfitFx(outfit, FX_SEED) : null;
+  // When his kit clashes with theirs, they change: the same call the match makes.
+  const change = match.opponent === 'biscuit' ? null : changeKitFor(outfit.kit, match.opponent);
   const lines = vsLines(match, ctx.profile);
   const boss = match.kind === 'boss';
   if (boss) ctx.audio.play('bossSting');
@@ -100,7 +102,10 @@ export function createVsScene(ctx: GameContext, match: CareerMatch, back: () => 
         // He faces Harrison: left, so the anchor column mirrors.
         const dog = art.biscuit.idle.left[0]!;
         g.drawImage(dog, AWAY_X - (dog.width - 1 - BISCUIT_ANCHOR.x), PITCH_Y - BISCUIT_ANCHOR.y);
-      } else g.drawImage(art.opponents[match.opponent].sprites.left.idle[0]!, AWAY_X - ANCHOR.x, PITCH_Y - ANCHOR.y);
+      } else {
+        const sprites = change ? art.opponentIn(match.opponent, change) : art.opponents[match.opponent].sprites;
+        g.drawImage(sprites.left.idle[0]!, AWAY_X - ANCHOR.x, PITCH_Y - ANCHOR.y);
+      }
       drawButtonHint(g, art, art.buttons.A, 'KICK OFF', BASE_W / 2, HINT_Y);
     },
   };

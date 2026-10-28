@@ -17,7 +17,7 @@ import { clockMinute, endGoalPause } from '../game/match';
 import { nextCareerMatch, type CareerMatch } from '../meta/career';
 import { hasSkillMoves, powerKit } from '../meta/catalog';
 import { animates } from '../art/harrison/outfitFx';
-import { outfitOf } from '../meta/locker';
+import { changeKitFor, outfitOf } from '../meta/locker';
 import type { GoalRecord, StyleKind } from '../meta/economy';
 import { BONUSES } from '../meta/objectives';
 import { applyMatch, type MatchReward } from '../meta/progress';
@@ -140,6 +140,8 @@ export function createMatchScene(ctx: GameContext, seed: number, match: CareerMa
   const dogBrain = dog ? createDogBrain(DOG_DIFFICULTY[difficulty]) : null;
   const awayIntent = (dt: number): PlayerIntent => (dogBrain ? dogThink(dogBrain, world, dt) : think(brain, world, world.away, world.home, dt));
   const cam: Camera = { x: world.ball.x - BASE_W / 2 };
+  // Decided once: when his kit clashes with theirs, they change.
+  const change = dog ? null : changeKitFor(outfitOf(ctx.profile).kit, human);
   const hud: MatchHud = {
     perfect: null,
     moment: null,
@@ -155,7 +157,7 @@ export function createMatchScene(ctx: GameContext, seed: number, match: CareerMa
     venue: match.venue,
     // Read when drawn, so a scene made without art (in tests) never touches it.
     get awaySprites() {
-      return art.opponents[human].sprites;
+      return change ? art.opponentIn(human, change) : art.opponents[human].sprites;
     },
     fx: animates(outfitOf(ctx.profile)) ? new OutfitFx(outfitOf(ctx.profile), seed + FX_SEED_OFFSET) : null,
   };

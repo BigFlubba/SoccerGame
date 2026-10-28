@@ -1108,3 +1108,23 @@ describe('match scene: cosmetics', () => {
     expect(drawn.some(n => n.startsWith('art.home.'))).toBe(false);
   });
 });
+
+describe('match scene: kit clashes', () => {
+  const wearing = (kit: 'sky' | 'home') => ({ ...newProfile(), locker: { ...newProfile().locker, bought: kit === 'sky' ? ['kit:sky' as const] : [], kit } });
+  const drawnBy = (kit: 'sky' | 'home') => {
+    const s = createMatchScene(testContext({ profile: wearing(kit), art: fakeArt() }), 1, matchById('backyard-3')!);
+    const { g, drawn } = recordingContext();
+    s.draw(g, 0);
+    return drawn;
+  };
+
+  it('Max changes when Harrison wears SKY', () => {
+    expect(drawnBy('sky').some(n => n.startsWith('art.opponentIn(max,white)'))).toBe(true);
+  });
+
+  it('and not in HOME', () => {
+    const drawn = drawnBy('home');
+    expect(drawn.some(n => n.startsWith('art.opponentIn('))).toBe(false);
+    expect(drawn.some(n => n.startsWith('art.opponents.max.sprites'))).toBe(true);
+  });
+});

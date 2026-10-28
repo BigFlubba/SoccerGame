@@ -1,4 +1,5 @@
-import type { MasterColor } from './colors';
+import type { ChangeKit } from '../meta/locker';
+import type { LookColors, MasterColor } from './colors';
 
 export const KIT_SLOT_NAMES = [
   'JerseyShadow',
@@ -115,3 +116,24 @@ export const VOLT_BOOTS: Record<'BootShadow' | 'Boot' | 'BootLight', MasterColor
   Boot: 'volt',
   BootLight: 'voltLight',
 };
+
+/** A change kit's jersey (shadow, base, light) and socks (shadow, base). */
+const CHANGE_KITS: Record<ChangeKit, { jersey: [MasterColor, MasterColor, MasterColor]; socks: [MasterColor, MasterColor] }> = {
+  white: { jersey: ['silver', 'white', 'white'], socks: ['silver', 'white'] },
+  black: { jersey: ['charcoal', 'slate', 'gray'], socks: ['charcoal', 'slate'] },
+};
+
+/** An opponent's look in a change kit: white (or black) jersey, trim in their own jersey colours, socks to match, their own shorts. */
+export function changeLook(look: LookColors, change: ChangeKit): LookColors {
+  const { jersey, socks } = CHANGE_KITS[change];
+  return {
+    ...look,
+    JerseyShadow: jersey[0],
+    Jersey: jersey[1],
+    JerseyLight: jersey[2],
+    TrimShadow: look.JerseyShadow,
+    Trim: look.Jersey,
+    SocksShadow: socks[0],
+    Socks: socks[1],
+  };
+}
