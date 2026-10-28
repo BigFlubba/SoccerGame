@@ -12,6 +12,9 @@ import { BASE_STATS, chargeTime, type Stats } from './stats';
 import { BALL_REST_Y } from './ball';
 import { POWERED_S, WAVE_READY_S } from './power';
 import { createWorld, placeForKickoff, stepWorld, type World } from './world';
+import { harrisonIntent, harrisonStats, scriptMemo } from './maxScripts';
+import { HUMAN_AIM_ERROR_DEG } from './kick';
+import { TRICK_DIFFICULTY, type TrickSetup } from './tricks';
 import { ballIn, ballInBody, footZone } from './zones';
 
 const STEP = 1 / 60;
@@ -607,5 +610,25 @@ describe('world: handling', () => {
     expect(w.away.handling).toEqual(SOFT);
     stepWorld(w, NO_INTENT, NO_INTENT, STEP);
     expect([w.away.vx, w.away.vz]).toEqual([0, 0]);
+  });
+});
+
+/** A scripted match against Max at rung 10 on Normal, with or without the tricks; where everything ended up. */
+function scriptedEnd(seed: number, tricks: TrickSetup | null) {
+  const profile = DIFFICULTY.normal;
+  const w = createWorld(harrisonStats(10), maxStats(10), seed, { home: HUMAN_AIM_ERROR_DEG, away: profile.aimErrorDeg }, null, null, profile, NORMAL_HANDLING, tricks);
+  const [brain, memo] = [createBrain(profile), scriptMemo(seed)];
+  let t = 0;
+  for (let i = 0; i < 60 * 400 && w.match.result === null; i++) {
+    stepWorld(w, harrisonIntent(w, t, STEP, memo), think(brain, w, w.away, w.home, STEP), STEP);
+    t += STEP;
+  }
+  return { score: { ...w.match.score }, ball: [w.ball.x, w.ball.y, w.ball.z], home: [w.home.x, w.home.z], away: [w.away.x, w.away.z] };
+}
+
+describe('the tricks in a match', () => {
+  it('owning them changes nothing until he presses RB', () => {
+    const tricks: TrickSetup = { profile: TRICK_DIFFICULTY.normal, scale: { stepover: 1, flick: 1 } };
+    for (let seed = 100; seed < 108; seed++) expect(scriptedEnd(seed, tricks), `seed ${seed}`).toEqual(scriptedEnd(seed, null));
   });
 });

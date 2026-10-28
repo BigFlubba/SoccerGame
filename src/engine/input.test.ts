@@ -51,6 +51,11 @@ describe('padActions', () => {
     expect([...keyActions(new Set(['KeyA'])).held]).toEqual(['steal']);
   });
 
+  it('RB on the pad and D on the keyboard do a skill move', () => {
+    expect([...padActions(fakePad({ 5: true })).held]).toEqual(['skill']);
+    expect([...keyActions(new Set(['KeyD'])).held]).toEqual(['skill']);
+  });
+
   it('a missing pad holds nothing', () => {
     expect(padActions(null)).toEqual({ held: new Set(), moveX: 0, moveY: 0 });
   });

@@ -26,6 +26,7 @@ import {
 } from './power';
 import type { Stats } from './stats';
 import { maxHasBall, resolveSteal, stealZone, type StealOutcome } from './steal';
+import { quietTricks, startTrick, stepTrick, type TrickEvents, type TrickSetup } from './tricks';
 import { fireWave, stepWave, type Wave } from './wave';
 import { ballAtFeet, ballIn } from './zones';
 
@@ -49,6 +50,8 @@ export interface WorldEvents {
   dog: DogEvents;
   /** What Harrison's steal press did this tick; null without one. */
   steal: StealOutcome | null;
+  /** What his tricks did this tick. All quiet without them. */
+  trick: TrickEvents;
 }
 
 export interface World {
@@ -70,6 +73,8 @@ export interface World {
   maxProfile: AiProfile | null;
   /** Fixed ticks so far; its parity decides who acts on the ball first. */
   tick: number;
+  /** Harrison's tricks against this opponent; null below level 4, when RB does nothing and the match plays exactly as before. */
+  tricks: TrickSetup | null;
 }
 
 /** A ball slower than this, px/s, is at rest. */
@@ -91,6 +96,7 @@ const quietEvents = (): WorldEvents => ({
   power: quietPower(),
   dog: quietDog(),
   steal: null,
+  trick: quietTricks(),
 });
 
 /** The kicks that make a goal a style goal. */
@@ -100,7 +106,8 @@ const STYLE_KINDS: ReadonlySet<PowerState['lastKind']> = new Set(['header', 'vol
  * `kit` gives Harrison his super meter; without one the match plays exactly
  * as it always has. `dog` makes the away body Biscuit, with that profile.
  * `awayHandling` is the away player's brakes, touch and shot (Speedy Sam's
- * are his own; everyone else's are normal).
+ * are his own; everyone else's are normal). `tricks` gives Harrison his
+ * stepover and flick against this opponent.
  */
 export function createWorld(
   homeStats: Stats,
@@ -111,6 +118,7 @@ export function createWorld(
   dog: DogProfile | null = null,
   maxProfile: AiProfile | null = null,
   awayHandling: Handling = NORMAL_HANDLING,
+  tricks: TrickSetup | null = null,
 ): World {
   const centre = BACKYARD.width / 2;
   const w: World = {
@@ -127,6 +135,7 @@ export function createWorld(
     dog: dog ? createDog(dog) : null,
     maxProfile,
     tick: 0,
+    tricks,
   };
   w.away.handling = awayHandling;
   placeForKickoff(w);
@@ -204,7 +213,7 @@ function noteLastKind(power: PowerState, [home, away]: ContactEvents[]): void {
  */
 function powerEnds(w: World, live: boolean, [, away]: ContactEvents[]): boolean {
   const home = w.home;
-  const otherMove = (home.kick !== null && home.kick.kind !== 'wave') || home.state === 'charging' || home.state === 'chipping';
+  const otherMove = (home.kick !== null && home.kick.kind !== 'wave') || home.state === 'charging' || home.state === 'chipping' || home.trick !== null;
   const maxPlayed = away !== undefined && (away.touched || away.kicked !== null || away.tackledBall);
   return !live || home.state === 'fallen' || maxPlayed || otherMove;
 }
@@ -220,7 +229,7 @@ function powerEnds(w: World, live: boolean, [, away]: ContactEvents[]): boolean 
 function dogContacts(w: World, dog: DogState, ev: DogEvents, steal: boolean): ContactEvents[] {
   let home = quietContact();
   const carried = dog.carrying;
-  if (!w.wave?.live && w.home.turnS === 0 && (!carried || vulnerable(dog))) {
+  if (!w.wave?.live && w.home.turnS === 0 && w.home.trick === null && (!carried || vulnerable(dog))) {
     if (carried) w.ball.y = BALL_REST_Y;
     home = resolveContacts(w.home, w.away, w.ball, w.aimErrorDeg.home, w.rng, w.field, { trips: false, squeeze: false });
     const jab = steal && dog.jinkS > 0 && w.home.state === 'ground' && ballIn(stealZone(w.home), w.ball, BALL_R);
@@ -256,6 +265,8 @@ export function stepWorld(w: World, homeIntent: PlayerIntent, awayIntent: Player
   if (wasReadying && w.power && waveReady(w.power)) power.ready = true;
   // Powered up, X only ever fires the wave: until it can (ready, with the ball, a clean line), the press does nothing.
   const waveDir = live && canFireWave(w) ? maxGoalDir(w) : live && (w.power?.activeS ?? 0) > 0 ? 'wait' : null;
+  // RB with the stick back is a stepover, not a drag-back.
+  const started = startTrick(w, homeIntent);
   if (startDragBack(w, homeIntent)) w.ball.touchedBy = 'home';
   // Winding up with the ball at his feet, he rolls it along with him in depth.
   const carryFromZ = ballAtFeet(home, w.ball) ? home.z : null;
@@ -283,6 +294,7 @@ export function stepWorld(w: World, homeIntent: PlayerIntent, awayIntent: Player
   const steal = resolveSteal(w, homeIntent);
   if (steal === 'stole' || steal === 'poked' || steal === 'trapped') w.ball.touchedBy = 'home';
   stepDragBack(w, dt);
+  const trick = { ...stepTrick(w, dt), started };
 
   const { braced, blown } = stepWave(w, dt);
   [power.braced, power.blown] = [braced, blown];
@@ -291,9 +303,9 @@ export function stepWorld(w: World, homeIntent: PlayerIntent, awayIntent: Player
   // The second player to act on the ball has the last word, so take turns going first.
   // A ball just trapped at his feet isn't a 50/50 this tick, so the squirt can't undo the trap at once.
   const squeeze = steal !== 'stole' && steal !== 'trapped';
-  // In a drag-back his sole has the ball: only the other player's contacts can take it.
+  // In a drag-back his sole has the ball, and in a trick the trick has it: only the other player's contacts can take it.
   const contact = (p: Player, other: Player) => {
-    if (w.wave?.live || (p === home && home.turnS > 0)) return quietContact();
+    if (w.wave?.live || (p === home && (home.turnS > 0 || home.trick !== null))) return quietContact();
     // Harrison, and a player on soft brakes who can't stop short of his own goal, never knock the ball at it near it.
     const guarded = p === home || p.handling.decel < DECEL;
     const ev = resolveContacts(p, other, w.ball, w.aimErrorDeg[p.team], w.rng, w.field, { trips: true, squeeze, clearUpfield: guarded, keepOut: guarded });
@@ -330,7 +342,7 @@ export function stepWorld(w: World, homeIntent: PlayerIntent, awayIntent: Player
     if (goal === 'home' && STYLE_KINDS.has(w.power.lastKind)) addMeter(w.power, 'styleGoal');
     w.power.lastKind = null;
   }
-  w.events = { kicks, ball, goal, power, dog, steal };
+  w.events = { kicks, ball, goal, power, dog, steal, trick };
   if (resetForKickoff) {
     placeForKickoff(w);
     w.wave = null;

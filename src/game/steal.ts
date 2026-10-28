@@ -153,7 +153,7 @@ function poke(w: World): void {
  */
 export function resolveSteal(w: World, intent: PlayerIntent): StealOutcome | null {
   const home = w.home;
-  const ready = home.state === 'ground' && home.y === 0 && home.stumbleS === 0 && home.stealCooldownS === 0;
+  const ready = home.state === 'ground' && home.y === 0 && home.stumbleS === 0 && home.stealCooldownS === 0 && home.trick === null;
   if (!intent.steal || w.match.phase !== 'playing' || w.dog !== null || !ready || (w.power?.activeS ?? 0) > 0) return null;
   home.stealCooldownS = STEAL_COOLDOWN_S;
   if (!inStealReach(w)) {

@@ -2,6 +2,7 @@ import { CLIPS, SHOOT_CHARGE_FRAME, SHOOT_STRIKE_FRAME, SKID_FRAME_HOLD, SLIDE_H
 import { GRAVITY } from './constants';
 import { BACKYARD, playerSpan, type Field } from './field';
 import { TAP_CHARGE, type Aim } from './kick';
+import type { TrickKind } from './tricks';
 import { SPRINT_MULTIPLIER, chargeTime, jumpVelocity, runSpeed, type Stats } from './stats';
 
 /**
@@ -20,6 +21,8 @@ export interface PlayerIntent {
   sprint: boolean;
   /** Harrison's steal button, pressed this tick; the world resolves it. */
   steal: boolean;
+  /** Harrison's RB, pressed this tick: a stepover, or with the stick up a rainbow flick. Absent for the computer. */
+  skill?: boolean;
   /** Face this way whatever way he moves, as when backing off from someone. */
   faceX?: 1 | -1;
   /** Scales his run and sprint on the ground (the computer's pace factor); 1 when absent. */
@@ -118,6 +121,14 @@ export interface Player {
   stealCooldownS: number;
   /** Time left on a drag-back turn, when he plants facing his new way; the world counts it down. */
   turnS: number;
+  /**
+   * Harrison's trick under way: its clock, the side a stepover dips to,
+   * whether it has sold yet, the pace he moves at along his facing, and
+   * whether the ball is still his to carry. The world runs it.
+   */
+  trick: null | { kind: TrickKind; t: number; side: 1 | -1; sold: boolean; pace: number; onBall: boolean };
+  /** Time until RB can start another trick. */
+  trickCooldownS: number;
 }
 
 export const PLAYER_H = 40;
@@ -196,6 +207,8 @@ export function createPlayer(team: 'home' | 'away', stats: Stats, x: number, fac
     stumbleS: 0,
     stealCooldownS: 0,
     turnS: 0,
+    trick: null,
+    trickCooldownS: 0,
   };
 }
 
@@ -351,6 +364,8 @@ function chooseAnim(p: Player, sprinting: boolean, skid: boolean): { name: AnimN
       return { name: 'fall', frame: Math.min(CLIPS.fall.frameCount - 1, BLOWN_GET_UP_FRAME + Math.floor(down * getUpFrames)) };
     }
     default: {
+      // A trick: its own clip, on its own clock.
+      if (p.trick) return { name: p.trick.kind, frame: clipFrame(p.trick.kind, 0, p.trick.t) };
       // A missed steal: his foot is still out, jabbing at nothing.
       if (p.stumbleS > 0) return { name: 'shoot', frame: SHOOT_STRIKE_FRAME };
       // A drag-back: planted, his sole on the ball.
@@ -392,7 +407,8 @@ function dropWallSpeed(p: Player, intent: PlayerIntent, field: Field): void {
  * Stumbling, he plays on no intent, but buttons held still count as held,
  * so one pressed during the stumble needs a fresh press afterwards. In a
  * drag-back he plants, facing his new way, and a press waits for the turn
- * to end.
+ * to end; in a trick he moves on along his facing at the trick's pace, and
+ * a press waits for the trick to end.
  */
 export function stepPlayer(
   p: Player,
@@ -403,12 +419,21 @@ export function stepPlayer(
   waveDir: 1 | -1 | 'wait' | null = null,
 ): void {
   const turning = p.turnS > 0;
-  const intent = p.stumbleS > 0 ? NO_INTENT : turning ? { ...NO_INTENT, faceX: p.facing } : given;
+  const trick = p.trick;
+  const committed = turning || trick !== null;
+  const intent =
+    p.stumbleS > 0
+      ? NO_INTENT
+      : trick
+        ? { ...NO_INTENT, moveX: p.facing, pace: trick.pace, faceX: p.facing }
+        : turning
+          ? { ...NO_INTENT, faceX: p.facing }
+          : given;
   const shootPressed = intent.shootHeld && !p.held.shoot;
   const chipPressed = intent.chipHeld && !p.held.chip;
   if (intent.powerHeld && !p.held.power) p.powerArmed = true;
   if (!intent.powerHeld) p.powerArmed = false;
-  if (!turning) p.held = { shoot: given.shootHeld, chip: given.chipHeld, power: given.powerHeld };
+  if (!committed) p.held = { shoot: given.shootHeld, chip: given.chipHeld, power: given.powerHeld };
   p.aim = intent.aim;
   p.stateT += dt;
   p.slideCooldown = Math.max(0, p.slideCooldown - dt);

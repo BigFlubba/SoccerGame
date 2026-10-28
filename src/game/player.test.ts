@@ -609,3 +609,23 @@ describe('handling: soft brakes and the skid', () => {
     expect(skidding(flatOut(NORMAL_HANDLING), intent({ moveX: -1 }))).toBe(false);
   });
 });
+
+describe('a trick', () => {
+  it.each([
+    ['stepover', 0.25, 2],
+    ['flick', 0.3, 3],
+  ] as const)('shows the %s clip, its frames running on the trick clock', (kind, t, frame) => {
+    const p = harrison();
+    p.trick = { kind, t, side: 1, sold: false, pace: 0.5, onBall: true };
+    stepPlayer(p, NO_INTENT, STEP, BACKYARD, true);
+    expect(p.anim).toEqual({ name: kind, frame });
+  });
+
+  it('commits him: he eases along his facing at the trick pace, the stick ignored', () => {
+    const p = harrison();
+    p.trick = { kind: 'stepover', t: 0, side: 1, sold: false, pace: 0.5, onBall: true };
+    for (let i = 0; i < ticks(0.2); i++) stepPlayer(p, intent({ moveX: -1, moveZ: 1 }), STEP, BACKYARD, true);
+    expect(p.vx).toBeCloseTo(0.5 * runSpeed(BASE_STATS), 0);
+    expect([p.vz, p.facing]).toEqual([0, 1]);
+  });
+});

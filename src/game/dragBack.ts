@@ -23,6 +23,14 @@ const BALL_LOW = BALL_REST_Y + 3;
 /** The stick must push at least this hard back the other way. */
 const STICK_BACK = 0.5;
 
+/** The ball is Harrison's to turn or trick with: low, just ahead of him, in his lane, and not at the opponent's feet nor in the dog's mouth. */
+export function ballIsHis(w: World): boolean {
+  const { home, ball } = w;
+  const ahead = (ball.x - home.x) * home.facing;
+  const his = ball.y <= BALL_LOW && ahead >= 0 && ahead <= DRAG_REACH && Math.abs(ball.z - home.z) <= DRAG_SIDE;
+  return his && !w.dog?.carrying && !(w.dog === null && maxHasBall(w.away, ball));
+}
+
 /**
  * Starts a drag-back when he's on his feet in play, not already turning or
  * stumbling, the stick pushes back against the way he faces, and the ball
@@ -31,12 +39,9 @@ const STICK_BACK = 0.5;
  */
 export function startDragBack(w: World, intent: PlayerIntent): boolean {
   const { home, ball } = w;
-  const ready = w.match.phase === 'playing' && home.state === 'ground' && home.y === 0 && home.turnS === 0 && home.stumbleS === 0;
+  const ready = w.match.phase === 'playing' && home.state === 'ground' && home.y === 0 && home.turnS === 0 && home.stumbleS === 0 && home.trick === null;
   const back = Math.sign(intent.moveX) === -home.facing && Math.abs(intent.moveX) >= STICK_BACK;
-  if (!ready || !back || w.wave?.live || w.dog?.carrying) return false;
-  const ahead = (ball.x - home.x) * home.facing;
-  const his = ball.y <= BALL_LOW && ahead >= 0 && ahead <= DRAG_REACH && Math.abs(ball.z - home.z) <= DRAG_SIDE;
-  if (!his || (w.dog === null && maxHasBall(w.away, ball))) return false;
+  if (!ready || !back || w.wave?.live || !ballIsHis(w)) return false;
   home.turnS = TURN_S;
   home.facing = home.facing === 1 ? -1 : 1;
   Object.assign(ball, { y: BALL_REST_Y, vx: 0, vy: 0, vz: 0, spin: 0 });
