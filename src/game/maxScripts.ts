@@ -58,7 +58,7 @@ const ON_SPOT = 0.5;
  * beyond him with the ball within `keep` px; it doesn't if he wins the ball
  * or `forS` goes by.
  */
-const BEAT = { ahead: 30, lane: 10, past: 10, keep: 24, forS: 1.5 };
+export const BEAT = { ahead: 30, lane: 10, past: 10, keep: 24, forS: 1.5 };
 
 /** An opponent's stats with every stat one level higher, capped: what Harrison can afford by the time he meets them. */
 export function harrisonStatsFor(opponent: Stats): Stats {

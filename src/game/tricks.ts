@@ -37,21 +37,36 @@ export interface TrickSetup {
   scale: TrickScale;
 }
 
-/** Mutable, for headless sweeps. */
+/**
+ * The windows are the spec's; Hard's times went from 0.5 to 0.6 s in the
+ * tuning. Measured with trickTuning's scripts (seeds 100-163, 2026-10-28):
+ * fooling tricks that beat Max E/N/H .91/.86/.81; trickster wins vs Max
+ * E/N/H .688/.656/.063 (plain .875/.625/.016); spammer wins E/N/H
+ * .422/.203/.047; vs Biscuit on Normal plain .625, trickster .656, spammer
+ * 0. Personalities (Normal, seeds 100-131): fooling stepovers that beat
+ * Max 1.00, Tia .57, Brick .14 (Pete .92 over 64 seeds); a fooled Sam ends
+ * 84.7 px past Harrison, Max 30.1. Mutable, for headless sweeps.
+ */
 export const TRICK_DIFFICULTY: Record<Difficulty, TrickProfile> = {
   easy: { near: 12, far: 56, confusedS: 0.9, stumbleS: 0.9 },
   normal: { near: 14, far: 46, confusedS: 0.7, stumbleS: 0.7 },
-  hard: { near: 16, far: 38, confusedS: 0.5, stumbleS: 0.5 },
+  hard: { near: 16, far: 38, confusedS: 0.6, stumbleS: 0.6 },
 };
 
-/** Each style's reaction times as a share of the difficulty's: Pete bites hardest, Brick barely moves for a stepover. Mutable, for headless sweeps. */
+/**
+ * Each style's reaction times as a share of the difficulty's: Pete and Sam
+ * bite hardest (Sam skids a long way past), Brick barely moves for a
+ * stepover, Tia recovers quickly. Pete and Sam went from ×1.5 and ×1 to ×2
+ * on the parent's call after the tuning (2026-10-28). Mutable, for headless
+ * sweeps.
+ */
 export const TRICK_SCALE: Record<Style, TrickScale> = {
   allRound: { stepover: 1, flick: 1 },
   blocker: { stepover: 0.3, flick: 1.2 },
   shooter: { stepover: 1, flick: 1 },
   dribbler: { stepover: 0.6, flick: 0.6 },
-  presser: { stepover: 1.5, flick: 1.5 },
-  speedster: { stepover: 1, flick: 1 },
+  presser: { stepover: 2, flick: 2 },
+  speedster: { stepover: 2, flick: 2 },
 };
 
 /** Biscuit's own window and times. Mutable, for headless sweeps. */
@@ -76,11 +91,11 @@ export const STEPOVER = { durationS: 0.4, sellS: 0.2, pace: 0.5, swayPx: 8 };
 /**
  * The rainbow flick: its length and release, s; the launch, px/s; how high
  * the ball rides up the back of his leg and how far behind his feet it
- * leaves his heel, px. From rideY it peaks about 85 px up, clears a
- * standing player 12-56 px ahead and lands about 80 px on, just ahead of
- * him running after it.
+ * leaves his heel, px; its backspin. From rideY it peaks about 78 px up,
+ * clears a standing player 12-56 px ahead and lands about 90 px on, just
+ * ahead of him running after it, and the backspin sits it down for him.
  */
-export const FLICK = { durationS: 0.5, sellS: 0.25, vx: 130, vy: 360, rideY: 12, behind: 6 };
+export const FLICK = { durationS: 0.5, sellS: 0.25, vx: 130, vy: 360, rideY: 12, behind: 6, spin: -6 };
 
 /** After a trick ends, RB does nothing for this long, s. */
 export const TRICK_COOLDOWN_S = 1;
@@ -231,7 +246,7 @@ export function stepTrick(w: World, dt: number): TrickEvents {
     if (trick.kind === 'flick') {
       trick.pace = 1;
       if (trick.onBall) {
-        Object.assign(ball, { vx: home.facing * FLICK.vx, vy: FLICK.vy, vz: 0 });
+        Object.assign(ball, { vx: home.facing * FLICK.vx, vy: FLICK.vy, vz: 0, spin: FLICK.spin });
         ev.released = true;
       }
     }

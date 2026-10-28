@@ -134,12 +134,13 @@ describe('trickSetup', () => {
       }
   });
 
-  it('scales Brick, Tia and Pete their own way, and Max, Leo and Sam not at all', () => {
+  it('scales Brick, Tia, Pete and Sam their own way, and Max and Leo not at all', () => {
     const scale = (id: HumanOpponentId) => trickSetup('normal', id).scale;
     expect(scale('brick')).toEqual({ stepover: 0.3, flick: 1.2 });
     expect(scale('tia')).toEqual({ stepover: 0.6, flick: 0.6 });
-    expect(scale('pete')).toEqual({ stepover: 1.5, flick: 1.5 });
-    for (const id of ['max', 'leo', 'sam'] as const) expect(scale(id)).toEqual({ stepover: 1, flick: 1 });
+    expect(scale('pete')).toEqual({ stepover: 2, flick: 2 });
+    expect(scale('sam')).toEqual({ stepover: 2, flick: 2 });
+    for (const id of ['max', 'leo'] as const) expect(scale(id)).toEqual({ stepover: 1, flick: 1 });
   });
 
   it("gives Biscuit the dog's own window and times, unscaled", () => {

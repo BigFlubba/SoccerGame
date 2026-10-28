@@ -36,7 +36,7 @@ const CHARGE = { from: 0.5, spread: 0.4 };
 
 const STEP = 1 / 60;
 /** Mixed into a match's seed for its blocker's sharpness. */
-const BLOCKER_SEED = 0x5eed;
+export const BLOCKER_SEED = 0x5eed;
 /** 90 s of play plus a pause for every goal, and golden goal: even a 40-goal match runs well under this. */
 const MAX_TICKS = 60 * 400;
 /** Close enough to a spot to stop. */

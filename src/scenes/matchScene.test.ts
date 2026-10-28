@@ -977,7 +977,7 @@ describe('tricks in a match', () => {
 
   it("from level 4 the match has the tricks for this opponent and difficulty", () => {
     const { s } = at(4);
-    expect(s.world.tricks).toEqual(trickSetup(s.difficulty, 'max'));
+    expect(s.world.tricks).toEqual(trickSetup(s.difficulty, s.match.opponent));
     s.update(frame(['skill']), STEP);
   });
 
