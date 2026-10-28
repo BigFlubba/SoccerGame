@@ -61,13 +61,13 @@ const STILL_PX = 0.05;
 
 const rightGoal = (w: World) => w.field.goals.find(g => g.side === 'right')!;
 /** Presses alternate with releases, a tick each, so a held button still makes fresh presses. */
-const pressNow = (t: number): boolean => Math.round(t / STEP) % 2 === 0;
+export const pressNow = (t: number): boolean => Math.round(t / STEP) % 2 === 0;
 
 /**
  * A stick toward (x, z), round a goal's corners as Max goes, sprinting, or still once there;
  * with `easeOver`, slowing over that last stretch, as a player gathering a ball does.
  */
-function runTo(w: World, x: number, z: number, sprint = true, easeOver = 0): PlayerIntent {
+export function runTo(w: World, x: number, z: number, sprint = true, easeOver = 0): PlayerIntent {
   const spot = outOfGoals(w, x, z);
   const next = route(w, w.home, spot.x, spot.z);
   const [dx, dz] = [next.x - w.home.x, next.z - w.home.z];
@@ -77,7 +77,7 @@ function runTo(w: World, x: number, z: number, sprint = true, easeOver = 0): Pla
 }
 
 /** Behind the ball, off its line on his side of it (the other where the boards are too close), so he passes it without a touch. */
-function roundBall(w: World): { x: number; z: number } {
+export function roundBall(w: World): { x: number; z: number } {
   const [me, b] = [w.home, w.ball];
   const lo = PLAYER_R;
   const hi = w.field.depth - PLAYER_R;
