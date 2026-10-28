@@ -92,3 +92,10 @@ describe('starsFor', () => {
     expect(starsFor(match({ result: 'lose', goalsFor: 3, goalsAgainst: 4, goals: [goal(), goal(), goal()] }), 'score3')).toBe(0);
   });
 });
+
+describe('trick goals and the bonuses', () => {
+  it('two trick goals meet SCORE 2 STYLE GOALS', () => {
+    const s = match({ goalsFor: 2, styleGoals: ['trick', 'trick'], goals: [goal({ kind: 'trick' }), goal({ kind: 'trick' })] });
+    expect(BONUSES.twoStyle.done(s)).toBe(true);
+  });
+});

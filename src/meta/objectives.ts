@@ -31,7 +31,7 @@ export const STEALS_FOR_BONUS = 3;
 /** A win by this many or more is worth the second star. */
 const TWO_STAR_MARGIN = 2;
 
-const isStyle = (g: GoalRecord) => g.kind === 'header' || g.kind === 'volley' || g.kind === 'chip' || g.kind === 'wave';
+const isStyle = (g: GoalRecord) => g.kind === 'header' || g.kind === 'volley' || g.kind === 'chip' || g.kind === 'wave' || g.kind === 'trick';
 const scoredA = (kind: GoalRecord['kind']) => (s: BonusInput) => s.goals.some(g => g.kind === kind);
 const atFullTime = (rule: (s: BonusInput) => boolean) => (s: BonusInput) => s.result !== null && rule(s);
 

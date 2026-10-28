@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { measureText } from '../art/font';
 import { BOSS_ID, PARK_BOSS_ID, grantRungStars, matchById, nextCareerMatch, type CareerMatch } from '../meta/career';
 import type { GoalRecord, MatchSummary } from '../meta/economy';
 import { nextMatch } from '../meta/ladder';
@@ -303,9 +304,9 @@ describe('results: unlocks and the skip grace', () => {
     expect(footLines(reward, tallyAt(reward, Infinity), true)).toEqual([careerLine(reward), 'ENERGY WAVE UNLOCKED IN THE SHOP!', 'UPGRADE READY IN THE SHOP!']);
   });
 
-  it('Golden Form is announced too, and both together still fit three lines', () => {
+  it('the skill moves and Golden Form are announced too, and all together still fit three lines', () => {
     const { reward } = after(WIN_3_0, { ...newProfile(), level: 2, xp: 790 });
-    expect(unlockLines(reward)).toEqual(['ENERGY WAVE UNLOCKED IN THE SHOP!', 'GOLDEN FORM UNLOCKED!']);
+    expect(unlockLines(reward)).toEqual(['ENERGY WAVE UNLOCKED IN THE SHOP!', 'NEW MOVES: STEPOVER + RAINBOW FLICK', 'GOLDEN FORM UNLOCKED!']);
     expect(footLines(reward, tallyAt(reward, Infinity), true)).toHaveLength(3);
   });
 
@@ -324,5 +325,13 @@ describe('results: unlocks and the skip grace', () => {
     s.update(frame(['confirm']), STEP);
     run(s, SKIP_GRACE_S + 0.05);
     expect(s.update(frame(['confirm']), STEP)?.kind).toBe('vs');
+  });
+});
+
+describe('results: the skill moves unlock', () => {
+  it('reads NEW MOVES: STEPOVER + RAINBOW FLICK on the level-up into 4, and fits the screen', () => {
+    const { reward } = after(WIN_3_0, { ...newProfile(), level: 3, xp: 150 });
+    expect(unlockLines(reward)).toEqual(['NEW MOVES: STEPOVER + RAINBOW FLICK']);
+    expect(measureText('NEW MOVES: STEPOVER + RAINBOW FLICK')).toBeLessThanOrEqual(300);
   });
 });

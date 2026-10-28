@@ -3,6 +3,7 @@ import { glyph, measureText } from '../art/font';
 import { HELP_PAGES, createHelpScene, type HelpScene } from './helpScene';
 import type { Scene } from './scene';
 import { testContext } from './testContext';
+import { fakeArt, recordingContext } from './testDraw';
 import { frame } from './testInput';
 
 const STEP = 1 / 60;
@@ -12,7 +13,7 @@ const allText = () => HELP_PAGES.flatMap(p => [p.title, ...p.lines]).join('\n');
 
 describe('help', () => {
   it('help covers the controls, the match and the moves', () => {
-    expect(HELP_PAGES.map(p => p.title)).toEqual(['CONTROLS', 'THE MATCH', 'MOVES', 'POWER MOVES']);
+    expect(HELP_PAGES.map(p => p.title)).toEqual(['CONTROLS', 'THE MATCH', 'MOVES', 'TRICKS', 'POWER MOVES']);
     for (const phrase of ['PERFECT', 'FAR POST', 'NEAR POST', 'GOLDEN GOAL']) expect(allText()).toContain(phrase);
   });
 
@@ -35,7 +36,7 @@ describe('help', () => {
   });
 
   it('the power moves page explains buying, filling, holding and Max', () => {
-    const page = HELP_PAGES[3]!.lines.join(' ');
+    const page = HELP_PAGES[4]!.lines.join(' ');
     for (const phrase of ['BUY THE ENERGY WAVE IN THE SHOP', 'POWER METER', 'PRESS Y OR V', 'FIRE IT WITH X', 'BACKS OFF TO BRACE', 'TAKES THE BALL']) expect(page).toContain(phrase);
   });
 
@@ -82,5 +83,20 @@ describe('Help about Sam', () => {
     const lines = HELP_PAGES[1]!.lines;
     expect(lines.at(-2)).toBe("BISCUIT CAN'T SHOOT: BLOCK HIS WAY TO YOUR GOAL.");
     expect(lines.at(-1)).toBe("SPEEDY SAM CAN'T STOP: TURN AND LET HIM FLY PAST.");
+  });
+});
+
+describe('help for the tricks', () => {
+  it('CONTROLS has an RB line, drawn with the RB picture', () => {
+    const rb = HELP_PAGES[0]!.lines.find(l => l.startsWith('RB:'));
+    expect(rb).toContain('KEY D');
+    const { g, drawn } = recordingContext();
+    createHelpScene(testContext({ art: fakeArt() }), () => BEHIND).draw(g, 0);
+    expect(drawn).toContain('art.buttons.RB');
+  });
+
+  it('the TRICKS page says what RB does, when it works, and from what level', () => {
+    const page = HELP_PAGES[3]!.lines.join(' ');
+    for (const phrase of ['RB DOES A STEPOVER', 'UP + RB', 'RAINBOW FLICK', 'CLOSE IN FRONT', 'FACING YOU', 'TOO FAR OFF OR TOO LATE FOOLS NOBODY', 'LEVEL 4']) expect(page).toContain(phrase);
   });
 });

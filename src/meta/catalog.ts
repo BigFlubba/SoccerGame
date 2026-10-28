@@ -38,3 +38,9 @@ export function powerKit(p: Profile): PowerKit | null {
   if (p.powerMoves.equipped === null) return null;
   return { golden: p.powerForms.equipped === 'golden' };
 }
+
+/** Both skill moves, the stepover and the rainbow flick, are free from this level. */
+export const SKILL_MOVES_LEVEL = 4;
+
+/** Whether he has the stepover and the flick: worked out from his level, so the save needs no field for them. */
+export const hasSkillMoves = (p: Profile): boolean => p.level >= SKILL_MOVES_LEVEL;

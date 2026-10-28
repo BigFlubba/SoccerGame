@@ -32,13 +32,15 @@ export interface MatchFeedback {
  * The rumble only ever reflects what Harrison feels. A ball resting against
  * the net reports a hit every tick, so the net only sounds on a goal.
  * Biscuit's grab (his touch) barks rather than taps, and he pants aloud.
+ * A stepover swishes and a flick pops off his heel; the crowd oohs only at
+ * a trick that fools someone.
  * With `speed`, a soft-braking away player whooshes past and scrapes into
  * each skid.
  */
 export function matchFeedback(w: World, prevPhase: Phase, speed?: SpeedMemo): MatchFeedback {
   const cues = new Set<Cue>();
   const rumble = new Set<RumbleKind>();
-  const { ball, kicks, goal, power, dog } = w.events;
+  const { ball, kicks, goal, power, dog, trick } = w.events;
   if (dog.grabbed) cues.add('bark');
   if (dog.panted) cues.add('pant');
   if (power.started) {
@@ -59,6 +61,9 @@ export function matchFeedback(w: World, prevPhase: Phase, speed?: SpeedMemo): Ma
     rumble.add('brace');
   }
   if (power.blown) cues.add('whoosh');
+  if (trick.started === 'stepover') cues.add('stepover');
+  if (trick.released) cues.add('flick');
+  if (trick.fooled) cues.add('ooh');
   const hard = Math.hypot(w.ball.vx, w.ball.vy, w.ball.vz) >= HARD_KICK_SPEED;
   kicks.forEach((k, i) => {
     if (k.kicked) {

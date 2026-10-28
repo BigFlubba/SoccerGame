@@ -1,5 +1,5 @@
 import { allBeaten, careerStars, grantRungStars, isBeaten, starsAt, type CareerMatch } from './career';
-import { POWER_MOVES, grantForms, moveStatus } from './catalog';
+import { POWER_MOVES, SKILL_MOVES_LEVEL, grantForms, moveStatus } from './catalog';
 import { LEVEL_UP_COINS, addXp, matchLines, matchXp, type MatchSummary, type RewardLine } from './economy';
 import { isChampion, nextMatch } from './ladder';
 import { milestonesDue, type Milestone } from './milestones';
@@ -14,7 +14,7 @@ export interface Standing {
 }
 
 /** Something a level-up just made available, announced on Results. */
-export type Unlock = 'energyWave' | 'goldenForm';
+export type Unlock = 'energyWave' | 'skillMoves' | 'goldenForm';
 
 /** What one career match did to his career. */
 export interface CareerResult {
@@ -111,6 +111,7 @@ export function applyMatch(p: Profile, s: MatchSummary, match: CareerMatch, toda
   const unlocked: Unlock[] = [];
   const waveLevel = POWER_MOVES.energyWave.unlockLevel;
   if (p.level < waveLevel && profile.level >= waveLevel && moveStatus(p, 'energyWave') !== 'owned') unlocked.push('energyWave');
+  if (p.level < SKILL_MOVES_LEVEL && profile.level >= SKILL_MOVES_LEVEL) unlocked.push('skillMoves');
   if (!p.powerForms.owned.includes('golden') && profile.powerForms.owned.includes('golden')) unlocked.push('goldenForm');
   return {
     profile,

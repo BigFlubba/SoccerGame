@@ -2,11 +2,11 @@ import { MAX_STAT_LEVEL, STAT_NAMES, type StatName } from '../game/stats';
 import { POWER_MOVES, moveStatus } from './catalog';
 import type { Profile } from './profile';
 
-/** The goals that pay a style bonus. The bicycle kick and other power moves join when they're built. */
-export type StyleKind = 'header' | 'volley' | 'chip' | 'wave';
+/** The goals that pay a style bonus: a trick goal is scored straight after a trick that fooled someone. The bicycle kick and other power moves join when they're built. */
+export type StyleKind = 'header' | 'volley' | 'chip' | 'wave' | 'trick';
 
-/** The kick a goal came from. */
-export type GoalKind = 'shot' | 'chip' | 'volley' | 'header' | 'wave';
+/** The kick a goal came from, or 'trick' for a trick goal. */
+export type GoalKind = 'shot' | 'chip' | 'volley' | 'header' | 'wave' | 'trick';
 
 /** One of Harrison's goals: the clock minute, the kick, and whether it was a perfect strike. */
 export interface GoalRecord {
@@ -44,12 +44,13 @@ export const LEVEL_UP_COINS = 50;
 
 const RESULT_LABEL = { win: 'WIN', draw: 'DRAW', lose: 'LOSS' } as const;
 const DAILY_WIN_LABEL = 'FIRST WIN TODAY';
-const STYLE_ORDER: readonly StyleKind[] = ['header', 'volley', 'chip', 'wave'];
+const STYLE_ORDER: readonly StyleKind[] = ['header', 'volley', 'chip', 'wave', 'trick'];
 const STYLE_LABEL: Record<StyleKind, [one: string, many: string]> = {
   header: ['HEADER', 'HEADERS'],
   volley: ['VOLLEY', 'VOLLEYS'],
   chip: ['CHIP', 'CHIPS'],
   wave: ['ENERGY WAVE', 'ENERGY WAVES'],
+  trick: ['TRICK GOAL', 'TRICK GOALS'],
 };
 
 /** XP needed to go from `level` to the next: 100, then 50 more each level. */

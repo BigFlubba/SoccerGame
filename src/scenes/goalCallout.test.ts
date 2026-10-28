@@ -2,7 +2,8 @@ import { describe, expect, it } from 'vitest';
 import type { ContactEvents } from '../game/contact';
 import { BASE_STATS } from '../game/stats';
 import { createWorld, type World } from '../game/world';
-import { HAT_TRICK_GOALS, SCREAMER_PX, goalCallout, noteKick, type LastKick } from './goalCallout';
+import { HAT_TRICK_GOALS, SCREAMER_PX, TRICK_GOAL_S, goalCallout, noteKick, noteTrick, type LastKick, type TrickChance } from './goalCallout';
+import { quietTricks, type TrickEvents } from '../game/tricks';
 
 const quiet = (): ContactEvents => ({ touched: false, blocked: false, kicked: null, perfect: false, tackledBall: false, trippedOpponent: false });
 
@@ -80,5 +81,59 @@ describe('the Energy Wave callout', () => {
 
   it('Max touching the ball after a wave clears it', () => {
     expect(noteKick(kick({ kind: 'wave' }), world({}, { touched: true }))).toBeNull();
+  });
+});
+
+describe('noteTrick', () => {
+  const STEP = 1 / 60;
+  const tricked = (trick: Partial<TrickEvents>, home: Partial<ContactEvents> = {}, away: Partial<ContactEvents> = {}): World => {
+    const w = world(home, away);
+    w.events.trick = { ...quietTricks(), ...trick };
+    return w;
+  };
+  const open = (kind: 'stepover' | 'flick' = 'stepover'): TrickChance => ({ kind, sinceS: 0, flicked: false });
+
+  it('a trick that fools someone opens a chance', () => {
+    expect(noteTrick(null, tricked({ fooled: 'stepover' }), STEP)).toEqual({ kind: 'stepover', sinceS: 0, flicked: false });
+  });
+
+  it('a flick that fools nobody opens one too, as it leaves his heel', () => {
+    expect(noteTrick(null, tricked({ released: true }), STEP)).toEqual({ kind: 'flick', sinceS: 0, flicked: true });
+  });
+
+  it("the opponent's touch, kick or tackle ends it", () => {
+    for (const away of [{ touched: true }, { kicked: 'shot' as const }, { tackledBall: true }]) expect(noteTrick(open(), tricked({}, {}, away), STEP)).toBeNull();
+  });
+
+  it('4 s going by ends it', () => {
+    expect(noteTrick({ ...open(), sinceS: TRICK_GOAL_S - STEP / 2 }, tricked({}), STEP)).toBeNull();
+    expect(noteTrick({ ...open(), sinceS: TRICK_GOAL_S - 2 * STEP }, tricked({}), STEP)).not.toBeNull();
+  });
+
+  it("Harrison's own dribble touches and his shot keep it", () => {
+    expect(noteTrick(open(), tricked({}, { touched: true }), STEP)?.kind).toBe('stepover');
+    expect(noteTrick(open(), tricked({}, { kicked: 'shot' }), STEP)?.kind).toBe('stepover');
+  });
+
+  it("an unfooled flick's chance lasts until anyone plays the ball, Harrison too", () => {
+    const flicked: TrickChance = { kind: 'flick', sinceS: 5, flicked: true };
+    expect(noteTrick(flicked, tricked({}), STEP)).not.toBeNull();
+    expect(noteTrick(flicked, tricked({}, { touched: true }), STEP)).toBeNull();
+  });
+});
+
+describe('goalCallout with a trick', () => {
+  it('names the trick for a trick goal, ahead of PERFECT STRIKE!', () => {
+    expect(goalCallout(kick({ perfect: true }), 1, 'stepover')).toBe('STEPOVER!');
+    expect(goalCallout(null, 1, 'flick')).toBe('RAINBOW FLICK!');
+  });
+
+  it('ENERGY WAVE! and HAT-TRICK! still come first', () => {
+    expect(goalCallout(kick({ kind: 'wave' }), 1, 'stepover')).toBe('ENERGY WAVE!');
+    expect(goalCallout(kick({}), HAT_TRICK_GOALS, 'stepover')).toBe('HAT-TRICK!');
+  });
+
+  it('a header after a trick stays HEADER!: one style per goal', () => {
+    expect(goalCallout(kick({ kind: 'header' }), 1, 'stepover')).toBe('HEADER!');
   });
 });

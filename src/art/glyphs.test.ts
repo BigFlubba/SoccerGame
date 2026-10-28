@@ -2,8 +2,8 @@ import { describe, expect, it } from 'vitest';
 import { M } from './colors';
 import { buttonGlyph, type ButtonName } from './glyphs';
 
-const BUTTONS: readonly Exclude<ButtonName, 'Y'>[] = ['A', 'B', 'X', 'LB', 'RT', 'START'];
-const FACE: Record<Exclude<ButtonName, 'Y'>, number> = { A: M.grassLight, B: M.red, X: M.blue, LB: M.slate, RT: M.slate, START: M.slate };
+const BUTTONS: readonly Exclude<ButtonName, 'Y'>[] = ['A', 'B', 'X', 'LB', 'RB', 'RT', 'START'];
+const FACE: Record<Exclude<ButtonName, 'Y'>, number> = { A: M.grassLight, B: M.red, X: M.blue, LB: M.slate, RB: M.slate, RT: M.slate, START: M.slate };
 
 describe('buttonGlyph', () => {
   it('glyphs are distinct and round', () => {
@@ -50,5 +50,15 @@ describe('buttonGlyph', () => {
     expect(ids.has(M.white)).toBe(false);
     const dark = (img: typeof y) => img.data.filter(id => id === M.outline).length;
     expect(dark(y)).toBeGreaterThan(dark(a));
+  });
+});
+
+describe('the RB glyph', () => {
+  it("is a slate pill with a white RB, the same size as LB's", () => {
+    const [rb, lb] = [buttonGlyph('RB'), buttonGlyph('LB')];
+    expect([rb.width, rb.height]).toEqual([lb.width, lb.height]);
+    expect(new Set(rb.data).has(M.slate)).toBe(true);
+    expect(new Set(rb.data).has(M.white)).toBe(true);
+    expect(rb.data.join()).not.toBe(lb.data.join());
   });
 });

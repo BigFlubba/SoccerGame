@@ -15,7 +15,7 @@ const hudWith = (h: Partial<MatchHud> = {}): MatchHud => ({
   shake: null,
   impactFrames: 0,
   goldenCelebration: false,
-  bonusCallout: null,
+  bonusCallout: null, trickCallout: null,
   awayName: 'MAX',
   venue: 'backyard',
   awaySprites: {} as SpriteSet,

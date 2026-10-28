@@ -10,7 +10,7 @@ export interface HelpScene extends Scene {
   readonly page: number;
 }
 
-/** Four pages in the pixel font. A line starting "A:", "X:" and so on is drawn with that button's picture. */
+/** Five pages in the pixel font. A line starting "A:", "X:" and so on is drawn with that button's picture. */
 export const HELP_PAGES: readonly { title: string; lines: readonly string[] }[] = [
   {
     title: 'CONTROLS',
@@ -21,6 +21,7 @@ export const HELP_PAGES: readonly { title: string; lines: readonly string[] }[] 
       'B: CHIP WITH THE BALL, SLIDE TACKLE WITHOUT. KEY C',
       'Y: POWER UP WITH A FULL POWER METER. KEY V',
       'LB: STEAL THE BALL OFF MAX. KEY A',
+      'RB: STEPOVER. WITH UP: RAINBOW FLICK. KEY D',
       'RT: SPRINT. KEY SHIFT',
       'START: PAUSE. KEY ENTER OR ESC',
       'MENUS: UP/DOWN TO CHOOSE, A TO PICK, B TO GO BACK',
@@ -59,6 +60,20 @@ export const HELP_PAGES: readonly { title: string; lines: readonly string[] }[] 
     ],
   },
   {
+    title: 'TRICKS',
+    lines: [
+      'FROM LEVEL 4, WITH THE BALL AT YOUR FEET:',
+      'RB DOES A STEPOVER. UP + RB DOES A RAINBOW FLICK,',
+      'FLICKING THE BALL UP OVER YOUR HEAD.',
+      'DO IT WHEN SOMEONE IS CLOSE IN FRONT, FACING YOU:',
+      'A STEPOVER CONFUSES THEM, A FLICK TRIPS THEM UP.',
+      'THEN TAKE THE BALL PAST THEM!',
+      'TOO FAR OFF OR TOO LATE FOOLS NOBODY,',
+      'AND THEY GET WISE TO IT FOR A WHILE.',
+      'SCORE RIGHT AFTER ONE FOR A TRICK GOAL.',
+    ],
+  },
+  {
     title: 'POWER MOVES',
     lines: [
       'BUY THE ENERGY WAVE IN THE SHOP. FILL THE POWER',
@@ -82,7 +97,7 @@ const BUTTON_GAP = 4;
 /** The picture sits this far above the text's top, so their middles line up. */
 const BUTTON_RAISE = 2;
 const FOOTER_Y = BASE_H - 18;
-const BUTTON_LINE = /^(A|B|X|Y|LB|RT|START): (.*)$/;
+const BUTTON_LINE = /^(A|B|X|Y|LB|RB|RT|START): (.*)$/;
 
 /** CONTROLS, THE MATCH, MOVES: left/right flip the pages (wrapping); B, Backspace, C, Esc or Start goes back. */
 export function createHelpScene(ctx: GameContext, back: () => Scene): HelpScene {

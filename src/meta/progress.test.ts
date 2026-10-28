@@ -150,13 +150,13 @@ describe('applyMatch', () => {
     const first = applyMatch({ ...newProfile(), level: 2, xp: 140 }, win30, rung(1), TODAY);
     expect(first.profile.level).toBe(3);
     expect(first.reward.unlocked).toEqual(['energyWave']);
-    expect(applyMatch(first.profile, win30, rung(2), TODAY).reward.unlocked).toEqual([]);
+    expect(applyMatch(first.profile, win30, rung(2), TODAY).reward.unlocked).not.toContain('energyWave');
   });
 
-  it('jumping from level 2 to 6 announces both unlocks and grants Golden Form', () => {
+  it('jumping from level 2 to 6 announces every unlock in level order and grants Golden Form', () => {
     const { profile, reward } = applyMatch({ ...newProfile(), level: 2, xp: 790 }, win30, rung(1), TODAY);
     expect(profile.level).toBe(6);
-    expect(reward.unlocked).toEqual(['energyWave', 'goldenForm']);
+    expect(reward.unlocked).toEqual(['energyWave', 'skillMoves', 'goldenForm']);
     expect(profile.powerForms).toEqual({ owned: ['golden'], equipped: 'golden' });
   });
 
@@ -177,5 +177,19 @@ describe('localDate', () => {
   it('localDate is the local calendar date', () => {
     expect(localDate(new Date(2026, 9, 3, 23, 59))).toBe('2026-10-03');
     expect(localDate(new Date(2026, 0, 1, 0, 0))).toBe('2026-01-01');
+  });
+});
+
+describe('the skill moves unlock', () => {
+  it('a match taking him from level 3 to 4 announces the stepover and the flick', () => {
+    const { profile, reward } = applyMatch({ ...newProfile(), level: 3, xp: 150 }, win30, rung(1), TODAY);
+    expect(profile.level).toBe(4);
+    expect(reward.unlocked).toContain('skillMoves');
+  });
+
+  it('a match from 4 to 5 does not announce them again', () => {
+    const { profile, reward } = applyMatch({ ...newProfile(), level: 4, xp: 200 }, win30, rung(1), TODAY);
+    expect(profile.level).toBe(5);
+    expect(reward.unlocked).not.toContain('skillMoves');
   });
 });

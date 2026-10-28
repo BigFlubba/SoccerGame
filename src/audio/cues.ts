@@ -29,6 +29,8 @@ export type Cue =
   | 'brace'
   | 'whoosh'
   | 'skid'
+  | 'stepover'
+  | 'flick'
   | 'star'
   | 'bark'
   | 'pant'
@@ -215,6 +217,10 @@ export const CUES: Readonly<Record<Cue, CueRecipe>> = {
   skid: { voices: [{ wave: 'noise', dur: 0.32, gain: 0.18, attack: 0.02, freq: 1600, toFreq: 500, filter: { type: 'bandpass', q: 1.2 } }], minGapS: 0.4 },
   /** Max blown off his feet, or Speedy Sam flying past. */
   whoosh: { voices: [{ wave: 'noise', dur: 0.35, gain: 0.3, attack: 0.08, freq: 600, toFreq: 2200, filter: { type: 'bandpass', q: 1.5 } }], minGapS: 0.3 },
+  /** Harrison's stepover: a quick swish of his boot over the ball. By design, not by ear. */
+  stepover: { voices: [{ wave: 'noise', dur: 0.14, gain: 0.16, attack: 0.03, freq: 1800, toFreq: 900, filter: { type: 'bandpass', q: 2 } }], minGapS: 0.2 },
+  /** The rainbow flick leaving his heel: a soft rising pop. By design, not by ear. */
+  flick: { voices: [{ wave: 'square', dur: 0.07, gain: 0.08, freq: 330, toFreq: 660 }], minGapS: 0.2 },
   /** A star earned, or a bonus done: a short rising two-note chime, G then D above. By design, not by ear. */
   star: {
     voices: [

@@ -98,6 +98,7 @@ export function milestoneLines(reward: MatchReward): string[] {
 
 const UNLOCK_TEXT: Record<Unlock, string> = {
   energyWave: 'ENERGY WAVE UNLOCKED IN THE SHOP!',
+  skillMoves: 'NEW MOVES: STEPOVER + RAINBOW FLICK',
   goldenForm: 'GOLDEN FORM UNLOCKED!',
 };
 const UPGRADE_READY = 'UPGRADE READY IN THE SHOP!';

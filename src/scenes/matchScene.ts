@@ -10,16 +10,18 @@ import { cancelCharge, type PlayerIntent } from '../game/player';
 import { endPower } from '../game/power';
 import { opponentHandling, opponentProfile, opponentStats, type HumanOpponentId } from '../game/opponents';
 import { createWorld, stepWorld, type World } from '../game/world';
+import { addMeter } from '../game/power';
+import { trickSetup } from '../game/opponents';
 import { BASE_STATS } from '../game/stats';
 import { clockMinute, endGoalPause } from '../game/match';
 import { nextCareerMatch, type CareerMatch } from '../meta/career';
-import { powerKit } from '../meta/catalog';
+import { hasSkillMoves, powerKit } from '../meta/catalog';
 import type { GoalRecord, StyleKind } from '../meta/economy';
 import { BONUSES } from '../meta/objectives';
 import { applyMatch, type MatchReward } from '../meta/progress';
 import type { GameContext } from './context';
 import { drawMenu, menuCue, stepMenu, type MenuState } from './menu';
-import { HAT_TRICK_GOALS, goalCallout, noteKick, type LastKick } from './goalCallout';
+import { HAT_TRICK_GOALS, TRICK_CALLOUT, goalCallout, noteKick, noteTrick, trickGoal, type LastKick, type TrickChance } from './goalCallout';
 import { createGoalMoment, simScale, stepGoalMoment, type GoalMoment } from './goalMoment';
 import { stepTrail, type TrailPoint } from './shotTrail';
 import { drawMatch, type MatchHud } from './matchView';
@@ -74,6 +76,8 @@ const AIM_THRESHOLD = 0.5;
 const HAT_TRICK_ROAR_S = 1.2;
 /** A fired wave shows this many high-contrast impact frames. */
 const IMPACT_FRAMES = 2;
+/** A trick that fools someone is called out over Harrison for this long. */
+export const TRICK_CALLOUT_S = 1;
 
 /** A fresh seed per match so every game plays differently. */
 export const newSeed = (): number => Math.floor(Math.random() * 2 ** 32);
@@ -95,6 +99,7 @@ function harrisonIntent(input: InputFrame): PlayerIntent {
     powerHeld: input.held.has('power'),
     sprint: input.held.has('sprint'),
     steal: input.pressed.has('steal'),
+    skill: input.pressed.has('skill'),
   };
 }
 
@@ -120,6 +125,7 @@ export function createMatchScene(ctx: GameContext, seed: number, match: CareerMa
     dog ? DOG_DIFFICULTY[difficulty] : null,
     dog ? null : thinking,
     opponentHandling(human),
+    hasSkillMoves(ctx.profile) ? trickSetup(difficulty, match.opponent) : null,
   );
   const brain = createBrain(thinking);
   // Speedy Sam's whoosh past Harrison remembers when it last sounded.
@@ -137,6 +143,7 @@ export function createMatchScene(ctx: GameContext, seed: number, match: CareerMa
     impactFrames: 0,
     goldenCelebration: false,
     bonusCallout: null,
+    trickCallout: null,
     awayName: match.hudName,
     venue: match.venue,
     // Read when drawn, so a scene made without art (in tests) never touches it.
@@ -145,6 +152,9 @@ export function createMatchScene(ctx: GameContext, seed: number, match: CareerMa
     },
   };
   let lastKick: LastKick | null = null;
+  /** A goal now would be a trick goal. */
+  let trickChance: TrickChance | null = null;
+  let trickCalloutUntilS = 0;
   /** Harrison's header, volley, chip and Energy Wave goals, for the style bonus. */
   const styleGoals: StyleKind[] = [];
   /** Every goal of his, for the bonus objective and the stars. */
@@ -192,9 +202,9 @@ export function createMatchScene(ctx: GameContext, seed: number, match: CareerMa
     const { home, away } = world.match.score;
     bonusOwed = bonus.done({ goalsFor: home, goalsAgainst: away, goals, result: null, steals });
   };
-  /** Notes one of his goals. */
-  const recordGoal = () => {
-    goals.push({ minute: clockMinute(world.match), kind: lastKick?.kind ?? null, perfect: lastKick?.perfect ?? false });
+  /** Notes one of his goals: a trick goal as 'trick', otherwise the kick it came from. */
+  const recordGoal = (trick: boolean) => {
+    goals.push({ minute: clockMinute(world.match), kind: trick ? 'trick' : (lastKick?.kind ?? null), perfect: lastKick?.perfect ?? false });
     checkBonus();
   };
   /** Shows an owed bonus callout, unless a goal moment is running: it waits behind one, so it never covers it. */
@@ -213,6 +223,7 @@ export function createMatchScene(ctx: GameContext, seed: number, match: CareerMa
     world.aimErrorDeg.away = brain.profile.aimErrorDeg;
     if (world.maxProfile) world.maxProfile = brain.profile;
     if (dogBrain && world.dog) dogBrain.profile = world.dog.profile = DOG_DIFFICULTY[difficulty];
+    if (world.tricks) world.tricks = trickSetup(difficulty, match.opponent);
     return scene;
   };
 
@@ -307,18 +318,33 @@ export function createMatchScene(ctx: GameContext, seed: number, match: CareerMa
         updateCamera(cam, world.ball, simDt, world.field);
         stepTrail(hud.trail, world.ball);
         lastKick = noteKick(lastKick, world);
+        trickChance = noteTrick(trickChance, world, simDt);
+        if (world.events.trick.fooled) {
+          hud.trickCallout = TRICK_CALLOUT[world.events.trick.fooled];
+          trickCalloutUntilS = t + TRICK_CALLOUT_S;
+        }
         if (world.events.goal === 'home') {
+          const trick = trickGoal(trickChance, lastKick);
           hud.moment = createGoalMoment();
           hud.flash = true;
-          hud.callout = goalCallout(lastKick, world.match.score.home);
+          hud.trickCallout = null;
+          hud.callout = goalCallout(lastKick, world.match.score.home, trick);
           if (lastKick && isStyle(lastKick.kind)) styleGoals.push(lastKick.kind);
-          recordGoal();
+          else if (trick) {
+            styleGoals.push('trick');
+            // A trick goal is a style goal: the world can't see the chance, so the meter's gain comes from here.
+            if (world.power) addMeter(world.power, 'styleGoal');
+          }
+          recordGoal(trick !== null);
           // Forms show while powered up and celebrating: an Energy Wave goal in Golden Form keeps the gold.
           hud.goldenCelebration = lastKick?.kind === 'wave' && world.power?.golden === true;
           // The roar cue swells; the crowd holds it through the celebration.
           ctx.audio.setCrowd('roar');
         }
-        if (world.events.goal) lastKick = null;
+        if (world.events.goal) {
+          lastKick = null;
+          trickChance = null;
+        }
       }
       if (moment) {
         const before = moment.t;
@@ -337,6 +363,7 @@ export function createMatchScene(ctx: GameContext, seed: number, match: CareerMa
       }
       showOwedBonus();
       if (hud.bonusCallout && t >= bonusUntilS) hud.bonusCallout = null;
+      if (hud.trickCallout && t >= trickCalloutUntilS) hud.trickCallout = null;
       if (world.match.phase !== 'fullTime' || !world.match.result) return null;
       if (!reward) award(world.match.result);
       // Results brings in the jingle, after the full-time whistle.

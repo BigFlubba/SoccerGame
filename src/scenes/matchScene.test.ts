@@ -16,7 +16,8 @@ import { matchById } from '../meta/career';
 import { maxStats } from '../meta/ladder';
 import { newProfile } from '../meta/profile';
 import { DEFAULT_SETTINGS } from '../meta/settings';
-import { BONUS_CALLOUT, BONUS_SHOW_S, PAUSE_ITEMS, createMatchScene, type MatchScene } from './matchScene';
+import { BONUS_CALLOUT, BONUS_SHOW_S, PAUSE_ITEMS, TRICK_CALLOUT_S, createMatchScene, type MatchScene } from './matchScene';
+import { trickSetup } from '../game/opponents';
 import type { Scene } from './scene';
 import { fakeArt, type Named } from './testDraw';
 import { testContext } from './testContext';
@@ -939,5 +940,107 @@ describe('match scene: the Park crew', () => {
       expect(s.world.match.phase).toBe('fullTime');
       expect(s.reward!.summary.steals).toBe(3);
     });
+  });
+});
+
+describe('tricks in a match', () => {
+  const at = (level: number, match?: Parameters<typeof createMatchScene>[2], ctx = testContext({ profile: { ...newProfile(), level, ladderWins: 10, career: { stars: { 'backyard-boss': 1, 'park-1': 1, 'park-2': 1, 'park-3': 1, 'park-4': 1 }, milestonesPaid: 0, lossStreaks: {} } } })) => {
+    const s = createMatchScene(ctx, 1, match);
+    s.world.match.phase = 'playing';
+    return { s, ctx };
+  };
+  /** Harrison on the ball at x 300; the opponent coming from 55 px in his lane, squared up at the sell. */
+  const staged = (s: MatchScene) => {
+    Object.assign(s.world.home, { x: 300, z: 40, facing: 1, vx: 0, vz: 0 });
+    Object.assign(s.world.away, { x: 355, z: 40, facing: -1, vx: 0, vz: 0 });
+    Object.assign(s.world.ball, { x: 308, y: BALL_REST_Y, z: 40, vx: 0, vy: 0, vz: 0 });
+    return s;
+  };
+  /** Presses RB and steps until the trick fools him. */
+  const fool = (s: MatchScene) => {
+    s.update(frame(['skill']), STEP);
+    for (let i = 0; i < 30 && !s.world.away.fooled; i++) s.update(frame(), STEP);
+    expect(s.world.away.fooled).toBeTruthy();
+  };
+  function pickIn(s: MatchScene, item: (typeof PAUSE_ITEMS)[number]): Scene | null {
+    s.update(frame(['pause']), STEP);
+    for (let i = 0; i < PAUSE_ITEMS.indexOf(item); i++) s.update(frame(['down']), STEP);
+    return s.update(frame(['confirm']), STEP);
+  }
+
+  it('below level 4 there are no tricks, and RB does nothing', () => {
+    const s = staged(at(3).s);
+    expect(s.world.tricks).toBeNull();
+    s.update(frame(['skill']), STEP);
+    expect(s.world.home.trick).toBeNull();
+  });
+
+  it("from level 4 the match has the tricks for this opponent and difficulty", () => {
+    const { s } = at(4);
+    expect(s.world.tricks).toEqual(trickSetup(s.difficulty, 'max'));
+    s.update(frame(['skill']), STEP);
+  });
+
+  it('a trick that fools him shows STEPOVER! for a second', () => {
+    const s = staged(at(4).s);
+    fool(s);
+    expect(s.hud.trickCallout).toBe('STEPOVER!');
+    run(s, TRICK_CALLOUT_S - 0.1);
+    expect(s.hud.trickCallout).toBe('STEPOVER!');
+    run(s, 0.2);
+    expect(s.hud.trickCallout).toBeNull();
+  });
+
+  it("a goal soon after is a trick goal: its callout, its record, and a style goal on Results", () => {
+    const s = staged(at(4).s);
+    s.world.match.clockS = 20;
+    fool(s);
+    Object.assign(s.world.away, { x: 20, vx: 0 });
+    run(s, 1.5);
+    Object.assign(s.world.ball, { x: 600, y: BALL_REST_Y, z: 32, vx: 300, vy: 0, vz: 0 });
+    for (let i = 0; i < 30 && !s.world.events.goal; i++) s.update(frame(), STEP);
+    expect(s.goals.at(-1)?.kind).toBe('trick');
+    expect(s.callout).toBe('STEPOVER!');
+    expect(s.hud.trickCallout).toBeNull();
+    run(s, 4);
+    s.world.match.clockS = 89.99;
+    run(s, 3);
+    expect(s.reward!.summary.styleGoals).toEqual(['trick']);
+  });
+
+  it('pausing mid-stepover and resuming carries on from the same moment (Review Focus 3)', () => {
+    const s = staged(at(4).s);
+    s.update(frame(['skill']), STEP);
+    run(s, 0.05);
+    const t = s.world.home.trick!.t;
+    s.update(frame(['pause']), STEP);
+    run(s, 0.5);
+    expect(s.world.home.trick!.t).toBe(t);
+    s.update(frame(['confirm']), STEP);
+    expect(s.paused).toBe(false);
+    expect(s.world.home.trick!.t).toBe(t);
+    s.update(frame(), STEP);
+    expect(s.world.home.trick!.t).toBeCloseTo(t + STEP, 9);
+  });
+
+  it('pausing mid-confusion and resuming carries on from the same moment (Review Focus 3)', () => {
+    const s = staged(at(4).s);
+    fool(s);
+    const left = s.world.away.fooled!.leftS;
+    s.update(frame(['pause']), STEP);
+    run(s, 0.5);
+    s.update(frame(['confirm']), STEP);
+    expect(s.world.away.fooled!.leftS).toBe(left);
+  });
+
+  it("Options mid-match re-applies the tricks for the new difficulty, and leaves Sam's handling alone (Review Focus 3)", () => {
+    const { s, ctx } = at(6, matchById('park-boss')!);
+    const handling = s.world.away.handling;
+    const options = pickIn(s, 'OPTIONS')!;
+    options.update(frame(['right']), STEP);
+    options.update(frame(['back']), STEP);
+    expect(ctx.settings.difficulty).toBe('hard');
+    expect(s.world.tricks).toEqual(trickSetup('hard', 'sam'));
+    expect(s.world.away.handling).toBe(handling);
   });
 });

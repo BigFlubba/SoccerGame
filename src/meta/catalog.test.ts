@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { POWER_FORMS, POWER_MOVES, buyMove, grantForms, moveStatus, powerKit } from './catalog';
+import { POWER_FORMS, POWER_MOVES, SKILL_MOVES_LEVEL, buyMove, grantForms, hasSkillMoves, moveStatus, powerKit } from './catalog';
 import { newProfile, type Profile } from './profile';
 
 const at = (level: number, coins = 0): Profile => ({ ...newProfile(), level, coins });
@@ -45,5 +45,13 @@ describe('catalog', () => {
     expect(wave && powerKit(wave)).toEqual({ golden: false });
     const both = buyMove(grantForms(at(5, 600)), 'energyWave');
     expect(both && powerKit(both)).toEqual({ golden: true });
+  });
+});
+
+describe('skill moves', () => {
+  it('are his from level 4, worked out from his level alone', () => {
+    expect(SKILL_MOVES_LEVEL).toBe(4);
+    expect(hasSkillMoves({ ...newProfile(), level: 3 })).toBe(false);
+    expect(hasSkillMoves({ ...newProfile(), level: 4 })).toBe(true);
   });
 });

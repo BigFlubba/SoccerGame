@@ -5,6 +5,7 @@ import { createWorld, type World } from '../game/world';
 import { NO_INTENT, NORMAL_HANDLING, stepPlayer } from '../game/player';
 import { SAM_HANDLING } from '../game/sam';
 import { HARD_KICK_SPEED, WHOOSH, matchFeedback, speedMemo } from './matchFeedback';
+import { quietTricks } from '../game/tricks';
 
 const quiet = (): ContactEvents => ({ touched: false, blocked: false, kicked: null, perfect: false, tackledBall: false, trippedOpponent: false });
 
@@ -196,5 +197,30 @@ describe("Sam's whoosh and skid", () => {
     const w = passing(400, 210, NORMAL_HANDLING);
     stepPlayer(w.away, { ...NO_INTENT, moveX: 1 }, 1 / 60, w.field, false);
     expect(matchFeedback(w, 'playing', speedMemo()).cues).not.toContain('skid');
+  });
+});
+
+describe('trick feedback', () => {
+  const tricked = (trick: Partial<ReturnType<typeof quietTricks>>) => {
+    const w = world();
+    w.events.trick = { ...quietTricks(), ...trick };
+    return matchFeedback(w, 'playing').cues;
+  };
+
+  it("a stepover's start swishes", () => {
+    expect(tricked({ started: 'stepover' })).toContain('stepover');
+  });
+
+  it("a flick's release pops", () => {
+    expect(tricked({ released: true })).toContain('flick');
+  });
+
+  it('a trick that fools someone gets the crowd\'s ooh', () => {
+    expect(tricked({ fooled: 'stepover' })).toContain('ooh');
+  });
+
+  it('a trick that fools nobody gets no ooh', () => {
+    expect(tricked({ started: 'stepover' })).not.toContain('ooh');
+    expect(tricked({ released: true })).not.toContain('ooh');
   });
 });

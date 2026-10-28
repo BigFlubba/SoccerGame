@@ -15,6 +15,7 @@ import type { GameArt, SpriteSet } from './art';
 import { depthSorted, type Drawable } from './depthSort';
 import { drawDog } from './dogView';
 import { drawSpeed, skidFacing } from './samView';
+import { drawTrickMarks } from './trickView';
 import {
   POWER_METER_X0,
   auraStrength,
@@ -51,6 +52,8 @@ export interface MatchHud {
   goldenCelebration: boolean;
   /** BONUS DONE!, while it shows after a goal moment. */
   bonusCallout: string | null;
+  /** STEPOVER! or RAINBOW FLICK!, over Harrison for a second after a trick fools someone; never during a goal moment. */
+  trickCallout: string | null;
   /** The away side's name on the HUD and its goal banner. */
   awayName: string;
   /** Where the match is played: its scenery. */
@@ -382,6 +385,7 @@ export function drawMatch(g: CanvasRenderingContext2D, w: World, cam: Camera, ar
   drawSkid(g, cam, w.away);
   drawTrail(g, cam, hud.trail);
   for (const d of depthSorted(pitchDrawables(w, cam, art, home, look, hud.awaySprites))) d.draw(g);
+  drawTrickMarks(g, cam, w, art, nowS);
   if (w.wave) {
     drawBeam(g, cam, w.wave, nowS);
     // Braced, he stands in front of the beam's broken end.
@@ -407,6 +411,10 @@ export function drawMatch(g: CanvasRenderingContext2D, w: World, cam: Camera, ar
     const kicker = hud.perfect.team === 'home' ? w.home : w.away;
     const at = screen(cam, kicker.x, kicker.y, kicker.z);
     drawText(g, art, 'PERFECT', at.x, at.y - 56, 1, 'energyGold');
+  }
+  if (hud.trickCallout && !moment) {
+    const at = screen(cam, w.home.x, w.home.y, w.home.z);
+    drawText(g, art, hud.trickCallout, at.x, at.y + PROMPT_Y, 1);
   }
   const prompt = powerPrompt(w);
   if (prompt) {

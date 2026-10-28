@@ -133,3 +133,16 @@ describe('the shop', () => {
     expect(STAT_INFO.speed).toEqual({ label: 'SPEED', blurb: 'RUN AND SPRINT FASTER' });
   });
 });
+
+describe('trick goals', () => {
+  it('one is TRICK GOAL +15, two are 2 TRICK GOALS +30', () => {
+    const lines = (n: number) => matchLines({ result: 'win', goalsFor: n, goalsAgainst: 1, styleGoals: Array(n).fill('trick'), goals: [], steals: 0 }, false).map(l => [l.label, l.coins]);
+    expect(lines(1)).toContainEqual(['TRICK GOAL', 15]);
+    expect(lines(2)).toContainEqual(['2 TRICK GOALS', 30]);
+  });
+
+  it('come after the other style goals', () => {
+    const labels = matchLines({ result: 'win', goalsFor: 2, goalsAgainst: 1, styleGoals: ['trick', 'header'], goals: [], steals: 0 }, false).map(l => l.label);
+    expect(labels.indexOf('TRICK GOAL')).toBeGreaterThan(labels.indexOf('HEADER'));
+  });
+});
