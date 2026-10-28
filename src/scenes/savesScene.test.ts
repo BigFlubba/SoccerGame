@@ -207,7 +207,7 @@ describe('saves', () => {
     const saves = step(shop, A, B, B) as SavesScene;
     expect(saves.kind).toBe('saves');
     expect(saves.cursor).toBe(1);
-    const options = step(saves, frame(['down']), A, A, frame(['down']), frame(['down']), A);
+    const options = step(saves, frame(['down']), A, A, frame(['down']), frame(['down']), frame(['down']), A);
     expect(options.kind).toBe('options');
     options.update(frame(['right']), STEP);
     expect(ctx.saves.read(1)).toMatchObject({ name: 'ONE', difficulty: 'easy', stats: { speed: 2 } });

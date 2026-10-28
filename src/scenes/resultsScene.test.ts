@@ -5,6 +5,7 @@ import type { GoalRecord, MatchSummary } from '../meta/economy';
 import { nextMatch } from '../meta/ladder';
 import { newProfile, type Profile } from '../meta/profile';
 import { applyMatch } from '../meta/progress';
+import { MILESTONES } from '../meta/milestones';
 import { LINE_S, SKIP_GRACE_S, STAR_S, XP_FILL_S, bonusLine, careerLine, createResultsScene, footLines, milestoneLines, resultsItems, tallyAt, unlockLines, type ResultsScene } from './resultsScene';
 import type { ShopScene } from './shopScene';
 import { TEST_TODAY, testContext } from './testContext';
@@ -274,9 +275,16 @@ describe('careerLine', () => {
     expect(bonusLine(reward)).toBe('BONUS DONE: SCORE 3 GOALS');
     expect(bonusLine(after(LOSS_0_2).reward)).toBe('BONUS MISSED: SCORE 3 GOALS');
     const paid = after(LOSS_0_2, grantRungStars({ ...newProfile(), ladderWins: 10 }), boss).reward;
-    expect(milestoneLines(paid)).toEqual(['10 STARS! +300 COINS']);
+    expect(milestoneLines(paid)).toEqual(['10 STARS! +300 COINS', "NEW IN THE LOCKER ROOM: CAPTAIN'S ARMBAND"]);
     expect(milestoneLines(reward)).toEqual([]);
-    expect(footLines(paid, tallyAt(paid, Infinity), true)).toEqual(['BISCUIT TAKES THIS ONE. GO AGAIN!', '10 STARS! +300 COINS', 'UPGRADE READY IN THE SHOP!']);
+    // Three lines at most: the gift's line takes UPGRADE READY's place.
+    expect(footLines(paid, tallyAt(paid, Infinity), true)).toEqual(['BISCUIT TAKES THIS ONE. GO AGAIN!', '10 STARS! +300 COINS', "NEW IN THE LOCKER ROOM: CAPTAIN'S ARMBAND"]);
+  });
+
+  it("a milestone with a gift adds its line after the milestone's", () => {
+    const { reward } = after(WIN_3_0);
+    const at25 = { ...reward, career: { ...reward.career, milestones: [MILESTONES[1]!] } };
+    expect(milestoneLines(at25)).toEqual(['25 STARS! +600 COINS', 'NEW IN THE LOCKER ROOM: LIGHTNING BOOTS']);
   });
 
   it('NEXT MATCH plays the next unbeaten match; TRY AGAIN replays this one; Biscuit leads on to the Park', () => {

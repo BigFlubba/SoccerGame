@@ -40,6 +40,9 @@ const LINE_H = 10;
 const PANEL_PAD = 6;
 const CURSOR_GAP = 8;
 
+/** Where drawMenu puts item `i`'s text, for a menu whose panel starts at `top`. */
+export const menuItemY = (top: number, i: number): number => top + PANEL_PAD - 1 + i * LINE_H;
+
 /** A centred menu panel with the selected item in gold behind a cursor. */
 export function drawMenu(g: CanvasRenderingContext2D, art: GameArt, m: MenuState, cx: number, top: number): void {
   const widest = Math.max(...m.items.map(s => art.text(s, 1, 'white', 'outline').width));
@@ -52,7 +55,7 @@ export function drawMenu(g: CanvasRenderingContext2D, art: GameArt, m: MenuState
   m.items.forEach((item, i) => {
     const selected = i === m.index;
     const t = art.text(item, 1, selected ? 'energyGold' : 'white', 'outline');
-    const y = top + PANEL_PAD - 1 + i * LINE_H;
+    const y = menuItemY(top, i);
     const x = Math.round(cx - t.width / 2);
     g.drawImage(t, x, y);
     if (selected) g.drawImage(art.text('+', 1, 'energyGold', 'outline'), x - CURSOR_GAP, y);

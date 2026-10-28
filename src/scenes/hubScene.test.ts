@@ -3,10 +3,12 @@ import { DIFFICULTY, type Difficulty } from '../game/ai';
 import { measureText } from '../art/font';
 import { careerCardLines } from '../meta/career';
 import { maxStats } from '../meta/ladder';
+import type { LockerItemId } from '../meta/locker';
 import { newProfile } from '../meta/profile';
 import { CARD, HUB_ITEMS, TEXT_X, XP_BAR, createHubScene, saveLabel, statsLine } from './hubScene';
 import type { MatchScene } from './matchScene';
 import type { SavesScene } from './savesScene';
+import { fakeArt, recordingContext } from './testDraw';
 import { testContext } from './testContext';
 import { frame } from './testInput';
 import { createPressStartScene } from './titleScene';
@@ -32,8 +34,45 @@ describe('press start screen', () => {
 });
 
 describe('hub', () => {
-  it('the Hub has CAREER, SHOP, OPTIONS, HELP, SAVES and no quit', () => {
-    expect(HUB_ITEMS).toEqual(['CAREER', 'SHOP', 'OPTIONS', 'HELP', 'SAVES']);
+  it('the Hub has CAREER, SHOP, LOCKER ROOM, OPTIONS, HELP, SAVES and no quit', () => {
+    expect(HUB_ITEMS).toEqual(['CAREER', 'SHOP', 'LOCKER ROOM', 'OPTIONS', 'HELP', 'SAVES']);
+  });
+
+  it('LOCKER ROOM is third, and opens the room', () => {
+    expect(HUB_ITEMS.indexOf('LOCKER ROOM')).toBe(2);
+    const room = createHubScene(context(), 2).update(frame(['confirm']), STEP);
+    expect(room?.kind).toBe('lockerRoom');
+  });
+
+  it('B from the room comes back on LOCKER ROOM', () => {
+    const ctx = context();
+    const room = createHubScene(ctx, 2).update(frame(['confirm']), STEP)!;
+    const hub = room.update(frame(['back']), STEP)!;
+    expect(hub.kind).toBe('hub');
+    const next = hub.update(frame(['confirm']), STEP);
+    expect(next?.kind).toBe('lockerRoom');
+  });
+
+  it('NEW beside LOCKER ROOM while a gift is unseen', () => {
+    const p = newProfile();
+    const drawnWith = (seen: LockerItemId[]) => {
+      const ctx = testContext({ art: fakeArt(), profile: { ...p, career: { ...p.career, milestonesPaid: 1 }, locker: { ...p.locker, seen } } });
+      const { g, drawn } = recordingContext();
+      createHubScene(ctx).draw(g, 0);
+      return drawn;
+    };
+    expect(drawnWith([])).toContain('art.text(NEW,1,flameLight,outline)');
+  });
+
+  it("not once it's seen", () => {
+    const p = newProfile();
+    const ctx = testContext({ art: fakeArt(), profile: { ...p, career: { ...p.career, milestonesPaid: 1 }, locker: { ...p.locker, seen: ['extra:armband'] } } });
+    const { g, drawn } = recordingContext();
+    createHubScene(ctx).draw(g, 0);
+    expect(drawn).not.toContain('art.text(NEW,1,flameLight,outline)');
+    const fresh = recordingContext();
+    createHubScene(testContext({ art: fakeArt() })).draw(fresh.g, 0);
+    expect(fresh.drawn).not.toContain('art.text(NEW,1,flameLight,outline)');
   });
 
   it('CAREER opens the road map, and A there then A plays the next match through the VS card', () => {
@@ -85,7 +124,7 @@ describe('hub', () => {
 
   it('Start on the Hub starts the selected item, like A', () => {
     expect(createHubScene(context()).update(frame(['pause']), STEP)?.kind).toBe('roadMap');
-    expect(createHubScene(context(), 3).update(frame(['pause']), STEP)?.kind).toBe('help');
+    expect(createHubScene(context(), HUB_ITEMS.indexOf('HELP')).update(frame(['pause']), STEP)?.kind).toBe('help');
   });
 
   it('Esc on the Hub goes back to SAVES', () => {
@@ -106,7 +145,7 @@ describe('hub', () => {
   });
 
   it('OPTIONS opens Options, and B there comes back to the Hub on OPTIONS', () => {
-    const s = createHubScene(context(), 2);
+    const s = createHubScene(context(), HUB_ITEMS.indexOf('OPTIONS'));
     const options = s.update(frame(['confirm']), STEP);
     expect(options?.kind).toBe('options');
     const back = options!.update(frame(['back']), STEP);

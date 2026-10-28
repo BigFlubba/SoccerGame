@@ -6,16 +6,18 @@ import type { Profile } from '../meta/profile';
 import { drawBackdrop } from './backdrop';
 import type { GameContext } from './context';
 import { createHelpScene } from './helpScene';
-import { drawMenu, menuAudio, menuCue, stepMenu, type MenuState } from './menu';
+import { drawMenu, menuAudio, menuCue, menuItemY, stepMenu, type MenuState } from './menu';
 import { createOptionsScene } from './optionsScene';
 import { drawBar, drawCoins, drawPanel } from './panel';
 import { createRoadMapScene } from './roadMapScene';
 import { createSavesScene } from './savesScene';
 import type { Scene } from './scene';
 import { createShopScene } from './shopScene';
+import { createLockerRoomScene } from './lockerRoomScene';
+import { unseenGifts } from '../meta/locker';
 
 /** No QUIT: a web page can't close its own tab. */
-export const HUB_ITEMS = ['CAREER', 'SHOP', 'OPTIONS', 'HELP', 'SAVES'] as const;
+export const HUB_ITEMS = ['CAREER', 'SHOP', 'LOCKER ROOM', 'OPTIONS', 'HELP', 'SAVES'] as const;
 
 const SHORT: Record<StatName, string> = { speed: 'SPD', power: 'PWR', jump: 'JMP', control: 'CTL', stamina: 'STA' };
 export const CARD = { x: 16, y: 8, w: 288, h: 80 };
@@ -27,6 +29,8 @@ const CARD_RIGHT = CARD.x + CARD.w - 8;
 const MENU_TOP = 98;
 /** Right of centre, so the backdrop's juggling Harrison (who drifts across the left and middle) is never hidden behind it. */
 const MENU_CX = 248;
+/** NEW sits this far right of LOCKER ROOM's text. */
+const NEW_GAP = 3;
 
 /** His five stats in short, e.g. SPD 3  PWR 2  JMP 1  CTL 4  STA 2. */
 export function statsLine(s: Stats): string {
@@ -41,9 +45,9 @@ export function saveLabel(p: Profile): string {
 /**
  * Harrison's card (portrait, level and XP, the save's name and
  * difficulty, coins, stats, and what's next in the career) over the
- * drifting Backyard, with CAREER, SHOP, OPTIONS, HELP and SAVES. Up/down
- * choose, A or Start confirms, and SAVES, B or Esc goes back to SAVES on
- * this save.
+ * drifting Backyard, with CAREER, SHOP, LOCKER ROOM (NEW beside it while
+ * a gift waits unseen), OPTIONS, HELP and SAVES. Up/down choose, A or
+ * Start confirms, and SAVES, B or Esc goes back to SAVES on this save.
  */
 export function createHubScene(ctx: GameContext, index = 0): Scene {
   const { art } = ctx;
@@ -62,6 +66,7 @@ export function createHubScene(ctx: GameContext, index = 0): Scene {
       if (r.back || chosen === 'SAVES') return createSavesScene(ctx, ctx.slot);
       if (chosen === 'CAREER') return createRoadMapScene(ctx);
       if (chosen === 'SHOP') return createShopScene(ctx, backHere);
+      if (chosen === 'LOCKER ROOM') return createLockerRoomScene(ctx, backHere);
       if (chosen === 'HELP') return createHelpScene(ctx, backHere);
       if (chosen === 'OPTIONS') return createOptionsScene(ctx, backHere, true);
       return null;
@@ -83,6 +88,11 @@ export function createHubScene(ctx: GameContext, index = 0): Scene {
       g.drawImage(art.text(career.first, 1, 'energyGold', 'outline'), TEXT_X, CARD.y + 54);
       if (career.second) g.drawImage(art.text(career.second, 1, 'silver', 'outline'), TEXT_X, CARD.y + 65);
       drawMenu(g, art, menu, MENU_CX, MENU_TOP);
+      if (unseenGifts(p).length > 0) {
+        const room = art.text('LOCKER ROOM', 1, 'white', 'outline');
+        const y = menuItemY(MENU_TOP, HUB_ITEMS.indexOf('LOCKER ROOM'));
+        g.drawImage(art.text('NEW', 1, 'flameLight', 'outline'), Math.round(MENU_CX - room.width / 2) + room.width + NEW_GAP, y);
+      }
     },
   };
 }

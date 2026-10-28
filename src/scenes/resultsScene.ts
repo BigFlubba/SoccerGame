@@ -3,6 +3,7 @@ import type { Expression } from '../art/harrison/portrait';
 import { BASE_W } from '../engine/viewport';
 import { nextCareerMatch, venueById } from '../meta/career';
 import { addXp, canUpgrade, xpToNext } from '../meta/economy';
+import { giftLine } from '../meta/locker';
 import { BONUSES, MAX_STARS } from '../meta/objectives';
 import type { MatchReward, Unlock } from '../meta/progress';
 import { drawBackdrop } from './backdrop';
@@ -91,9 +92,12 @@ export function bonusLine(reward: MatchReward): string {
   return `${reward.career.bonusDone ? 'BONUS DONE' : 'BONUS MISSED'}: ${label}`;
 }
 
-/** One line per milestone paid at this Results. */
+/** One line per milestone paid at this Results, each followed by its gift line. */
 export function milestoneLines(reward: MatchReward): string[] {
-  return reward.career.milestones.map(m => `${m.stars} STARS! +${m.coins} COINS`);
+  return reward.career.milestones.flatMap(m => {
+    const gift = giftLine(m.index);
+    return [`${m.stars} STARS! +${m.coins} COINS`, ...(gift ? [gift] : [])];
+  });
 }
 
 const UNLOCK_TEXT: Record<Unlock, string> = {
