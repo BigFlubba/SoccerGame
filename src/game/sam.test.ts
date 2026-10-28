@@ -2,7 +2,8 @@ import { describe, expect, it } from 'vitest';
 import { seeded } from '../engine/random';
 import { BALL_REST_Y } from './ball';
 import { shot, SWEET_SPOT } from './kick';
-import { NO_INTENT } from './player';
+import { NO_INTENT, createPlayer, stepPlayer } from './player';
+import { BACKYARD } from './field';
 import { SAM_HANDLING, SAM_PROFILES, SAM_STATS } from './sam';
 import { SPRINT_MULTIPLIER, runSpeed } from './stats';
 import { createWorld, stepWorld } from './world';
@@ -46,6 +47,17 @@ describe('Speedy Sam', () => {
     expect(furthest).toBeGreaterThanOrEqual(30);
     expect(furthest).toBeLessThanOrEqual(45);
     expect(furthest).toBeLessThan(SAM_HANDLING.ballAhead);
+  });
+
+  it('reversing from flat out on Normal, he shows the skid for 0.3 to 0.5 s', () => {
+    const p = Object.assign(createPlayer('away', SAM_STATS, 300, -1), { handling: SAM_HANDLING, vx: -flatOut('normal') });
+    let skidS = 0;
+    for (let t = 0; t < 60; t++) {
+      stepPlayer(p, { ...NO_INTENT, moveX: 1, sprint: true, pace: SAM_PROFILES.normal.paceFactor }, 1 / 60, BACKYARD, false);
+      if (p.anim.name === 'skid') skidS += 1 / 60;
+    }
+    expect(skidS).toBeGreaterThanOrEqual(0.3);
+    expect(skidS).toBeLessThanOrEqual(0.5);
   });
 
   it('from flat out his brakes take 0.3 to 0.5 s to stop him', () => {

@@ -27,11 +27,11 @@ const samProfile = (d: Difficulty, dials: Dials): AiProfile => ({ ...DIFFICULTY[
  * so Hard keeps Normal's pace. Mutable like DIFFICULTY, for headless sweeps.
  *
  * Measured by samTuning.test.ts on seeds 100–163 at the tuning stats, as
- * racer / matador wins: Easy 0.156 / 0.859, Normal 0.078 / 0.500, Hard
- * 0.094 / 0.406.
+ * racer / matador wins: Easy 0.188 / 0.922, Normal 0.094 / 0.609, Hard
+ * 0.109 / 0.422.
  */
 export const SAM_PROFILES: Record<Difficulty, AiProfile> = {
   easy: samProfile('easy', { paceFactor: 1, rangeShot: 0.5, kickoffRush: false, kickoffSpot: { back: 110, off: 8 } }),
-  normal: samProfile('normal', { paceFactor: 1.08, rangeShot: 0.35, kickoffRush: false, kickoffSpot: { back: 110, off: 8 }, cleanSteal: 0.55, wrongFootedS: 0.2, aggression: 0.45 }),
-  hard: samProfile('hard', { paceFactor: 1.08, rangeShot: 0.1, kickoffRush: false, kickoffSpot: { back: 110, off: 10 } }),
+  normal: samProfile('normal', { paceFactor: 1.08, rangeShot: 0.35, kickoffRush: false, kickoffSpot: { back: 110, off: 8 }, cleanSteal: 0.55, wrongFootedS: 0.2 }),
+  hard: samProfile('hard', { paceFactor: 1.08, rangeShot: 0.1, kickoffRush: false, kickoffSpot: { back: 110, off: 10 }, aggression: 0.6 }),
 };

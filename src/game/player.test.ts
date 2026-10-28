@@ -600,7 +600,7 @@ describe('handling: soft brakes and the skid', () => {
     const p = flatOut(SOFT);
     expect(skidding(p, NO_INTENT)).toBe(true);
     expect(skidding(p, intent({ moveX: 1 }))).toBe(false);
-    p.vx = 50;
+    p.vx = 10;
     expect(skidding(p, intent({ moveX: -1 }))).toBe(false);
   });
 

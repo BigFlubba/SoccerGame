@@ -204,8 +204,10 @@ export function matadorIntent(w: World, t: number, dt: number, memo: MatadorMemo
   const samHas = maxHasBall(sam, ball);
   if (samHas && !memo.samHad) memo.holdAt = HOLD_AT.from + memo.rng() * HOLD_AT.spread;
   memo.samHad = samHas;
-  // Sam's ball, or one he didn't play last, in his reach and not at Sam's feet: the gap, or a slow shot rolling by.
-  if (me.stealCooldownS === 0 && (samHas || ball.touchedBy !== 'home') && inStealReach(w) && !ballAtFeet(sam, ball)) return { ...NO_INTENT, faceX: 1, steal: true };
+  // In his reach and not at Sam's feet: Sam's ball in the gap, a ball coming at him (a slow shot rolling by), or one not under his own control.
+  const coming = !settled(w) && (me.x - ball.x) * ball.vx + (me.z - ball.z) * ball.vz > 0;
+  const stealable = samHas || coming || !maxHasBall(me, ball);
+  if (me.stealCooldownS === 0 && stealable && inStealReach(w) && !ballAtFeet(sam, ball)) return { ...NO_INTENT, faceX: 1, steal: true };
   if (maxHasBall(me, ball)) return onTheBall(w, t, memo);
   memo.seenS = null;
   // A loose ball is Sam's to defend only near him and in front of him, with room goal-side of him:

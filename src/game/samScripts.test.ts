@@ -117,6 +117,11 @@ describe('the matador', () => {
     expect(i.moveX > 0 || i.steal).toBe(true);
   });
 
+  it("judges by what he can see: a still ball at his own feet is his to play, whoever touched it last", () => {
+    const w = stage({ harrison: [300, 32], sam: [420, 32], ball: [308, 32], touchedBy: 'away' });
+    expect(matadorIntent(w, 0, STEP, steady()).steal).toBeFalsy();
+  });
+
   it('steals a slow range shot rolling past him', () => {
     const w = stage({ harrison: [200, 32], sam: [400, 32], ball: [214, 32], ballV: -150, touchedBy: 'away' });
     expect(matadorIntent(w, 0, STEP, steady()).steal).toBe(true);

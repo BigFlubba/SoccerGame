@@ -81,6 +81,28 @@ describe('the drag-back', () => {
     expect(startDragBack(w, run(-1))).toBe(true);
   });
 
+  it("a ball Sam knocked on that comes to rest at Harrison's feet is Harrison's: he can drag it back as Sam closes", () => {
+    const w = stage({ x: 300, facing: 1, bx: 310, max: 345 });
+    Object.assign(w.away, { facing: -1, handling: { ...NORMAL_HANDLING, decel: 500, ballAhead: 48 } });
+    w.ball.touchedBy = 'away';
+    stepWorld(w, NO_INTENT, NO_INTENT, STEP);
+    expect(w.ball.touchedBy).toBe('home');
+    expect(startDragBack(w, run(-1))).toBe(true);
+  });
+
+  it("Sam's long touch bouncing off Harrison's body is Harrison's ball now", () => {
+    const w = stage({ x: 300, facing: 1, bx: 330, max: 380 });
+    Object.assign(w.away, { facing: -1, handling: { ...NORMAL_HANDLING, decel: 500, ballAhead: 48 } });
+    Object.assign(w.ball, { vx: -280, touchedBy: 'away' });
+    let bounced = false;
+    for (let i = 0; i < 30 && !bounced; i++) {
+      stepWorld(w, NO_INTENT, NO_INTENT, STEP);
+      bounced = w.ball.vx > 0;
+    }
+    expect(bounced).toBe(true);
+    expect(w.ball.touchedBy).toBe('home');
+  });
+
   it('only a firm push back the other way starts it, on the ground, in play', () => {
     expect(startDragBack(stage({ x: 300, facing: 1, bx: 310 }), run(-0.3))).toBe(false);
     expect(startDragBack(stage({ x: 300, facing: 1, bx: 310 }), run(1))).toBe(false);

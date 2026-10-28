@@ -8,7 +8,8 @@ import { LADDER_MATCHES, maxStats } from '../meta/ladder';
 import { SAM_HANDLING, SAM_PROFILES, SAM_STATS } from './sam';
 import type { Aim } from './kick';
 import { METER_MIN_REFILL_S, WAVE_READY_S, canStartPower } from './power';
-import { BASE_STATS, STAT_NAMES, runSpeed, type StatName, type Stats } from './stats';
+import { BASE_STATS, STAT_NAMES, runSpeed, touchPush, type StatName, type Stats } from './stats';
+import { ROLL_FRICTION } from './constants';
 import { FAKE, defendSpot } from './styles';
 import { CREW_PROFILES, CREW_STATS } from './crew';
 import { maxHasBall } from './steal';
@@ -985,17 +986,24 @@ describe('Speedy Sam: all gas, no brakes', () => {
     expect(brain.plan).toBe('dribble');
   });
 
-  it('dribbling at an open goal he only shoots once inside his shooting range, and the ball goes in off a touch or that shot', () => {
+  it("dribbling at an open goal he never winds up from beyond his range; a long touch may roll in, but never from further than it can roll", () => {
+    // Flat out, his touch sends the ball at his speed plus his push: it rolls (v²/2·friction) about 260 px before it stops.
+    const touchRoll = (211 + SAM_HANDLING.touchScale * touchPush(SAM_STATS)) ** 2 / (2 * ROLL_FRICTION);
     for (const seed of [1, 2, 3, 4, 5, 6]) {
       const { w, brain } = samWorld({ sam: [520, 32], harrison: [620, 60], ball: [512, 32], touchedBy: 'away' });
       w.rng = seeded(seed);
-      let firstChargeAt: number | null = null;
+      const chargesFrom: number[] = [];
+      let lastTouchFrom = Infinity;
       for (let t = 0; t < 600 && w.events.goal === null; t++) {
+        const wasCharging = w.away.state === 'charging';
         stepWorld(w, NO_INTENT, think(brain, w, w.away, w.home, STEP), STEP);
-        if (firstChargeAt === null && w.away.state === 'charging') firstChargeAt = w.away.x - w.field.goals[0].lineX;
+        const line = w.field.goals[0].lineX;
+        if (!wasCharging && w.away.state === 'charging') chargesFrom.push(w.away.x - line);
+        if (w.events.kicks[1]!.touched || w.events.kicks[1]!.kicked) lastTouchFrom = w.ball.x - line;
       }
       expect(w.events.goal, `seed ${seed}`).toBe('away');
-      if (firstChargeAt !== null) expect(firstChargeAt, `seed ${seed}`).toBeLessThanOrEqual(SAM_PROFILES.normal.shootRange + 16);
+      for (const d of chargesFrom) expect(d, `seed ${seed}`).toBeLessThanOrEqual(SAM_PROFILES.normal.shootRange + 16);
+      expect(lastTouchFrom, `seed ${seed}`).toBeLessThanOrEqual(touchRoll);
     }
   });
 

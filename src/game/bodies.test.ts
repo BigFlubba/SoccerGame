@@ -249,6 +249,18 @@ describe('soft brakes: a runner who can\'t stop brushes past a body', () => {
     expect(runner.z).toBeGreaterThan(12);
   });
 
+  it.each([
+    ['chasing back behind Harrison, both into the mouth', 609, 30, 601, 31, 200, 0],
+    ['coming across the mouth in depth', 609, 30, 608, 22, 0, 200],
+  ] as const)("brushing past Harrison as he steps into a goal mouth never leaves him inside the goal (Sam %s)", (_, hx, hz, sx, sz, svx, svz) => {
+    const goal = BACKYARD.goals[1];
+    const harrison = Object.assign(createPlayer('home', BASE_STATS, hx, 1, hz), { vx: 170 });
+    const runner = Object.assign(createPlayer('away', FAST, sx, -1, sz), { handling: SOFT, vx: svx, vz: svz });
+    resolveBodies(harrison, runner, BACKYARD);
+    for (const p of [harrison, runner]) expect(inGoalBox(goal, p.x, p.z, PLAYER_R - 0.01), `${p.team} at (${p.x.toFixed(1)}, ${p.z.toFixed(1)})`).toBe(false);
+    expect(gap(harrison, runner)).toBeGreaterThanOrEqual(2 * PLAYER_R - 1e-6);
+  });
+
   it('with normal brakes the body stops him, as always', () => {
     const { runner, stander } = charge(32, NORMAL_HANDLING);
     expect(runner.x).toBeGreaterThan(stander.x);

@@ -141,7 +141,12 @@ function brushPast(runner: Player, other: Player, field: Field): boolean {
  * of the push, so nobody is left overlapping or wedged.
  */
 export function resolveBodies(a: Player, b: Player, field: Field): void {
-  if (brushPast(a, b, field) || brushPast(b, a, field)) return;
+  // A brush past still keeps both on the pitch and out of the goals; if that brings them back together, they settle as usual.
+  if (brushPast(a, b, field) || brushPast(b, a, field)) {
+    confine(a, field);
+    confine(b, field);
+    if (!overlapping(a, b)) return;
+  }
   for (let pass = 0; pass < SOLVE_PASSES; pass++) {
     separatePlayers(a, b);
     const pinnedA = confine(a, field);

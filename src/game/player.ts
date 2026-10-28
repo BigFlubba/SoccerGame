@@ -131,8 +131,8 @@ export const ACCEL = 900;
 export const DECEL = 1200;
 /** Everyone's handling but Speedy Sam's: today's brakes, touch and shot. */
 export const NORMAL_HANDLING: Readonly<Handling> = Object.freeze({ decel: DECEL, touchScale: 1, shotScale: 1, ballAhead: 16 });
-/** Above this speed, soft brakes skid: from flat out that's most of the stop, about 0.3 s. */
-const SKID_SPEED = 60;
+/** Above this speed, soft brakes skid: from flat out that's nearly the whole stop, 0.3 s on Sam's brakes. */
+const SKID_SPEED = 15;
 const AIR_ACCEL = 400;
 const CHARGE_MOVE_FACTOR = 0.5;
 /** A release below this charge is a tap and uses TAP_CHARGE. */

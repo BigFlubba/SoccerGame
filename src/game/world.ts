@@ -72,6 +72,8 @@ export interface World {
   tick: number;
 }
 
+/** A ball slower than this, px/s, is at rest. */
+const BALL_RESTING = 40;
 /** Where the kicking-off player stands, behind the ball. */
 const KICKOFF_GAP = 12;
 /** How far inside his own half the other player waits. */
@@ -306,6 +308,9 @@ export function stepWorld(w: World, homeIntent: PlayerIntent, awayIntent: Player
     const second = homeFirst ? contact(w.away, home) : contact(home, w.away);
     kicks = homeFirst ? [first, second] : [second, first];
   }
+  // A ball Harrison blocks, or that comes to rest at his feet, is his: the other side's long touch no longer claims it.
+  const resting = Math.hypot(w.ball.vx, w.ball.vz) < BALL_RESTING;
+  if (kicks[0]?.blocked || (resting && ballAtFeet(home, w.ball))) w.ball.touchedBy = 'home';
   w.tick++;
   if (w.power && !power.fired && (wasActive || power.started)) {
     if (w.power.activeS > 0 && powerEnds(w, live, kicks)) w.power.activeS = 0;
