@@ -11,9 +11,9 @@ const BEHIND: Scene = { kind: 'hub', update: () => null, draw: () => {} };
 const withCoins = (coins: number, stats = newProfile().stats) => testContext({ profile: { ...newProfile(), coins, stats } });
 
 describe('shop', () => {
-  it('lists the four stats in order', () => {
-    expect(STAT_NAMES.map(k => shopRow(k, newProfile()))).toEqual(['SPEED  LV 1  150', 'POWER  LV 1  150', 'JUMP  LV 1  150', 'CONTROL  LV 1  150']);
-    const p = { ...newProfile(), stats: { speed: 10, power: 2, jump: 1, control: 1 } };
+  it('lists the five stats in order', () => {
+    expect(STAT_NAMES.map(k => shopRow(k, newProfile()))).toEqual(['SPEED  LV 1  150', 'POWER  LV 1  150', 'JUMP  LV 1  150', 'CONTROL  LV 1  150', 'STAMINA  LV 1  150']);
+    const p = { ...newProfile(), stats: { speed: 10, power: 2, jump: 1, control: 1, stamina: 1 } };
     expect(shopRow('speed', p)).toBe('SPEED  LV 10  MAX');
     expect(shopRow('power', p)).toBe('POWER  LV 2  205');
   });
@@ -48,7 +48,7 @@ describe('shop', () => {
   });
 
   it('at level 10: nope, nothing saved', () => {
-    const ctx = withCoins(99999, { speed: 10, power: 1, jump: 1, control: 1 });
+    const ctx = withCoins(99999, { speed: 10, power: 1, jump: 1, control: 1, stamina: 1 });
     const s = createShopScene(ctx, () => BEHIND);
     s.update(frame(['confirm']), STEP);
     expect(s.message).toBe('MAX LEVEL');
@@ -60,13 +60,26 @@ describe('shop', () => {
     const ctx = withCoins(1000);
     const s = createShopScene(ctx, () => BEHIND);
     s.update(frame(['up']), STEP);
-    expect(s.row).toBe(4);
+    expect(s.row).toBe(5);
     s.update(frame(['down']), STEP);
     s.update(frame(['down']), STEP);
     expect(s.row).toBe(1);
     expect(ctx.audio.played.filter(c => c === 'menuMove')).toHaveLength(3);
     s.update(frame(['confirm']), STEP);
-    expect(ctx.profile.stats).toEqual({ speed: 1, power: 2, jump: 1, control: 1 });
+    expect(ctx.profile.stats).toEqual({ speed: 1, power: 2, jump: 1, control: 1, stamina: 1 });
+  });
+
+  it('four downs from SPEED reach STAMINA, A buys it, and a fifth reaches the Energy Wave', () => {
+    const ctx = withCoins(150);
+    const s = createShopScene(ctx, () => BEHIND);
+    for (let i = 0; i < 4; i++) s.update(frame(['down']), STEP);
+    expect(s.row).toBe(4);
+    s.update(frame(['confirm']), STEP);
+    expect(ctx.profile.stats.stamina).toBe(2);
+    expect(ctx.profile.coins).toBe(0);
+    expect(ctx.savedProfiles).toHaveLength(1);
+    s.update(frame(['down']), STEP);
+    expect(s.row).toBe(5);
   });
 
   it('moving to another stat clears the message', () => {
@@ -114,14 +127,14 @@ describe('shop: power moves', () => {
     expect(moveRow({ ...newProfile(), level: 3, powerMoves: { owned: ['energyWave'], equipped: 'energyWave' } })).toBe('ENERGY WAVE  OWNED');
   });
 
-  it('the cursor wraps through five rows', () => {
+  it('the cursor wraps through six rows', () => {
     const s = createShopScene(at(1, 0), () => BEHIND);
     s.update(frame(['up']), STEP);
-    expect(s.row).toBe(4);
+    expect(s.row).toBe(5);
     s.update(frame(['down']), STEP);
     expect(s.row).toBe(0);
-    for (let i = 0; i < 4; i++) s.update(frame(['down']), STEP);
-    expect(s.row).toBe(4);
+    for (let i = 0; i < 5; i++) s.update(frame(['down']), STEP);
+    expect(s.row).toBe(5);
   });
 
   it('a locked Energy Wave plays nope and says REACH LEVEL 3', () => {

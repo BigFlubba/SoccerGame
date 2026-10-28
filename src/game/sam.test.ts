@@ -12,7 +12,7 @@ const DIFFS = ['easy', 'normal', 'hard'] as const;
 /** Biscuit's top speed, px/s. */
 const BISCUIT = 183;
 /** The tuning Harrison's sprint: Speed 7. */
-const TUNING_SPRINT = runSpeed({ speed: 7, power: 5, jump: 4, control: 5 }) * SPRINT_MULTIPLIER;
+const TUNING_SPRINT = runSpeed({ speed: 7, power: 5, jump: 4, control: 5, stamina: 1 }) * SPRINT_MULTIPLIER;
 const flatOut = (d: (typeof DIFFS)[number]) => runSpeed(SAM_STATS) * SPRINT_MULTIPLIER * SAM_PROFILES[d].paceFactor;
 
 describe('Speedy Sam', () => {
@@ -32,7 +32,7 @@ describe('Speedy Sam', () => {
   });
 
   it('flat out on Normal, his touch runs 30 to 45 px ahead of him, inside his reach for his own ball', () => {
-    const w = createWorld({ speed: 7, power: 5, jump: 4, control: 5 }, SAM_STATS, 1, { home: 0, away: 0 }, null, null, SAM_PROFILES.normal, SAM_HANDLING);
+    const w = createWorld({ speed: 7, power: 5, jump: 4, control: 5, stamina: 1 }, SAM_STATS, 1, { home: 0, away: 0 }, null, null, SAM_PROFILES.normal, SAM_HANDLING);
     w.match.phase = 'playing';
     Object.assign(w.home, { x: 600, z: 60 });
     Object.assign(w.away, { x: 500, z: 32, facing: -1, vx: -flatOut('normal') });

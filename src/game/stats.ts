@@ -6,13 +6,14 @@ export interface Stats {
   power: number;
   jump: number;
   control: number;
+  stamina: number;
 }
 
 export type StatName = keyof Stats;
 
-export const STAT_NAMES: readonly StatName[] = ['speed', 'power', 'jump', 'control'];
+export const STAT_NAMES: readonly StatName[] = ['speed', 'power', 'jump', 'control', 'stamina'];
 
-export const BASE_STATS: Stats = { speed: 1, power: 1, jump: 1, control: 1 };
+export const BASE_STATS: Stats = { speed: 1, power: 1, jump: 1, control: 1, stamina: 1 };
 
 export const MIN_STAT_LEVEL = 1,
   MAX_STAT_LEVEL = 10;
@@ -34,3 +35,7 @@ export const maxShotSpeed = (s: Stats): number => curve(s.power, 430, 640);
 export const chargeTime = (s: Stats): number => curve(s.power, 0.9, 0.6);
 /** How hard a dribble touch pushes the ball ahead of him, px/s: better control keeps it closer. */
 export const touchPush = (s: Stats): number => curve(s.control, 60, 25);
+/** Sprint spent per second: a full bar lasts 2 s at level 1, 4 s at level 10. */
+export const staminaDrain = (s: Stats): number => curve(s.stamina, 0.5, 0.25);
+/** Sprint won back per second, not sprinting. */
+export const staminaRegen = (s: Stats): number => curve(s.stamina, 0.3, 0.45);

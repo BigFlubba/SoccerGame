@@ -435,6 +435,35 @@ describe('stepPlayer: stamina and falls', () => {
     expect(p.stamina).toBeGreaterThanOrEqual(0.25);
   });
 
+  /** Ticks of `i` from now until `done` holds. */
+  function ticksUntil(p: Player, i: Partial<PlayerIntent>, done: (p: Player) => boolean): number {
+    let n = 0;
+    while (!done(p) && n < 1000) {
+      tick(p, i);
+      n++;
+    }
+    return n;
+  }
+
+  it('a full bar lasts 2 s of sprinting at Stamina 1 and 4 s at Stamina 10', () => {
+    const sprint = { moveX: 1, sprint: true };
+    const lasts = (stamina: number) => ticksUntil(createPlayer('home', { ...BASE_STATS, stamina }, 100, 1), sprint, p => p.exhausted);
+    expect(Math.abs(lasts(1) - 120)).toBeLessThanOrEqual(1);
+    expect(Math.abs(lasts(10) - 240)).toBeLessThanOrEqual(1);
+  });
+
+  it('an empty bar refills in 3.3 s at Stamina 1 and 2.2 s at Stamina 10', () => {
+    for (const [stamina, expected] of [
+      [1, 200],
+      [10, 134],
+    ] as const) {
+      const p = createPlayer('home', { ...BASE_STATS, stamina }, 320, 1);
+      p.stamina = 0;
+      p.exhausted = true;
+      expect(Math.abs(ticksUntil(p, {}, q => q.stamina >= 1) - expected), `Stamina ${stamina}`).toBeLessThanOrEqual(1);
+    }
+  });
+
   it('regenerates stamina when not sprinting', () => {
     const p = harrison();
     p.stamina = 0.5;
@@ -549,7 +578,7 @@ describe('bracing and blown away', () => {
 
 describe('handling: soft brakes and the skid', () => {
   const SOFT: Handling = { ...NORMAL_HANDLING, decel: 500 };
-  const FAST = { speed: 10, power: 1, jump: 3, control: 3 };
+  const FAST = { speed: 10, power: 1, jump: 3, control: 3, stamina: 1 };
   /** A player flat out at 212 px/s to the right with `handling`. */
   const flatOut = (handling: Handling): Player => Object.assign(createPlayer('away', FAST, 200, 1), { handling, vx: 212 });
   /** Reverses the stick until he stops: how long it took, how far he went, and every pose he showed. */

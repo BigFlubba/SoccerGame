@@ -20,7 +20,7 @@ const SETUP: TrickSetup = { profile: TRICK_DIFFICULTY.normal, scale: { stepover:
 const RB: PlayerIntent = { ...NO_INTENT, trick: 'stepover' };
 const FLICK_PRESS: PlayerIntent = { ...NO_INTENT, trick: 'flick' };
 const run = (moveX: number): PlayerIntent => ({ ...NO_INTENT, moveX });
-const TUNING: Stats = { speed: 7, power: 5, jump: 4, control: 5 };
+const TUNING: Stats = { speed: 7, power: 5, jump: 4, control: 5, stamina: 1 };
 
 interface Stage {
   x?: number;

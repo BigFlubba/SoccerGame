@@ -107,9 +107,15 @@ describe('match scene', () => {
     expect(ctx.savedProfiles).toHaveLength(0);
   });
 
+  it('his Stamina reaches the match, and the opponent stays at Stamina 1', () => {
+    const s = createMatchScene(testContext({ profile: { ...newProfile(), stats: { ...BASE_STATS, stamina: 10 } } }), 1);
+    expect(s.world.home.stats.stamina).toBe(10);
+    expect(s.world.away.stats.stamina).toBe(1);
+  });
+
   it('Harrison plays with his bought stats', () => {
-    const s = createMatchScene(testContext({ profile: { ...newProfile(), stats: { speed: 4, power: 2, jump: 3, control: 1 } } }), 1);
-    expect(s.world.home.stats).toEqual({ speed: 4, power: 2, jump: 3, control: 1 });
+    const s = createMatchScene(testContext({ profile: { ...newProfile(), stats: { speed: 4, power: 2, jump: 3, control: 1, stamina: 1 } } }), 1);
+    expect(s.world.home.stats).toEqual({ speed: 4, power: 2, jump: 3, control: 1, stamina: 1 });
   });
 
   it('plays the next career match by default, Max at that rung', () => {

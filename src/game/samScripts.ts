@@ -19,7 +19,7 @@ import { REACH_Z, ballAtFeet } from './zones';
  */
 
 /** One level above Pete's: what Harrison can afford by the time he meets Sam. */
-export const SAM_TUNING_STATS: Readonly<Stats> = { speed: 7, power: 5, jump: 4, control: 5 };
+export const SAM_TUNING_STATS: Readonly<Stats> = { speed: 7, power: 5, jump: 4, control: 5, stamina: 1 };
 
 /**
  * The racer slides at Sam's ball within `slideAt` px of it, and shoots within `shootFrom` px of the line,

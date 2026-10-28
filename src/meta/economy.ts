@@ -128,4 +128,5 @@ export const STAT_INFO: Record<StatName, { label: string; blurb: string }> = {
   power: { label: 'POWER', blurb: 'HARDER SHOTS, QUICKER CHARGE' },
   jump: { label: 'JUMP', blurb: 'JUMP HIGHER FOR HEADERS' },
   control: { label: 'CONTROL', blurb: 'KEEP THE BALL CLOSE' },
+  stamina: { label: 'STAMINA', blurb: 'SPRINT LONGER, GET YOUR BREATH BACK FASTER' },
 };

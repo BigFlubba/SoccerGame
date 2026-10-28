@@ -17,7 +17,7 @@ export interface ShopScene extends Scene {
   readonly message: string | null;
 }
 
-const PANEL = { w: 220, h: 160, top: 12 };
+const PANEL = { w: 220, h: 166, top: 7 };
 const PAD = 8;
 const ROWS_Y = PANEL.top + 30;
 const ROW_H = 13;

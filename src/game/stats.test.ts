@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { GRAVITY } from './constants';
-import { BASE_STATS, chargeTime, jumpVelocity, maxShotSpeed, runSpeed, touchPush } from './stats';
+import { BASE_STATS, chargeTime, jumpVelocity, maxShotSpeed, runSpeed, staminaDrain, staminaRegen, touchPush } from './stats';
 
 describe('stats', () => {
   it('stat curves hit their level 1 and 10 targets', () => {
@@ -31,6 +31,16 @@ describe('stats', () => {
   });
 
   it('every base stat is level 1', () => {
-    expect(BASE_STATS).toEqual({ speed: 1, power: 1, jump: 1, control: 1 });
+    expect(BASE_STATS).toEqual({ speed: 1, power: 1, jump: 1, control: 1, stamina: 1 });
+  });
+
+  it("Stamina 1 is today's sprint exactly", () => {
+    expect(staminaDrain(BASE_STATS)).toBe(0.5);
+    expect(staminaRegen(BASE_STATS)).toBe(0.3);
+  });
+
+  it('Stamina 10 halves the drain and regens half as fast again', () => {
+    expect(staminaDrain({ ...BASE_STATS, stamina: 10 })).toBeCloseTo(0.25);
+    expect(staminaRegen({ ...BASE_STATS, stamina: 10 })).toBeCloseTo(0.45);
   });
 });

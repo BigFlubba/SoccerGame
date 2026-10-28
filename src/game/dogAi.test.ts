@@ -9,7 +9,7 @@ import { createWorld, stepWorld, type World } from './world';
 
 const STEP = 1 / 60;
 const ERR = { home: 0, away: 0 };
-const AWAY_STATS = { speed: 1, power: 1, jump: 1, control: 1 };
+const AWAY_STATS = { speed: 1, power: 1, jump: 1, control: 1, stamina: 1 };
 /** Max backs off to at least this far from the ball when he gets it right (ai.ts BACK_OFF_GAP.from). */
 const GOOD_GAP = 110;
 

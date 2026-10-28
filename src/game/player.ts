@@ -3,7 +3,7 @@ import { GRAVITY } from './constants';
 import { BACKYARD, playerSpan, type Field } from './field';
 import { TAP_CHARGE, type Aim } from './kick';
 import type { TrickKind } from './tricks';
-import { SPRINT_MULTIPLIER, chargeTime, jumpVelocity, runSpeed, type Stats } from './stats';
+import { SPRINT_MULTIPLIER, chargeTime, jumpVelocity, runSpeed, staminaDrain, staminaRegen, type Stats } from './stats';
 
 /**
  * jump and steal are one-tick pulses (pressed this tick); shootHeld/chipHeld/powerHeld
@@ -164,8 +164,6 @@ const VOLLEY_ACTIVE_S = 0.15;
 const SLIDE_SPEED = 190;
 const SLIDE_TIME = 0.45;
 const SLIDE_COOLDOWN = 0.8;
-const STAMINA_DRAIN = 0.5;
-const STAMINA_REGEN = 0.3;
 const EXHAUSTION_RECOVERY = 0.25;
 /** Below this speed he stands still. */
 const IDLE_SPEED = 5;
@@ -337,7 +335,7 @@ export function skidding(p: Player, intent: PlayerIntent): boolean {
 }
 
 function updateStamina(p: Player, sprinting: boolean, dt: number): void {
-  p.stamina = Math.min(1, Math.max(0, p.stamina + (sprinting ? -STAMINA_DRAIN : STAMINA_REGEN) * dt));
+  p.stamina = Math.min(1, Math.max(0, p.stamina + (sprinting ? -staminaDrain(p.stats) : staminaRegen(p.stats)) * dt));
   if (p.stamina === 0) p.exhausted = true;
   else if (p.exhausted && p.stamina >= EXHAUSTION_RECOVERY) p.exhausted = false;
 }

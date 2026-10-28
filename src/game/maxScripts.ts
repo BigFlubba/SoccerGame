@@ -60,10 +60,11 @@ const ON_SPOT = 0.5;
  */
 export const BEAT = { ahead: 30, lane: 10, past: 10, keep: 24, forS: 1.5 };
 
-/** An opponent's stats with every stat one level higher, capped: what Harrison can afford by the time he meets them. */
+/** An opponent's stats with every stat but Stamina one level higher, capped: what Harrison can afford by the time he meets them. */
 export function harrisonStatsFor(opponent: Stats): Stats {
   const up = { ...opponent };
-  for (const k of STAT_NAMES) up[k] = Math.min(opponent[k] + 1, MAX_STAT_LEVEL);
+  // Stamina stays the opponent's, so every scripted Harrison plays as he did before Stamina existed.
+  for (const k of STAT_NAMES) if (k !== 'stamina') up[k] = Math.min(opponent[k] + 1, MAX_STAT_LEVEL);
   return up;
 }
 

@@ -1,4 +1,4 @@
-import { STAT_NAMES } from '../game/stats';
+import type { StatName } from '../game/stats';
 import { BACKYARD, BOSS_ID, PARK, PARK_BOSS_ID } from './career';
 import { FORM_IDS, MOVE_IDS } from './catalog';
 import { TOTAL_NAMES, profileFrom, type Owned, type Profile } from './profile';
@@ -17,6 +17,8 @@ const DAY_MS = 86_400_000;
 const EPOCH_MS = Date.UTC(2000, 0, 1);
 /** A varint longer than this is junk, not a number. */
 const MAX_VARINT_BYTES = 8;
+/** The four stats every code carries mid-list, in their v1 order. Stamina is appended at the end (v5). */
+const CODE_STATS: readonly StatName[] = ['speed', 'power', 'jump', 'control'];
 
 /** Uppercase, with the look-alikes Crockford allows (O for 0, I and L for 1), and nothing outside the alphabet. */
 export function normaliseCode(text: string): string {
@@ -138,7 +140,7 @@ export function encodeSaveCode(p: Profile): string {
     p.coins,
     p.level,
     p.xp,
-    ...STAT_NAMES.map(k => p.stats[k]),
+    ...CODE_STATS.map(k => p.stats[k]),
     p.ladderWins,
     dayNumber(p.dailyWinDate),
     ...TOTAL_NAMES.map(k => p.totals[k]),
@@ -165,7 +167,7 @@ export function decodeSaveCode(text: string): Profile | null {
     coins: next(),
     level: next(),
     xp: next(),
-    stats: Object.fromEntries(STAT_NAMES.map(k => [k, next()])),
+    stats: Object.fromEntries(CODE_STATS.map(k => [k, next()])),
     ladderWins: next(),
     dailyWinDate: dateOf(next()),
     totals: Object.fromEntries(TOTAL_NAMES.map(k => [k, next()])),

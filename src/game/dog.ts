@@ -40,7 +40,7 @@ export const DOG_DIFFICULTY: Readonly<Record<Difficulty, DogProfile>> = {
 };
 
 /** The Harrison he's tuned against: one stat level above Max's last rung. */
-export const TUNING_STATS: Stats = { speed: 5, power: 5, jump: 3, control: 4 };
+export const TUNING_STATS: Stats = { speed: 5, power: 5, jump: 3, control: 4, stamina: 1 };
 export const DOG_SPEED_OVER_SPRINT = 1.12;
 /** His flat-out speed, px/s: the tuning Harrison's sprint and a bit. */
 export const DOG_SPEED = Math.round(runSpeed(TUNING_STATS) * SPRINT_MULTIPLIER * DOG_SPEED_OVER_SPRINT);

@@ -57,6 +57,7 @@ export const HELP_PAGES: readonly { title: string; lines: readonly string[] }[] 
       'X HITS A VOLLEY.',
       'RT SPRINTS, BUT IT USES STAMINA: THE BAR AT THE',
       'TOP LEFT. RUN IT DRY AND YOU SLOW DOWN FOR A BIT.',
+      'STAMINA IN THE SHOP MAKES IT LAST LONGER.',
     ],
   },
   {

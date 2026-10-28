@@ -20,9 +20,9 @@ describe('the Backyard Ladder', () => {
   });
 
   it('the table matches the spec', () => {
-    expect(maxStats(3)).toEqual({ speed: 2, power: 2, jump: 1, control: 1 });
-    expect(maxStats(7)).toEqual({ speed: 3, power: 3, jump: 2, control: 2 });
-    expect(maxStats(10)).toEqual({ speed: 4, power: 4, jump: 2, control: 3 });
+    expect(maxStats(3)).toEqual({ speed: 2, power: 2, jump: 1, control: 1, stamina: 1 });
+    expect(maxStats(7)).toEqual({ speed: 3, power: 3, jump: 2, control: 2, stamina: 1 });
+    expect(maxStats(10)).toEqual({ speed: 4, power: 4, jump: 2, control: 3, stamina: 1 });
   });
 
   it('maxStats is a copy', () => {

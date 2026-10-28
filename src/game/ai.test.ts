@@ -461,7 +461,8 @@ describe('think', () => {
     };
   }
 
-  const allAt = (n: number): Stats => Object.fromEntries(STAT_NAMES.map(k => [k, n])) as Record<StatName, number>;
+  /** Every stat at `n` but Stamina, which stays 1 so these matches play as before Stamina existed. */
+  const allAt = (n: number): Stats => ({ ...(Object.fromEntries(STAT_NAMES.map(k => [k, n])) as Record<StatName, number>), stamina: 1 });
 
   it.each(['easy', 'normal', 'hard'] as const)(
     'a whole AI-vs-AI match on %s: result, no NaN, both sides score, the ball never rests unreached for over 5 s, and nobody stands still for over 10 s in play',
@@ -884,7 +885,7 @@ describe('Pesky Pete', () => {
 });
 
 describe('Speedy Sam: all gas, no brakes', () => {
-  const TUNING: Stats = { speed: 7, power: 5, jump: 4, control: 5 };
+  const TUNING: Stats = { speed: 7, power: 5, jump: 4, control: 5, stamina: 1 };
   /** Sam in play, placed by hand, with his own handling, and his brain. */
   function samWorld(o: { sam: readonly [number, number]; harrison: readonly [number, number]; ball: readonly [number, number]; touchedBy?: 'home' | 'away' }, d: 'easy' | 'normal' | 'hard' = 'normal') {
     const profile = SAM_PROFILES[d];

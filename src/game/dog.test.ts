@@ -20,7 +20,7 @@ const LEFT_GOAL = BACKYARD.goals[0];
 /** A boss world in play, with the dog and Harrison where the test wants them and the ball at (bx, bz). */
 function boss(opts: { dog: [number, number]; home: [number, number]; ball: [number, number]; control?: number; d?: 'easy' | 'normal' | 'hard'; kit?: boolean }): World {
   const kit = opts.kit ? { golden: false } : null;
-  const w = createWorld({ ...TUNING_STATS, control: opts.control ?? TUNING_STATS.control }, { speed: 1, power: 1, jump: 1, control: 1 }, 7, ERR, kit, DOG_DIFFICULTY[opts.d ?? 'normal']);
+  const w = createWorld({ ...TUNING_STATS, control: opts.control ?? TUNING_STATS.control }, { speed: 1, power: 1, jump: 1, control: 1, stamina: 1 }, 7, ERR, kit, DOG_DIFFICULTY[opts.d ?? 'normal']);
   if (w.power) w.power.meter = 1;
   w.match.phase = 'playing';
   [w.away.x, w.away.z] = opts.dog;
@@ -218,7 +218,7 @@ describe('the dog', () => {
   });
 
   it('a world without a dog has no dog events and steps as before', () => {
-    const w = createWorld(TUNING_STATS, { speed: 1, power: 1, jump: 1, control: 1 }, 7, ERR);
+    const w = createWorld(TUNING_STATS, { speed: 1, power: 1, jump: 1, control: 1, stamina: 1 }, 7, ERR);
     expect(w.dog).toBeNull();
     stepWorld(w, still, still, STEP);
     expect(w.events.dog).toEqual({ grabbed: false, dropped: false, jinked: false, panted: false });

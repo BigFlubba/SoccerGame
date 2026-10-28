@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { DIFFICULTY } from '../game/ai';
+import { measureText } from '../art/font';
 import { careerCardLines } from '../meta/career';
 import { maxStats } from '../meta/ladder';
 import { newProfile } from '../meta/profile';
@@ -138,7 +139,11 @@ describe('hub', () => {
     expect(ctx.audio.music).toBe('title');
   });
 
-  it('shows his four stats in short', () => {
-    expect(statsLine({ speed: 3, power: 2, jump: 1, control: 10 })).toBe('SPD 3  PWR 2  JMP 1  CTL 10');
+  it('shows his five stats in short', () => {
+    expect(statsLine({ speed: 3, power: 2, jump: 1, control: 10, stamina: 4 })).toBe('SPD 3  PWR 2  JMP 1  CTL 10  STA 4');
+  });
+
+  it('the maxed stats line fits the card', () => {
+    expect(measureText(statsLine({ speed: 10, power: 10, jump: 10, control: 10, stamina: 10 }))).toBeLessThanOrEqual(200);
   });
 });

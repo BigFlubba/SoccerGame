@@ -5,9 +5,9 @@ import { harrisonIntent, harrisonStats, maxMatch, scriptMemo } from './maxScript
 import { createWorld } from './world';
 
 describe('the scripted Harrison against Max', () => {
-  it('harrisonStats is one level above Max on every stat', () => {
-    expect(harrisonStats(10)).toEqual({ speed: 5, power: 5, jump: 3, control: 4 });
-    expect(harrisonStats(1)).toEqual({ speed: 2, power: 2, jump: 2, control: 2 });
+  it('harrisonStats is one level above Max on every stat but Stamina', () => {
+    expect(harrisonStats(10)).toEqual({ speed: 5, power: 5, jump: 3, control: 4, stamina: 1 });
+    expect(harrisonStats(1)).toEqual({ speed: 2, power: 2, jump: 2, control: 2, stamina: 1 });
   });
 
   it('takes the kickoff shot: holding shoot at his kickoff with the ball on the spot', () => {

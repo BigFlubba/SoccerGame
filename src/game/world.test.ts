@@ -471,8 +471,8 @@ describe('world: the power-up', () => {
 describe('world: handling', () => {
   /** Sam-like: soft brakes, a long touch, a weak shot, a long reach for his own ball. */
   const SOFT: Handling = { decel: 500, touchScale: 1.9, shotScale: 0.55, ballAhead: 48 };
-  const FAST: Stats = { speed: 10, power: 1, jump: 3, control: 3 };
-  const TUNING: Stats = { speed: 5, power: 5, jump: 3, control: 5 };
+  const FAST: Stats = { speed: 10, power: 1, jump: 3, control: 3, stamina: 1 };
+  const TUNING: Stats = { speed: 5, power: 5, jump: 3, control: 5, stamina: 1 };
   /** Flat out: a sprint at the pace that makes 212 px/s at Speed 10. */
   const FLAT_OUT = 212 / (135 * 1.45);
   const run = (moveX: number, moveZ = 0): PlayerIntent => ({ ...NO_INTENT, moveX, moveZ, sprint: true, pace: FLAT_OUT });

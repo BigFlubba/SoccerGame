@@ -215,7 +215,7 @@ describe('kickoff', () => {
 
 describe('soft brakes: a runner who can\'t stop brushes past a body', () => {
   const SOFT = { ...NORMAL_HANDLING, decel: 500 };
-  const FAST = { speed: 10, power: 1, jump: 3, control: 3 };
+  const FAST = { speed: 10, power: 1, jump: 3, control: 3, stamina: 1 };
   /** A runner flat out to the left at (x, z) with `handling`, and Harrison standing at (300, 32). */
   function charge(z: number, handling = SOFT) {
     const runner = Object.assign(createPlayer('away', FAST, 340, -1, z), { handling, vx: -212 });

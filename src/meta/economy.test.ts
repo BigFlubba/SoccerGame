@@ -86,14 +86,20 @@ describe('the shop', () => {
   it('buying spends coins and raises one stat', () => {
     const p = { ...newProfile(), coins: 150 };
     const after = buyStat(p, 'speed')!;
-    expect(after.stats).toEqual({ speed: 2, power: 1, jump: 1, control: 1 });
+    expect(after.stats).toEqual({ speed: 2, power: 1, jump: 1, control: 1, stamina: 1 });
+    expect(after.coins).toBe(0);
+  });
+
+  it('Stamina is bought like any stat', () => {
+    const after = buyStat({ ...newProfile(), coins: 150 }, 'stamina')!;
+    expect(after.stats.stamina).toBe(2);
     expect(after.coins).toBe(0);
   });
 
   it('cannot buy short of coins or past level 10', () => {
     const poor = { ...newProfile(), coins: 149 };
     expect(buyStat(poor, 'speed')).toBeNull();
-    const maxed = { ...newProfile(), coins: 99999, stats: { speed: 10, power: 1, jump: 1, control: 1 } };
+    const maxed = { ...newProfile(), coins: 99999, stats: { speed: 10, power: 1, jump: 1, control: 1, stamina: 1 } };
     expect(buyStat(maxed, 'speed')).toBeNull();
     expect(poor).toEqual({ ...newProfile(), coins: 149 });
     expect(maxed.stats.speed).toBe(10);
@@ -108,11 +114,11 @@ describe('the shop', () => {
   it('canUpgrade when he can afford any stat that is not maxed', () => {
     expect(canUpgrade({ ...newProfile(), coins: 150 })).toBe(true);
     expect(canUpgrade({ ...newProfile(), coins: 149 })).toBe(false);
-    expect(canUpgrade({ ...newProfile(), coins: 99999, stats: { speed: 10, power: 10, jump: 10, control: 10 } })).toBe(false);
+    expect(canUpgrade({ ...newProfile(), coins: 99999, stats: { speed: 10, power: 10, jump: 10, control: 10, stamina: 10 } })).toBe(false);
   });
 
   it('the Energy Wave counts as an upgrade only when unlocked and affordable', () => {
-    const maxed = { ...newProfile(), stats: { speed: 10, power: 10, jump: 10, control: 10 } };
+    const maxed = { ...newProfile(), stats: { speed: 10, power: 10, jump: 10, control: 10, stamina: 10 } };
     expect(canUpgrade({ ...maxed, level: 2, coins: 600 })).toBe(false);
     expect(canUpgrade({ ...maxed, level: 3, coins: 599 })).toBe(false);
     expect(canUpgrade({ ...maxed, level: 3, coins: 600 })).toBe(true);
@@ -121,8 +127,9 @@ describe('the shop', () => {
 
   it('cheapestUpgrade ignores maxed stats', () => {
     expect(cheapestUpgrade(newProfile())).toBe(150);
-    expect(cheapestUpgrade({ ...newProfile(), stats: { speed: 10, power: 3, jump: 10, control: 2 } })).toBe(205);
-    expect(cheapestUpgrade({ ...newProfile(), stats: { speed: 10, power: 10, jump: 10, control: 10 } })).toBeNull();
+    expect(cheapestUpgrade({ ...newProfile(), stats: { speed: 10, power: 3, jump: 10, control: 2, stamina: 10 } })).toBe(205);
+    expect(cheapestUpgrade({ ...newProfile(), stats: { speed: 10, power: 10, jump: 10, control: 10, stamina: 1 } })).toBe(150);
+    expect(cheapestUpgrade({ ...newProfile(), stats: { speed: 10, power: 10, jump: 10, control: 10, stamina: 10 } })).toBeNull();
   });
 
   it('every stat has a label and a blurb in the font', () => {
@@ -131,6 +138,7 @@ describe('the shop', () => {
       expect(STAT_INFO[k].blurb).toMatch(/^[A-Z0-9 ',\-:!?./+<>]+$/);
     }
     expect(STAT_INFO.speed).toEqual({ label: 'SPEED', blurb: 'RUN AND SPRINT FASTER' });
+    expect(STAT_INFO.stamina).toEqual({ label: 'STAMINA', blurb: 'SPRINT LONGER, GET YOUR BREATH BACK FASTER' });
   });
 });
 

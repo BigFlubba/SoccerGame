@@ -10,16 +10,16 @@ export const LADDER_MATCHES = 10;
  * behind what Harrison can afford by then.
  */
 export const LADDER_STATS: readonly Readonly<Stats>[] = [
-  { speed: 1, power: 1, jump: 1, control: 1 },
-  { speed: 2, power: 1, jump: 1, control: 1 },
-  { speed: 2, power: 2, jump: 1, control: 1 },
-  { speed: 2, power: 2, jump: 1, control: 2 },
-  { speed: 3, power: 2, jump: 1, control: 2 },
-  { speed: 3, power: 3, jump: 1, control: 2 },
-  { speed: 3, power: 3, jump: 2, control: 2 },
-  { speed: 3, power: 3, jump: 2, control: 3 },
-  { speed: 4, power: 3, jump: 2, control: 3 },
-  { speed: 4, power: 4, jump: 2, control: 3 },
+  { speed: 1, power: 1, jump: 1, control: 1, stamina: 1 },
+  { speed: 2, power: 1, jump: 1, control: 1, stamina: 1 },
+  { speed: 2, power: 2, jump: 1, control: 1, stamina: 1 },
+  { speed: 2, power: 2, jump: 1, control: 2, stamina: 1 },
+  { speed: 3, power: 2, jump: 1, control: 2, stamina: 1 },
+  { speed: 3, power: 3, jump: 1, control: 2, stamina: 1 },
+  { speed: 3, power: 3, jump: 2, control: 2, stamina: 1 },
+  { speed: 3, power: 3, jump: 2, control: 3, stamina: 1 },
+  { speed: 4, power: 3, jump: 2, control: 3, stamina: 1 },
+  { speed: 4, power: 4, jump: 2, control: 3, stamina: 1 },
 ];
 
 /** The ladder match he plays next: the one after his wins, or a rematch of the last once he's champion. */

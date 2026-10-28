@@ -10,7 +10,7 @@ const RICH: Profile = {
   coins: 840,
   level: 6,
   xp: 125,
-  stats: { speed: 4, power: 3, jump: 2, control: 5 },
+  stats: { speed: 4, power: 3, jump: 2, control: 5, stamina: 1 },
   ladderWins: 4,
   dailyWinDate: '2026-10-25',
   totals: { matches: 23, wins: 14, draws: 3, losses: 6, goalsFor: 51, goalsAgainst: 27, styleGoals: 9, xpEarned: 2140 },
@@ -29,6 +29,12 @@ describe('save code', () => {
 
   it('a new profile survives a round trip', () => {
     expect(decodeSaveCode(encodeSaveCode(newProfile()))).toEqual(newProfile());
+  });
+
+  it('the code still carries four stats, in their old place', () => {
+    const f = decodeFields(encodeSaveCode(RICH))!;
+    expect(f).toHaveLength(41);
+    expect(f.slice(4, 8)).toEqual([4, 3, 2, 5]);
   });
 
   it('only the alphabet and dashes appear, in groups of 5', () => {
@@ -105,7 +111,7 @@ describe('save code', () => {
     for (let i = 4; i < 8; i++) tampered[i] = 99;
     const p = decodeSaveCode(encodeFields(tampered));
     expect(p?.xp).toBe(1_000_000);
-    expect(p?.stats).toEqual({ speed: 10, power: 10, jump: 10, control: 10 });
+    expect(p?.stats).toEqual({ speed: 10, power: 10, jump: 10, control: 10, stamina: 1 });
   });
 
   it('normalises and groups typed text', () => {

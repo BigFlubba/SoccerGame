@@ -9,6 +9,8 @@ import { DOG_TRICKS, TRICK_DIFFICULTY, TRICK_SCALE } from './tricks';
 import { SAM_HANDLING, SAM_PROFILES, SAM_STATS } from './sam';
 import { cleanStealOdds } from './steal';
 import { BASE_STATS } from './stats';
+import { TUNING_STATS } from './dog';
+import { SAM_TUNING_STATS } from './samScripts';
 import { createWorld, placeForKickoff, stepWorld } from './world';
 
 const DIFFS: readonly Difficulty[] = ['easy', 'normal', 'hard'];
@@ -23,12 +25,23 @@ describe('opponents', () => {
 
   it('each crew kid plays at their own stats, whatever the rung', () => {
     expect(CREW_STATS).toEqual({
-      brick: { speed: 3, power: 4, jump: 2, control: 4 },
-      leo: { speed: 4, power: 6, jump: 2, control: 3 },
-      tia: { speed: 5, power: 3, jump: 2, control: 6 },
-      pete: { speed: 6, power: 4, jump: 3, control: 4 },
+      brick: { speed: 3, power: 4, jump: 2, control: 4, stamina: 1 },
+      leo: { speed: 4, power: 6, jump: 2, control: 3, stamina: 1 },
+      tia: { speed: 5, power: 3, jump: 2, control: 6, stamina: 1 },
+      pete: { speed: 6, power: 4, jump: 3, control: 4, stamina: 1 },
     });
     for (const id of CREW) expect(opponentStats(id, 3)).toEqual(CREW_STATS[id]);
+  });
+
+  it('every opponent is at Stamina 1', () => {
+    const all = [
+      ...Array.from({ length: 10 }, (_, i) => maxStats(i + 1)),
+      ...CREW.map(id => CREW_STATS[id]),
+      SAM_STATS,
+      TUNING_STATS,
+      SAM_TUNING_STATS,
+    ];
+    for (const s of all) expect(s.stamina, JSON.stringify(s)).toBe(1);
   });
 
   it("each crew profile has its kid's style, and keeps Max's Energy Wave answers", () => {
@@ -58,7 +71,7 @@ describe('opponents', () => {
 
   it('Sam plays as himself, with his own stats, profiles and handling: no stand-in', () => {
     expect(opponentStats('sam', 1)).toEqual(SAM_STATS);
-    expect(SAM_STATS).toEqual({ speed: 10, power: 1, jump: 3, control: 3 });
+    expect(SAM_STATS).toEqual({ speed: 10, power: 1, jump: 3, control: 3, stamina: 1 });
     expect(opponentStats('sam', 1)).not.toEqual(CREW_STATS.pete);
     for (const d of DIFFS) {
       expect(opponentProfile('sam', d)).toBe(SAM_PROFILES[d]);

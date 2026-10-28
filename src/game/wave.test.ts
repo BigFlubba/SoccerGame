@@ -103,7 +103,7 @@ describe('the Energy Wave', () => {
   });
 
   it('the wave beats any shot: WAVE_SPEED exceeds 1.25 × the level-10 max shot speed × PERFECT_BONUS', () => {
-    const top = { speed: 10, power: 10, jump: 10, control: 10 };
+    const top = { speed: 10, power: 10, jump: 10, control: 10, stamina: 1 };
     expect(WAVE_SPEED).toBeGreaterThan(1.25 * maxShotSpeed(top) * PERFECT_BONUS);
   });
 });

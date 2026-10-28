@@ -16,7 +16,7 @@ import { createPressStartScene } from './titleScene';
 /** No QUIT: a web page can't close its own tab. */
 export const HUB_ITEMS = ['CAREER', 'SHOP', 'OPTIONS', 'HELP'] as const;
 
-const SHORT: Record<StatName, string> = { speed: 'SPD', power: 'PWR', jump: 'JMP', control: 'CTL' };
+const SHORT: Record<StatName, string> = { speed: 'SPD', power: 'PWR', jump: 'JMP', control: 'CTL', stamina: 'STA' };
 const CARD = { x: 16, y: 8, w: 288, h: 80 };
 const PORTRAIT_AT = { x: CARD.x + 6, y: CARD.y + 8 };
 const TEXT_X = CARD.x + 80;
@@ -25,7 +25,7 @@ const MENU_TOP = 98;
 /** Right of centre, so the backdrop's juggling Harrison (who drifts across the left and middle) is never hidden behind it. */
 const MENU_CX = 248;
 
-/** His four stats in short, e.g. SPD 3  PWR 2  JMP 1  CTL 4. */
+/** His five stats in short, e.g. SPD 3  PWR 2  JMP 1  CTL 4  STA 2. */
 export function statsLine(s: Stats): string {
   return STAT_NAMES.map(k => `${SHORT[k]} ${s[k]}`).join('  ');
 }

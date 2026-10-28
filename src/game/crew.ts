@@ -6,10 +6,10 @@ export type CrewId = 'brick' | 'leo' | 'tia' | 'pete';
 
 /** Each kid a little stronger overall than the one before, with one standout stat apiece. */
 export const CREW_STATS: Readonly<Record<CrewId, Readonly<Stats>>> = {
-  brick: { speed: 3, power: 4, jump: 2, control: 4 },
-  leo: { speed: 4, power: 6, jump: 2, control: 3 },
-  tia: { speed: 5, power: 3, jump: 2, control: 6 },
-  pete: { speed: 6, power: 4, jump: 3, control: 4 },
+  brick: { speed: 3, power: 4, jump: 2, control: 4, stamina: 1 },
+  leo: { speed: 4, power: 6, jump: 2, control: 3, stamina: 1 },
+  tia: { speed: 5, power: 3, jump: 2, control: 6, stamina: 1 },
+  pete: { speed: 6, power: 4, jump: 3, control: 4, stamina: 1 },
 };
 
 const STYLES: Record<CrewId, Style> = { brick: 'blocker', leo: 'shooter', tia: 'dribbler', pete: 'presser' };

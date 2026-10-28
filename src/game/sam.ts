@@ -8,7 +8,7 @@ import type { Stats } from './stats';
  * drag-back), knocks the ball well ahead (a gap Harrison can step into),
  * and has a weak shot a sprinting Harrison can run down.
  */
-export const SAM_STATS: Readonly<Stats> = { speed: 10, power: 1, jump: 3, control: 3 };
+export const SAM_STATS: Readonly<Stats> = { speed: 10, power: 1, jump: 3, control: 3, stamina: 1 };
 
 /**
  * From flat out on Normal (211 px/s) his brakes take 0.33 s to stop him, his
