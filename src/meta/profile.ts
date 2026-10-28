@@ -3,7 +3,7 @@ import { BASE_STATS, MAX_STAT_LEVEL, MIN_STAT_LEVEL, STAT_NAMES, type Stats } fr
 import { MATCH_IDS, grantRungStars } from './career';
 import { FORM_IDS, MOVE_IDS, grantForms } from './catalog';
 import { LADDER_MATCHES } from './ladder';
-import type { BootsItemId, ExtraId, KitItemId, LockerItemId } from './locker';
+import { BOOTS_IDS, EXTRA_IDS, GIFTS, KIT_IDS, LOCKER_ITEMS, itemPrice, owns, type BootsItemId, type ExtraId, type KitItemId, type LockerItemId } from './locker';
 import { isRecord } from './storage';
 
 export { LADDER_MATCHES } from './ladder';
@@ -52,8 +52,8 @@ export interface Locker {
 
 /** Harrison's progress, versioned so every later build can read it. */
 export interface Profile {
-  /** v5 adds the name, the difficulty and Stamina. */
-  version: 5;
+  /** v5 adds the name, the difficulty and Stamina; v6 the locker. */
+  version: 6;
   /** 1 to NAME_MAX of A-Z, 0-9 and space. */
   name: string;
   /** Each save has its own: picked when it's made, changed in Options. */
@@ -78,7 +78,7 @@ export interface Profile {
 
 /** Game-specific, so it never clashes with other pages on the same site. */
 export const PROFILE_KEY = 'harrisons-road-to-the-cup/profile';
-export const PROFILE_VERSION = 5;
+export const PROFILE_VERSION = 6;
 /** What a save without a name is called: his live save, from before there were names. */
 export const DEFAULT_NAME = 'HARRISON';
 export const NAME_MAX = 12;
@@ -161,25 +161,46 @@ function careerFrom(v: unknown): Career {
   };
 }
 
+/** Known ids only, each once, in catalogue order. */
+const knownIn = <T extends string>(v: unknown, known: readonly T[]): T[] => {
+  const list: unknown[] = Array.isArray(v) ? v : [];
+  return known.filter(id => list.includes(id));
+};
+
 /** Known names only, each once; an equipped one he doesn't own is dropped. */
 function ownedFrom<T extends string>(v: unknown, known: readonly T[]): Owned<T> {
   const r = isRecord(v) ? v : {};
-  const list = Array.isArray(r.owned) ? r.owned : [];
-  const owned = known.filter(id => list.includes(id));
+  const owned = knownIn(r.owned, known);
   const equipped = owned.find(id => id === r.equipped) ?? null;
   return { owned, equipped };
+}
+
+/** The locker after the career, since a gift is owned by the milestones paid: what he doesn't own falls back to the default. */
+function lockerFrom(v: unknown, career: Career): Locker {
+  const r = isRecord(v) ? v : {};
+  const bought = knownIn(r.bought, LOCKER_ITEMS.map(i => i.id)).filter(id => itemPrice(id) !== null);
+  const has = (id: LockerItemId) => owns({ career, locker: { bought } }, id);
+  return {
+    bought,
+    kit: KIT_IDS.find(k => k === r.kit && has(`kit:${k}`)) ?? 'home',
+    boots: BOOTS_IDS.find(b => b === r.boots && has(`boots:${b}`)) ?? 'volt',
+    extras: knownIn(r.extras, EXTRA_IDS).filter(e => has(`extra:${e}`)),
+    seen: knownIn(r.seen, GIFTS),
+  };
 }
 
 /**
  * Reads a profile field by field, so one bad value falls back to its own
  * default and the rest load. A v1 save loads with no power moves, a v1 or v2
  * save with no career but the stars its ladder wins earn, and a save before
- * v5 as HARRISON on `fallbackDifficulty`; a newer build's save is read as
+ * v5 as HARRISON on `fallbackDifficulty`, a save before v6 with an empty
+ * locker; a newer build's save is read as
  * best it can be. Anything that isn't a save at all is a new profile.
  */
 export function profileFrom(v: unknown, fallbackDifficulty: Difficulty): Profile {
   const d = newProfile();
   if (!isSave(v)) return d;
+  const career = careerFrom(v.career);
   return grantRungStars(grantForms({
     version: PROFILE_VERSION,
     name: (typeof v.name === 'string' && cleanName(v.name)) || DEFAULT_NAME,
@@ -193,7 +214,7 @@ export function profileFrom(v: unknown, fallbackDifficulty: Difficulty): Profile
     totals: totalsFrom(v.totals),
     powerMoves: ownedFrom(v.powerMoves, MOVE_IDS),
     powerForms: ownedFrom(v.powerForms, FORM_IDS),
-    career: careerFrom(v.career),
-    locker: d.locker,
+    career,
+    locker: lockerFrom(v.locker, career),
   }));
 }

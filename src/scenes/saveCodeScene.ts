@@ -30,8 +30,8 @@ const LOADED = 'SAVE LOADED!';
 export const BAD_CODE = "THAT CODE DOESN'T WORK";
 const SHOW_ITEMS = ['ENTER A CODE', 'BACK'] as const;
 const CONFIRM_ITEMS = ['NO', 'YES'] as const;
-/** Longer than any code (138 characters at the loader's ceilings), so a paste of junk can't grow the entry without end. */
-export const MAX_ENTRY = 140;
+/** Longer than any code (151 characters at the loader's ceilings), so a paste of junk can't grow the entry without end. */
+export const MAX_ENTRY = 153;
 
 const PANEL = { x: 8, y: 6, w: 304, h: 168 };
 const TITLE_Y = PANEL.y + 6;

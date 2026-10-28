@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { EXTRA_IDS, GIFTS, LOCKER_ITEMS } from './locker';
 import { newProfile, type Profile } from './profile';
 import { decodeFields, decodeSaveCode, encodeFields, encodeSaveCode, groupCode, normaliseCode } from './saveCode';
 
@@ -6,7 +7,7 @@ const ALPHABET = '0123456789ABCDEFGHJKMNPQRSTVWXYZ';
 
 /** A save with something in every field, both unlocks owned. */
 const RICH: Profile = {
-  version: 5,
+  version: 6,
   name: 'NORMAL RUN',
   difficulty: 'hard',
   coins: 840,
@@ -20,6 +21,21 @@ const RICH: Profile = {
   powerForms: { owned: ['golden'], equipped: 'golden' },
   career: { stars: { 'backyard-1': 1, 'backyard-2': 1, 'backyard-3': 3, 'backyard-4': 2 }, milestonesPaid: 1, lossStreaks: { 'backyard-boss': 2 } },
   locker: { bought: [], kit: 'home', boots: 'volt', extras: [], seen: [] },
+};
+
+const EMPTY_LOCKER: Profile['locker'] = { bought: [], kit: 'home', boots: 'volt', extras: [], seen: [] };
+
+/** Everything bought, every gift earned and seen, the GOLD kit and boots and all four extras on. */
+const DRESSED: Profile = {
+  ...RICH,
+  career: { ...RICH.career, milestonesPaid: 4 },
+  locker: {
+    bought: LOCKER_ITEMS.filter(i => typeof i.source === 'object' && 'price' in i.source).map(i => i.id),
+    kit: 'gold',
+    boots: 'gold',
+    extras: [...EXTRA_IDS],
+    seen: [...GIFTS],
+  },
 };
 
 /** The Park playtest's code, from a v4 build: Park 1-4 beaten, stats 7/5/4/5. */
@@ -39,8 +55,8 @@ describe('save code', () => {
 
   it('the code appends Stamina, then difficulty, and keeps four stats in their old place', () => {
     const f = decodeFields(encodeSaveCode(RICH))!;
-    expect(f).toHaveLength(43);
-    expect([f[0], f[41], f[42]]).toEqual([5, 7, 3]);
+    expect(f).toHaveLength(48);
+    expect([f[41], f[42]]).toEqual([7, 3]);
     expect(f.slice(4, 8)).toEqual([4, 3, 2, 5]);
   });
 
@@ -64,6 +80,28 @@ describe('save code', () => {
     expect(p.career.stars).toMatchObject({ 'park-1': 2, 'park-2': 2, 'park-3': 1, 'park-4': 2 });
     expect(p.stats).toEqual({ speed: 7, power: 5, jump: 4, control: 5, stamina: 1 });
     expect([p.coins, p.level, p.name, p.difficulty]).toEqual([2000, 6, 'HARRISON', 'normal']);
+  });
+
+  it('the Park playtest code (v4) loads with an empty locker', () => {
+    expect(decodeSaveCode(PARK_PLAYTEST, newProfile())?.locker).toEqual(EMPTY_LOCKER);
+  });
+
+  it('the first field is 6', () => {
+    expect(decodeFields(encodeSaveCode(newProfile()))?.[0]).toBe(6);
+  });
+
+  it('a full locker round-trips', () => {
+    expect(decodeSaveCode(encodeSaveCode(DRESSED), DRESSED)).toEqual(DRESSED);
+  });
+
+  it('the locker follows the difficulty: bought, kit, boots, extras, seen', () => {
+    const f = decodeFields(encodeSaveCode(DRESSED))!;
+    expect(f.slice(43)).toEqual([0b11_0001_1111_1001_1111_1100, 10, 9, 0b1111, 0b1111]);
+  });
+
+  it('a v5 code loads with an empty locker', () => {
+    const f = decodeFields(encodeSaveCode(DRESSED))!;
+    expect(decodeSaveCode(encodeFields([5, ...f.slice(1, 43)]), DRESSED)).toEqual({ ...DRESSED, locker: EMPTY_LOCKER });
   });
 
   it('only the alphabet and dashes appear, in groups of 5', () => {
@@ -96,7 +134,7 @@ describe('save code', () => {
   it('a code from a newer build with an extra field still loads', () => {
     const fields = decodeFields(encodeSaveCode(RICH));
     expect(fields).not.toBeNull();
-    const newer = [6, ...(fields ?? []).slice(1), 77];
+    const newer = [7, ...(fields ?? []).slice(1), 77];
     expect(decodeSaveCode(encodeFields(newer), RICH)).toEqual(RICH);
   });
 
@@ -123,7 +161,7 @@ describe('save code', () => {
     const p: Profile = { ...RICH, career: { ...RICH.career, stars: { ...RICH.career.stars, 'park-1': 3 }, lossStreaks: { 'park-boss': 4 } } };
     const fields = decodeFields(encodeSaveCode(p)) ?? [];
     const v3 = decodeSaveCode(encodeFields([3, ...fields.slice(1, 35)]), RICH);
-    expect(v3?.version).toBe(5);
+    expect(v3?.version).toBe(6);
     expect(v3?.career.stars).toEqual(RICH.career.stars);
     expect(v3?.career.lossStreaks).toEqual({});
   });

@@ -109,7 +109,10 @@ export const itemsIn = (tab: LockerTab): LockerItem[] => LOCKER_ITEMS.filter(i =
 const priceOf = (s: ItemSource): number | null => (typeof s === 'object' && 'price' in s ? s.price : null);
 const milestoneOf = (s: ItemSource): number | null => (typeof s === 'object' && 'milestone' in s ? s.milestone : null);
 
-export function owns(p: Profile, id: LockerItemId): boolean {
+/** What ownership reads from a save: the loader asks it before the profile is whole. */
+type OwnedFrom = { career: Pick<Profile['career'], 'milestonesPaid'>; locker: Pick<Profile['locker'], 'bought'> };
+
+export function owns(p: OwnedFrom, id: LockerItemId): boolean {
   const s = item(id).source;
   if (s === 'starter') return true;
   const m = milestoneOf(s);
@@ -152,7 +155,7 @@ const wearing = (p: Profile, id: LockerItemId): Profile => {
 
 /** Buys and wears `id`; null when it's owned, locked, a starter or too dear. */
 export function buyItem(p: Profile, id: LockerItemId): Profile | null {
-  const price = priceOf(item(id).source);
+  const price = itemPrice(id);
   if (price === null || owns(p, id) || p.coins < price) return null;
   return wearing({ ...p, coins: p.coins - price, locker: { ...p.locker, bought: [...p.locker.bought, id] } }, id);
 }
@@ -188,6 +191,9 @@ export function giftLine(milestoneIndex: number): string | null {
   const gift = GIFTS[milestoneIndex];
   return gift === undefined ? null : `NEW IN THE LOCKER ROOM: ${GIFT_NAMES[gift]}`;
 }
+
+/** What an item sells for, or null for a starter or a gift. */
+export const itemPrice = (id: LockerItemId): number | null => priceOf(item(id).source);
 
 /** The milestone a gift waits on, for its locked row. */
 export const starsFor = (id: LockerItemId): number | null => {

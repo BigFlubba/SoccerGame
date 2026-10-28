@@ -2,6 +2,7 @@ import { DIFFICULTIES } from '../game/ai';
 import type { StatName } from '../game/stats';
 import { BACKYARD, BOSS_ID, PARK, PARK_BOSS_ID } from './career';
 import { FORM_IDS, MOVE_IDS } from './catalog';
+import { BOOTS_IDS, EXTRA_IDS, GIFTS, KIT_IDS, LOCKER_ITEMS } from './locker';
 import { TOTAL_NAMES, profileFrom, type Owned, type Profile } from './profile';
 
 /**
@@ -125,14 +126,19 @@ function dayNumber(date: string | null): number {
 const dateOf = (day: number | undefined): string | null =>
   day ? new Date(EPOCH_MS + (day - 1) * DAY_MS).toISOString().slice(0, 10) : null;
 
+const ITEM_IDS = LOCKER_ITEMS.map(i => i.id);
+
+/** Bit i set when ids[i] is in `has`. */
+const maskOf = <T extends string>(has: readonly T[], ids: readonly T[]): number => ids.reduce((m, id, i) => (has.includes(id) ? m + 2 ** i : m), 0);
+const idsIn = <T extends string>(mask: number, ids: readonly T[]): T[] => ids.filter((_, i) => Math.floor(mask / 2 ** i) % 2 === 1);
+
 function ownedFields<T extends string>(o: Owned<T>, ids: readonly T[]): [mask: number, equipped: number] {
-  const mask = ids.reduce((m, id, i) => (o.owned.includes(id) ? m + 2 ** i : m), 0);
-  return [mask, o.equipped === null ? 0 : ids.indexOf(o.equipped) + 1];
+  return [maskOf(o.owned, ids), o.equipped === null ? 0 : ids.indexOf(o.equipped) + 1];
 }
 
 function ownedOf<T extends string>(mask: number | undefined, equipped: number | undefined, ids: readonly T[]): Owned<T> | undefined {
   if (mask === undefined) return undefined;
-  return { owned: ids.filter((_, i) => Math.floor(mask / 2 ** i) % 2 === 1), equipped: ids[(equipped ?? 0) - 1] ?? null };
+  return { owned: idsIn(mask, ids), equipped: ids[(equipped ?? 0) - 1] ?? null };
 }
 
 export function encodeSaveCode(p: Profile): string {
@@ -157,6 +163,12 @@ export function encodeSaveCode(p: Profile): string {
     // v5: Stamina, then the difficulty (1 easy, 2 normal, 3 hard; 0 is none). The name stays with the save.
     p.stats.stamina,
     DIFFICULTIES.indexOf(p.difficulty) + 1,
+    // v6: the locker: what's bought (a mask over LOCKER_ITEMS), the kit and boots (index + 1), the extras worn and the gifts seen (masks).
+    maskOf(p.locker.bought, ITEM_IDS),
+    KIT_IDS.indexOf(p.locker.kit) + 1,
+    BOOTS_IDS.indexOf(p.locker.boots) + 1,
+    maskOf(p.locker.extras, EXTRA_IDS),
+    maskOf(p.locker.seen, GIFTS),
   ]);
 }
 
@@ -195,5 +207,15 @@ export function decodeSaveCode(text: string, onto: Profile): Profile | null {
   // v5, after every v4 field: Stamina, then the difficulty, where 0, missing or out of range is none.
   Object.assign(record.stats, { stamina: next() });
   Object.assign(record, { difficulty: DIFFICULTIES[(next() ?? 0) - 1] });
+  // v6, after every v5 field: the locker, where 0 or missing is none.
+  Object.assign(record, {
+    locker: {
+      bought: idsIn(next() ?? 0, ITEM_IDS),
+      kit: KIT_IDS[(next() ?? 0) - 1],
+      boots: BOOTS_IDS[(next() ?? 0) - 1],
+      extras: idsIn(next() ?? 0, EXTRA_IDS),
+      seen: idsIn(next() ?? 0, GIFTS),
+    },
+  });
   return profileFrom(record, onto.difficulty);
 }
