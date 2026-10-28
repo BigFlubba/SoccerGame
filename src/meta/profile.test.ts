@@ -1,25 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import type { Stats } from '../game/stats';
 import { addXp } from './economy';
-import { LADDER_MATCHES, MAX_LOADED, PROFILE_KEY, cleanName, followProfile, isSave, loadProfile, nameChars, newProfile, profileFrom, saveProfile, type Profile } from './profile';
-import { writeUnlessNewer, type KeyValueStore } from './storage';
-
-/** An in-memory store, standing in for localStorage. */
-function memoryStore(initial: Record<string, string> = {}): KeyValueStore & { data: Record<string, string> } {
-  const data = { ...initial };
-  return { data, getItem: k => data[k] ?? null, setItem: (k, v) => void (data[k] = v) };
-}
-
-const throwing: KeyValueStore = {
-  getItem: () => {
-    throw new Error('denied');
-  },
-  setItem: () => {
-    throw new Error('denied');
-  },
-};
-
-const stored = (v: unknown) => memoryStore({ [PROFILE_KEY]: JSON.stringify(v) });
+import { LADDER_MATCHES, MAX_LOADED, PROFILE_KEY, cleanName, isSave, nameChars, newProfile, profileFrom, type Profile } from './profile';
+import { writeUnlessNewer } from './storage';
+import { memoryStore } from './testStore';
 
 const ZERO_TOTALS = { matches: 0, wins: 0, draws: 0, losses: 0, goalsFor: 0, goalsAgainst: 0, styleGoals: 0, xpEarned: 0 };
 
@@ -52,8 +36,7 @@ const NO_CAREER = { stars: {}, milestonesPaid: 0, lossStreaks: {} };
 const FOUR_RETRO = { 'backyard-1': 1, 'backyard-2': 1, 'backyard-3': 1, 'backyard-4': 1 };
 
 describe('profile', () => {
-  it('a missing save is a new profile under a game-specific key', () => {
-    expect(loadProfile(memoryStore(), 'normal')).toEqual(newProfile());
+  it('a new profile, and a game-specific key', () => {
     expect(newProfile()).toEqual({
       version: 5,
       name: 'HARRISON',
@@ -71,12 +54,6 @@ describe('profile', () => {
     });
     expect(PROFILE_KEY.startsWith('harrisons-road-to-the-cup/')).toBe(true);
     expect(LADDER_MATCHES).toBe(10);
-  });
-
-  it('round-trips every field', () => {
-    const store = memoryStore();
-    saveProfile(store, OWN);
-    expect(loadProfile(store, 'normal')).toEqual(OWN);
   });
 
   it('his live v4 save loads into v5 without loss', () => {
@@ -238,80 +215,28 @@ describe('profile', () => {
     expect(Object.keys(p.career.stars).filter(id => id.startsWith('park-'))).toEqual([]);
   });
 
-  it('a v5 save writes over a stored v4 one', () => {
-    const store = stored({ ...SOME, coins: 1 });
-    saveProfile(store, LOADED);
-    expect(JSON.parse(store.data[PROFILE_KEY]!)).toMatchObject({ version: 5, name: 'HARRISON', coins: SOME.coins });
-  });
-
   it('a v4 tab left open cannot write over a v5 save', () => {
-    const store = stored(OWN);
+    const store = memoryStore({ [PROFILE_KEY]: JSON.stringify(OWN) });
     const before = store.data[PROFILE_KEY];
     writeUnlessNewer(store, PROFILE_KEY, SOME);
     expect(store.data[PROFILE_KEY]).toBe(before);
   });
 
-  it('a newer save is read best-effort and never written over', () => {
-    const store = stored({ ...SOME, version: 6, coins: 300, gems: 5 });
-    const before = store.data[PROFILE_KEY];
-    expect(loadProfile(store, 'normal').coins).toBe(300);
-    saveProfile(store, { ...newProfile(), coins: 0 });
-    expect(store.data[PROFILE_KEY]).toBe(before);
-  });
-
   it('not a save at all loads a new profile', () => {
-    for (const raw of ['[]', 'null', '{"version":"1"}', '{"version":0,"coins":50}', '{"coins":', '"hello"']) {
-      expect(loadProfile(memoryStore({ [PROFILE_KEY]: raw }), 'normal'), raw).toEqual(newProfile());
+    for (const v of [[], null, { version: '1' }, { version: 0, coins: 50 }, 'hello']) {
+      expect(profileFrom(v, 'easy'), JSON.stringify(v)).toEqual(newProfile());
     }
   });
 
-  it('survives a store that throws', () => {
-    expect(loadProfile(throwing, 'normal')).toEqual(newProfile());
-    expect(() => saveProfile(throwing, LOADED)).not.toThrow();
-    expect(loadProfile(null, 'normal')).toEqual(newProfile());
-    expect(() => saveProfile(null, LOADED)).not.toThrow();
-  });
-
   it('returns a fresh copy', () => {
-    const store = stored(SOME);
-    const a = loadProfile(store, 'normal');
+    const a = profileFrom(SOME, 'normal');
     a.stats.speed = 9;
     a.totals.wins = 99;
-    expect(loadProfile(store, 'normal')).toEqual(LOADED);
+    expect(profileFrom(SOME, 'normal')).toEqual(LOADED);
     const n = newProfile();
     n.stats.power = 7;
     n.totals.matches = 3;
     expect(newProfile().stats.power).toBe(1);
     expect(newProfile().totals.matches).toBe(0);
-  });
-});
-
-describe('followProfile', () => {
-  /** A stand-in for window: keeps the storage listener so a test can fire it. */
-  function fakeWindow() {
-    let listener: ((e: { key: string | null }) => void) | null = null;
-    return {
-      addEventListener: (_type: 'storage', cb: (e: { key: string | null }) => void) => void (listener = cb),
-      fire: (key: string | null) => listener?.({ key }),
-    };
-  }
-
-  it('another tab saving the profile reloads it here', () => {
-    const store = memoryStore();
-    const win = fakeWindow();
-    const seen: Profile[] = [];
-    followProfile(win, store, 'normal', p => seen.push(p));
-    saveProfile(store, OWN);
-    win.fire(PROFILE_KEY);
-    expect(seen).toEqual([OWN]);
-  });
-
-  it('ignores other keys and a cleared store', () => {
-    const win = fakeWindow();
-    const seen: Profile[] = [];
-    followProfile(win, memoryStore(), 'normal', p => seen.push(p));
-    win.fire('harrisons-road-to-the-cup/settings');
-    win.fire(null);
-    expect(seen).toEqual([]);
   });
 });

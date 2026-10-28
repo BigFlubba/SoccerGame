@@ -1,20 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { DEFAULT_SETTINGS, SETTINGS_KEY, VOLUME_MAX, loadSettings, saveSettings, type KeyValueStore } from './settings';
-
-/** An in-memory store, standing in for localStorage. */
-function memoryStore(initial: Record<string, string> = {}): KeyValueStore & { data: Record<string, string> } {
-  const data = { ...initial };
-  return { data, getItem: k => data[k] ?? null, setItem: (k, v) => void (data[k] = v) };
-}
-
-const throwing: KeyValueStore = {
-  getItem: () => {
-    throw new Error('denied');
-  },
-  setItem: () => {
-    throw new Error('denied');
-  },
-};
+import { DEFAULT_SETTINGS, SETTINGS_KEY, VOLUME_MAX, loadSettings, saveSettings } from './settings';
+import { memoryStore, throwingStore as throwing } from './testStore';
 
 describe('settings', () => {
   it('defaults to normal difficulty, music 6, sfx 8 and rumble on at version 2, under a game-specific key', () => {

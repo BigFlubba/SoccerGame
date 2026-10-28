@@ -3,7 +3,7 @@ import { BASE_STATS, MAX_STAT_LEVEL, MIN_STAT_LEVEL, STAT_NAMES, type Stats } fr
 import { MATCH_IDS, grantRungStars } from './career';
 import { FORM_IDS, MOVE_IDS, grantForms } from './catalog';
 import { LADDER_MATCHES } from './ladder';
-import { isRecord, readStored, writeUnlessNewer, type KeyValueStore } from './storage';
+import { isRecord } from './storage';
 
 export { LADDER_MATCHES } from './ladder';
 
@@ -181,28 +181,4 @@ export function profileFrom(v: unknown, fallbackDifficulty: Difficulty): Profile
     powerForms: ownedFrom(v.powerForms, FORM_IDS),
     career: careerFrom(v.career),
   }));
-}
-
-export function loadProfile(store: KeyValueStore | null, fallbackDifficulty: Difficulty): Profile {
-  return profileFrom(readStored(store, PROFILE_KEY), fallbackDifficulty);
-}
-
-/**
- * Calls `apply` with the stored profile whenever another tab saves it, so a
- * tab left open never writes stale progress over a newer one.
- */
-export function followProfile(
-  target: { addEventListener(type: 'storage', cb: (e: { key: string | null }) => void): void },
-  store: KeyValueStore | null,
-  fallbackDifficulty: Difficulty,
-  apply: (p: Profile) => void,
-): void {
-  target.addEventListener('storage', e => {
-    if (e.key === PROFILE_KEY) apply(loadProfile(store, fallbackDifficulty));
-  });
-}
-
-/** Saves at once. Never throws, and never writes over a newer build's save. */
-export function saveProfile(store: KeyValueStore | null, p: Profile): void {
-  writeUnlessNewer(store, PROFILE_KEY, p);
 }

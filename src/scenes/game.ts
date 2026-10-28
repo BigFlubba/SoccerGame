@@ -4,7 +4,8 @@ import { createInput, type InputFrame } from '../engine/input';
 import { createStepper, startLoop } from '../engine/loop';
 import { createRumble } from '../engine/rumble';
 import { createScreen } from '../engine/screen';
-import { followProfile, loadProfile, saveProfile as storeProfile } from '../meta/profile';
+import { newProfile } from '../meta/profile';
+import { createSaveSlots } from '../meta/saveSlots';
 import { localDate } from '../meta/progress';
 import { loadSettings, saveSettings } from '../meta/settings';
 import type { KeyValueStore } from '../meta/storage';
@@ -43,6 +44,7 @@ export function startGame(canvas: HTMLCanvasElement): void {
   const audio = createAudio(typeof AudioContext === 'undefined' ? null : () => new AudioContext());
   const rumble = createRumble(() => navigator.getGamepads?.() ?? []);
   const settings = loadSettings(store);
+  const saves = createSaveSlots(store, settings.difficulty);
   const ctx: GameContext = {
     art: loadGameArt(),
     settings,
@@ -52,10 +54,12 @@ export function startGame(canvas: HTMLCanvasElement): void {
       audio.setVolumes(s.musicVolume, s.sfxVolume);
       rumble.enabled = s.rumble;
     },
-    profile: loadProfile(store, settings.difficulty),
+    profile: saves.read(1) ?? newProfile(),
+    slot: 1,
+    saves,
     saveProfile(p) {
       ctx.profile = p;
-      storeProfile(store, p);
+      saves.write(ctx.slot, p);
     },
     today: () => localDate(new Date()),
     audio,
@@ -72,7 +76,7 @@ export function startGame(canvas: HTMLCanvasElement): void {
   };
   audio.setVolumes(ctx.settings.musicVolume, ctx.settings.sfxVolume);
   rumble.enabled = ctx.settings.rumble;
-  followProfile(window, store, settings.difficulty, p => (ctx.profile = p));
+  saves.follow(window, () => ctx.slot, p => (ctx.profile = p));
   // Browsers only allow sound after a key press, click or tap. Chrome doesn't count a gamepad press.
   const unlock = () => audio.unlock();
   window.addEventListener('keydown', unlock);

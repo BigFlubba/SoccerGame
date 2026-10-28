@@ -1,6 +1,8 @@
 import { recordingAudio } from '../audio/testAudio';
 import { recordingRumble } from '../engine/testRumble';
 import { newProfile, type Profile } from '../meta/profile';
+import { createSaveSlots } from '../meta/saveSlots';
+import { memoryStore } from '../meta/testStore';
 import { DEFAULT_SETTINGS, type Settings } from '../meta/settings';
 import type { GameArt } from './art';
 import type { GameContext } from './context';
@@ -20,16 +22,19 @@ export type TestContext = GameContext & {
 
 /**
  * A context for scene tests: no art (update() never draws), default
- * settings, a new profile, recording audio and rumble, and a fixed today.
- * Saves update the context, as the game's do, and are recorded.
+ * settings, a new profile in slot 1 of empty in-memory slots, recording
+ * audio and rumble, and a fixed today. Saves update the context and the
+ * slots, as the game's do, and are recorded.
  */
-export function testContext(over: Partial<Pick<TestContext, 'art' | 'settings' | 'audio' | 'rumble' | 'profile' | 'today'>> = {}): TestContext {
+export function testContext(over: Partial<Pick<TestContext, 'art' | 'settings' | 'audio' | 'rumble' | 'profile' | 'slot' | 'saves' | 'today'>> = {}): TestContext {
   const ctx: TestContext = {
     art: {} as GameArt,
     settings: { ...DEFAULT_SETTINGS },
     audio: recordingAudio(),
     rumble: recordingRumble(),
     profile: newProfile(),
+    slot: 1,
+    saves: createSaveSlots(memoryStore(), 'normal'),
     today: () => TEST_TODAY,
     ...over,
     savedSettings: [],
@@ -46,6 +51,7 @@ export function testContext(over: Partial<Pick<TestContext, 'art' | 'settings' |
     saveProfile(p) {
       ctx.savedProfiles.push(p);
       ctx.profile = p;
+      ctx.saves.write(ctx.slot, p);
     },
   };
   return ctx;
