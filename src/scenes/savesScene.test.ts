@@ -218,4 +218,14 @@ describe('saves', () => {
     s.draw(box.g, 0);
     expect(box.drawn).toEqual(expect.arrayContaining(['art.text(TWO,2,energyGold,outline)', 'art.text(SAVE 2  -  HARD,1,silver,outline)', 'art.portraits.neutral']));
   });
+
+  it("the list's PICK and BACK hints hide behind the info box", () => {
+    const ctx = testContext({ art: fakeArt() });
+    ctx.saves.write(2, TWO);
+    const s = createSavesScene(ctx, 2);
+    s.update(A, STEP);
+    const { g, drawn } = recordingContext();
+    s.draw(g, 0);
+    expect(drawn).not.toContain('art.text(PICK,1,silver,outline)');
+  });
 });

@@ -139,11 +139,13 @@ export function createSavesScene(ctx: GameContext, cursor: number, boxOpen = fal
         drawStar(g, ROW_RIGHT - stars.width - STAR_LEFT, y + 1, true);
         drawCoins(g, art, `${p.coins}`, ROW_RIGHT, y + LINE_2);
       });
-      drawButtonHint(g, art, art.buttons.A, 'PICK', BASE_W / 2 - HINT_SPREAD, FOOTER_Y);
-      drawButtonHint(g, art, art.buttons.B, 'BACK', BASE_W / 2 + HINT_SPREAD, FOOTER_Y);
-
       const save = slots[list.index];
-      if (!box || !save) return;
+      // With the box open the list goes without its hints, which would peek out under the box's bottom edge.
+      if (!box || !save) {
+        drawButtonHint(g, art, art.buttons.A, 'PICK', BASE_W / 2 - HINT_SPREAD, FOOTER_Y);
+        drawButtonHint(g, art, art.buttons.B, 'BACK', BASE_W / 2 + HINT_SPREAD, FOOTER_Y);
+        return;
+      }
       g.save();
       g.globalAlpha = DIM;
       g.fillStyle = MASTER.ink;
