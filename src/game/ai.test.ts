@@ -15,6 +15,7 @@ import { CREW_PROFILES, CREW_STATS } from './crew';
 import { maxHasBall } from './steal';
 import { BRACE_DISTANCE } from './wave';
 import { createWorld, placeForKickoff, stepWorld, type World } from './world';
+import { STEPOVER, TRICK_DIFFICULTY } from './tricks';
 import { ballAtFeet } from './zones';
 
 const STEP = 1 / 60;
@@ -1025,5 +1026,103 @@ describe('Speedy Sam: all gas, no brakes', () => {
     expect(backpedal(CREW_STATS.pete, CREW_PROFILES.pete.normal)).toBeCloseTo(maxPace, 0);
     expect(backpedal(maxStats(LADDER_MATCHES), DIFFICULTY.normal)).toBeCloseTo(maxPace, 0);
     expect(backpedal(maxStats(3), DIFFICULTY.normal)).toBeCloseTo(runSpeed(maxStats(3)) * 0.9, 0);
+  });
+});
+
+describe('fooled by a trick', () => {
+  const RB: PlayerIntent = { ...NO_INTENT, skill: true };
+  const SETUP = { profile: TRICK_DIFFICULTY.normal, scale: { stepover: 1, flick: 1 } };
+
+  /** Harrison on the ball at x 300 in the deep half; Max coming at him from 55 px, his brain running, so he's squared up at the sell. */
+  function squared(handling = NORMAL_HANDLING) {
+    const w = createWorld(BASE_STATS, maxStats(LADDER_MATCHES), 3, { home: 0, away: 0 }, null, null, DIFFICULTY.normal, handling, SETUP);
+    w.match.phase = 'playing';
+    Object.assign(w.home, { x: 300, z: 40, facing: 1 });
+    Object.assign(w.away, { x: 355, z: 40, facing: -1 });
+    Object.assign(w.ball, { x: 308, y: BALL_REST_Y, z: 40, vx: 0, vy: 0, vz: 0 });
+    return { w, brain: brainFor() };
+  }
+  const tick = (w: World, brain: AiBrain, home: PlayerIntent = NO_INTENT) => stepWorld(w, home, think(brain, w, w.away, w.home, STEP), STEP);
+
+  /** Fools Max with a stepover; steps to the sell. */
+  function confuse() {
+    const s = squared();
+    tick(s.w, s.brain, RB);
+    for (let i = 0; i < 60 && !s.w.away.fooled; i++) tick(s.w, s.brain);
+    expect(s.w.away.fooled).toBeTruthy();
+    return s;
+  }
+
+  it('confused, Max sways a step toward the dip side, then stands facing the ball', () => {
+    const { w, brain } = confuse();
+    const z0 = w.away.z;
+    expect(w.away.fooled!.swayZ).toBeGreaterThan(z0);
+    for (let i = 0; i < 24; i++) tick(w, brain);
+    expect(brain.plan).toBe('fooled');
+    expect(w.away.z - z0).toBeGreaterThanOrEqual(6);
+    expect(w.away.z - z0).toBeLessThanOrEqual(10);
+    expect(Math.hypot(w.away.vx, w.away.vz)).toBeLessThan(5);
+    expect(w.away.facing).toBe(Math.sign(w.ball.x - w.away.x) || w.away.facing);
+  });
+
+  it('confused, he never slides, jumps or plays the ball, even rolled to his feet', () => {
+    const { w, brain } = confuse();
+    Object.assign(w.ball, { x: w.away.x - 8, z: w.away.z, vx: 0, vz: 0 });
+    w.ball.touchedBy = 'home';
+    for (let i = 0; i < 120 && w.away.fooled; i++) {
+      tick(w, brain);
+      expect(w.away.state).toBe('ground');
+      expect(w.ball.touchedBy).toBe('home');
+      const away = w.events.kicks[1]!;
+      expect(away.touched || away.kicked !== null || away.tackledBall).toBe(false);
+    }
+  });
+
+  it('the tick after his confusion ends he decides afresh', () => {
+    const { w, brain } = confuse();
+    for (let i = 0; i < 120 && w.away.fooled; i++) tick(w, brain);
+    tick(w, brain);
+    expect(brain.plan).not.toBe('fooled');
+  });
+
+  it('a ball rolled at 60 px/s into a confused Max passes him, still Harrison\'s (Review Focus 4)', () => {
+    const { w, brain } = confuse();
+    Object.assign(w.ball, { x: w.away.x - 20, z: w.away.z, vx: 60, vz: 0 });
+    w.ball.touchedBy = 'home';
+    for (let i = 0; i < 30 && w.away.fooled; i++) tick(w, brain);
+    expect(w.ball.x).toBeGreaterThan(w.away.x);
+    expect(w.ball.touchedBy).not.toBe('away');
+  });
+
+  it('stumbling, Max with the stick let go stops within a few px', () => {
+    const { w, brain } = squared();
+    Object.assign(w.away, { x: 400, vx: -100, fooled: { kind: 'stumble', leftS: 0.7, totalS: 0.7, swayZ: 40 } });
+    const x0 = w.away.x;
+    for (let i = 0; i < 20; i++) tick(w, brain);
+    expect(x0 - w.away.x).toBeLessThan(8);
+    expect(w.away.anim.name).toBe('stumble');
+  });
+
+  it('stumbling at 200 px/s, Sam skids on 30 px or more on his own brakes, in his skid clip until slow, then the stumble', () => {
+    const { w, brain } = squared(SAM_HANDLING);
+    Object.assign(w.away, { x: 450, vx: -200, fooled: { kind: 'stumble', leftS: 0.7, totalS: 0.7, swayZ: 40 } });
+    const x0 = w.away.x;
+    const clips: string[] = [];
+    for (let i = 0; i < 40; i++) {
+      tick(w, brain);
+      clips.push(w.away.anim.name);
+    }
+    // From 200 px/s his 650 px/s² brakes stop him in v²/2a, about 30 px (29 in 1/60 s steps).
+    expect(x0 - w.away.x).toBeGreaterThanOrEqual(28);
+    expect(clips[0]).toBe('skid');
+    expect(clips.at(-1)).toBe('stumble');
+    expect(clips.lastIndexOf('skid')).toBeLessThan(clips.indexOf('stumble'));
+  });
+
+  it('confused, a fooled player shows the fooled clip', () => {
+    const { w, brain } = confuse();
+    for (let i = 0; i < 20; i++) tick(w, brain);
+    expect(w.away.anim.name).toBe('fooled');
+    expect(STEPOVER.swayPx).toBe(8);
   });
 });

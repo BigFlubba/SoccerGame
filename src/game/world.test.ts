@@ -632,3 +632,32 @@ describe('the tricks in a match', () => {
     for (let seed = 100; seed < 108; seed++) expect(scriptedEnd(seed, tricks), `seed ${seed}`).toEqual(scriptedEnd(seed, null));
   });
 });
+
+describe('a fooled defender in the world', () => {
+  const SETUP: TrickSetup = { profile: TRICK_DIFFICULTY.normal, scale: { stepover: 1, flick: 1 } };
+  const staged = () => {
+    const w = createWorld(BASE_STATS, BASE_STATS, 1, ERR, null, null, DIFFICULTY.normal, NORMAL_HANDLING, SETUP);
+    w.match.phase = 'playing';
+    Object.assign(w.home, { x: 300, z: 32, facing: 1 });
+    Object.assign(w.away, { x: 330, z: 32, facing: -1, fooled: { kind: 'confused', leftS: 0.7, totalS: 0.7, swayZ: 32 } });
+    Object.assign(w.ball, { x: 200, y: BALL_REST_Y, z: 32, vx: 0, vy: 0, vz: 0 });
+    return w;
+  };
+
+  it("still stops Harrison running through him", () => {
+    const w = staged();
+    for (let i = 0; i < 30; i++) stepWorld(w, move(1), NO_INTENT, STEP);
+    expect(w.away.x - w.home.x).toBeGreaterThanOrEqual(2 * PLAYER_R - 1e-6);
+  });
+
+  it('the kickoff after a goal clears the trick, the cooldown, the fooled and the wise on both players (Review Focus 2)', () => {
+    const w = staged();
+    w.away.wiseS = 2;
+    w.home.trick = { kind: 'stepover', t: 0.1, side: 1, sold: false, pace: 0.5, onBall: true };
+    w.home.trickCooldownS = 0.5;
+    placeForKickoff(w);
+    for (const p of [w.home, w.away]) {
+      expect([p.trick, p.trickCooldownS, p.fooled, p.wiseS]).toEqual([null, 0, null, 0]);
+    }
+  });
+});

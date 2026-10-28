@@ -26,7 +26,7 @@ export interface PowerState {
 }
 
 /** What each thing he does adds to the meter, tuned so an ordinary match fills it about once. */
-export const METER_GAIN = { touch: 0.01, tackle: 0.15, onTarget: 0.2, styleGoal: 0.4 };
+export const METER_GAIN = { touch: 0.01, tackle: 0.15, onTarget: 0.2, styleGoal: 0.4, trick: 0.1 };
 /** Dribbling alone never fills it: touches add nothing from here up. */
 export const TOUCH_CEILING = 0.5;
 export const GOLDEN_GAIN = 1.1;

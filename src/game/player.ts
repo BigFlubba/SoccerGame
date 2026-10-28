@@ -129,6 +129,15 @@ export interface Player {
   trick: null | { kind: TrickKind; t: number; side: 1 | -1; sold: boolean; pace: number; onBall: boolean };
   /** Time until RB can start another trick. */
   trickCooldownS: number;
+  /**
+   * Fooled by Harrison's trick: confused (a stepover) or stumbling (a
+   * flick), for totalS from the sell with leftS to go. A confused player
+   * sways to swayZ in depth. Fooled, he can't play the ball; his body stays
+   * solid. The world counts it down.
+   */
+  fooled: null | { kind: 'confused' | 'stumble'; leftS: number; totalS: number; swayZ: number };
+  /** Time left wise to Harrison's tricks, when none can fool him. */
+  wiseS: number;
 }
 
 export const PLAYER_H = 40;
@@ -209,6 +218,8 @@ export function createPlayer(team: 'home' | 'away', stats: Stats, x: number, fac
     turnS: 0,
     trick: null,
     trickCooldownS: 0,
+    fooled: null,
+    wiseS: 0,
   };
 }
 
@@ -335,6 +346,7 @@ function chooseAnim(p: Player, sprinting: boolean, skid: boolean): { name: AnimN
   const t = p.stateT;
   const clipFrame = (name: AnimName, from: number, time: number) =>
     Math.min(CLIPS[name].frameCount - 1, from + Math.floor(time * CLIPS[name].fps));
+  const skidFrame = () => ({ name: 'skid' as const, frame: Math.min(SKID_FRAME_HOLD, Math.floor((p.anim.name === 'skid' ? p.animT : 0) * CLIPS.skid.fps)) });
   switch (p.state) {
     case 'air':
       if (p.kick?.kind === 'volley') return { name: 'volley', frame: clipFrame('volley', 0, t) };
@@ -366,12 +378,19 @@ function chooseAnim(p: Player, sprinting: boolean, skid: boolean): { name: AnimN
     default: {
       // A trick: its own clip, on its own clock.
       if (p.trick) return { name: p.trick.kind, frame: clipFrame(p.trick.kind, 0, p.trick.t) };
+      // Fooled: confused or stumbling, on the reaction's clock; on soft brakes he skids on first.
+      if (p.fooled) {
+        if (p.handling.decel < DECEL && Math.hypot(p.vx, p.vz) > SKID_SPEED) return skidFrame();
+        const into = p.fooled.totalS - p.fooled.leftS;
+        if (p.fooled.kind === 'stumble') return { name: 'stumble', frame: clipFrame('stumble', 0, into) };
+        return { name: 'fooled', frame: Math.floor(into * CLIPS.fooled.fps) % CLIPS.fooled.frameCount };
+      }
       // A missed steal: his foot is still out, jabbing at nothing.
       if (p.stumbleS > 0) return { name: 'shoot', frame: SHOOT_STRIKE_FRAME };
       // A drag-back: planted, his sole on the ball.
       if (p.turnS > 0) return { name: 'shoot', frame: SHOOT_CHARGE_FRAME };
       // Soft brakes: the brakes go on, then he sits back on his planted foot until he's slowed.
-      if (skid) return { name: 'skid', frame: Math.min(SKID_FRAME_HOLD, Math.floor((p.anim.name === 'skid' ? p.animT : 0) * CLIPS.skid.fps)) };
+      if (skid) return skidFrame();
       const name: AnimName = Math.hypot(p.vx, p.vz) < IDLE_SPEED ? 'idle' : sprinting ? 'sprint' : 'run';
       const time = name === p.anim.name ? p.animT : 0;
       return { name, frame: Math.floor(time * CLIPS[name].fps) % CLIPS[name].frameCount };

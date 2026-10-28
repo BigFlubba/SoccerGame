@@ -9,7 +9,8 @@ import { NO_INTENT, NORMAL_HANDLING, type PlayerIntent } from './player';
 import { POWERED_S, type PowerKit } from './power';
 import { BASE_STATS, runSpeed, type Stats } from './stats';
 import { FOOT_SPOT } from './steal';
-import { FLICK, STEPOVER, TRICK_COOLDOWN_S, TRICK_DIFFICULTY, type TrickSetup } from './tricks';
+import { trickSetup, type HumanOpponentId } from './opponents';
+import { FLICK, STEPOVER, TRICK_COOLDOWN_S, TRICK_DIFFICULTY, WISE_S, squaredUp, type TrickSetup } from './tricks';
 import { fireWave } from './wave';
 import { createWorld, stepWorld, type World } from './world';
 
@@ -34,7 +35,7 @@ interface Stage {
   dog?: boolean;
 }
 
-/** A world in play: Harrison at (x, z) with the ball at his feet, Max (or the dog) out of the way. */
+/** A world in play: Harrison at (x, z) with the ball at his feet, Max (or the dog) in his lane at x `max`, out of the way unless placed. */
 function stage(o: Stage = {}): World {
   const tricks = o.tricks === undefined ? SETUP : o.tricks;
   const w = createWorld(o.stats ?? BASE_STATS, BASE_STATS, 1, { home: 0, away: 0 }, o.kit ?? null, o.dog ? DOG_DIFFICULTY.normal : null, DIFFICULTY.normal, NORMAL_HANDLING, tricks);
@@ -42,7 +43,7 @@ function stage(o: Stage = {}): World {
   const mid = w.field.depth / 2;
   const [x, facing] = [o.x ?? 300, o.facing ?? 1];
   Object.assign(w.home, { x, z: o.z ?? mid, facing });
-  Object.assign(w.away, { x: o.max ?? 60, z: mid });
+  Object.assign(w.away, { x: o.max ?? 60, z: o.z ?? mid });
   Object.assign(w.ball, { x: o.bx ?? x + facing * FOOT_SPOT, y: BALL_REST_Y, z: o.z ?? mid, vx: 0, vy: 0, vz: 0 });
   return w;
 }
@@ -322,5 +323,156 @@ describe('play stopping mid-trick (Review Focus 2)', () => {
     expect(w.home.trick).toBeNull();
     for (let i = 0; i < 10; i++) stepWorld(w, NO_INTENT, NO_INTENT, STEP);
     expect(Math.abs(w.home.vx)).toBeLessThan(1);
+  });
+});
+
+/** Harrison with the ball at his feet at x 300, Max standing `gap` px ahead in his lane facing him. */
+const facing = (gap: number, o: Stage = {}) => stage({ max: 300 + gap, ...o });
+
+/** Presses RB (or stick up + RB) and steps to the trick's sell; returns that tick's trick events. */
+function toSell(w: World, press: PlayerIntent = RB) {
+  stepWorld(w, press, NO_INTENT, STEP);
+  for (let i = 0; i < 60 && !w.home.trick?.sold; i++) stepWorld(w, NO_INTENT, NO_INTENT, STEP);
+  return w.events.trick;
+}
+
+describe('fooling the defender at the sell', () => {
+  it('a stepover with Max squared up 30 px ahead confuses him', () => {
+    const w = facing(30);
+    expect(toSell(w).fooled).toBe('stepover');
+    expect(w.away.fooled?.kind).toBe('confused');
+    expect(w.away.fooled?.leftS).toBeCloseTo(TRICK_DIFFICULTY.normal.confusedS, 5);
+  });
+
+  it('a flick with Max squared up 30 px ahead makes him stumble', () => {
+    const w = facing(30);
+    expect(toSell(w, FLICK_PRESS).fooled).toBe('flick');
+    expect(w.away.fooled?.kind).toBe('stumble');
+    expect(w.away.fooled?.leftS).toBeCloseTo(TRICK_DIFFICULTY.normal.stumbleS, 5);
+  });
+
+  it("a confused defender's sway is set toward the stepover's dip, the tighter side", () => {
+    const deep = facing(30, { z: 44 });
+    toSell(deep);
+    expect(deep.away.fooled!.swayZ).toBeCloseTo(44 + STEPOVER.swayPx, 5);
+    const near = facing(30, { z: 20 });
+    toSell(near);
+    expect(near.away.fooled!.swayZ).toBeCloseTo(20 - STEPOVER.swayPx, 5);
+  });
+
+  const notSquared: [string, () => World][] = [
+    ['10 px ahead, already on the ball', () => facing(10)],
+    ['58 px ahead, too far off', () => facing(58)],
+    ['16 px off his lane', () => {
+      const w = facing(30);
+      w.away.z += 16;
+      return w;
+    }],
+    ['facing away', () => {
+      const w = facing(30);
+      w.away.facing = 1;
+      return w;
+    }],
+    ['wise to it', () => {
+      const w = facing(30);
+      w.away.wiseS = 2;
+      return w;
+    }],
+    ['fallen', () => {
+      const w = facing(30);
+      w.away.state = 'fallen';
+      return w;
+    }],
+  ];
+
+  it.each(notSquared)('%s, he is not fooled', (_, make) => {
+    const w = make();
+    expect(toSell(w).fooled).toBeNull();
+    expect(w.away.fooled).toBeNull();
+  });
+
+  it('already fooled, a second trick does not fool him again', () => {
+    const w = facing(30);
+    w.away.fooled = { kind: 'confused', leftS: 0.5, totalS: 0.7, swayZ: w.away.z };
+    expect(toSell(w).fooled).toBeNull();
+    expect(w.away.fooled!.leftS).toBeLessThan(0.5);
+  });
+
+  it("isn't squared up while the ball is still on the centre spot at Harrison's kickoff", () => {
+    const w = facing(30);
+    w.match.kickoffTeam = 'home';
+    Object.assign(w.ball, { x: w.field.width / 2, z: w.field.depth / 2 });
+    Object.assign(w.home, { x: w.ball.x - FOOT_SPOT, z: w.ball.z });
+    Object.assign(w.away, { x: w.home.x + 30, z: w.ball.z });
+    expect(squaredUp(w)).toBe(false);
+    w.ball.x += 4;
+    expect(squaredUp(w)).toBe(true);
+  });
+
+  it('a fooling trick adds 0.1 to the meter with a power move, and nothing without one', () => {
+    const w = facing(30, { kit: { golden: false } });
+    w.power!.meter = 0.3;
+    toSell(w);
+    expect(w.power!.meter).toBeCloseTo(0.4, 5);
+    const bare = facing(30);
+    toSell(bare);
+    expect(bare.power).toBeNull();
+  });
+});
+
+describe('wise to it', () => {
+  it('when his confusion ends he is wise for 3 s, and a stepover 1 s later does not fool him', () => {
+    const w = facing(30);
+    toSell(w);
+    for (let i = 0; i < 120 && w.away.fooled; i++) stepWorld(w, NO_INTENT, NO_INTENT, STEP);
+    expect(w.away.fooled).toBeNull();
+    expect(w.away.wiseS).toBeCloseTo(WISE_S, 5);
+    for (let i = 0; i < ticks(1); i++) stepWorld(w, NO_INTENT, NO_INTENT, STEP);
+    Object.assign(w.ball, { x: w.home.x + FOOT_SPOT, z: w.home.z, vx: 0, vz: 0 });
+    Object.assign(w.away, { x: w.home.x + 30, z: w.home.z, vx: 0, vz: 0, facing: -1 });
+    expect(toSell(w).fooled).toBeNull();
+  });
+
+  it('a stepover he sees from 80 px fools nobody and makes him wise from its sell', () => {
+    const w = facing(80);
+    expect(toSell(w).fooled).toBeNull();
+    expect(w.away.wiseS).toBe(WISE_S);
+  });
+
+  it('from 140 px, or facing away, he does not see it', () => {
+    const far = facing(140);
+    toSell(far);
+    expect(far.away.wiseS).toBe(0);
+    const away = facing(30);
+    away.away.facing = 1;
+    toSell(away);
+    expect(away.away.wiseS).toBe(0);
+  });
+
+  it("after a clean steal he is wise for the profile's wrong-footed beat", () => {
+    const w = stage({ x: 310, facing: -1, bx: 292, max: 300 });
+    Object.assign(w.away, { vx: -150, facing: -1 });
+    Object.assign(w.home, { vx: -150 });
+    Object.assign(w.ball, { vx: -150 });
+    w.rng = () => 0;
+    stepWorld(w, { ...NO_INTENT, steal: true }, NO_INTENT, STEP);
+    expect(w.events.steal).toBe('stole');
+    expect(w.away.wiseS).toBeCloseTo(DIFFICULTY.normal.wrongFootedS, 9);
+  });
+});
+
+describe("each opponent's reaction time", () => {
+  const base = TRICK_DIFFICULTY.normal;
+  it.each([
+    ['brick', 'stepover', 0.3 * base.confusedS],
+    ['pete', 'stepover', 1.5 * base.confusedS],
+    ['tia', 'stepover', 0.6 * base.confusedS],
+    ['leo', 'stepover', base.confusedS],
+    ['sam', 'stepover', base.confusedS],
+    ['brick', 'flick', 1.2 * base.stumbleS],
+  ] as [HumanOpponentId, 'stepover' | 'flick', number][])('%s: a %s fools him for %f s', (id, kind, s) => {
+    const w = facing(30, { tricks: trickSetup('normal', id) });
+    toSell(w, kind === 'flick' ? FLICK_PRESS : RB);
+    expect(w.away.fooled?.totalS).toBeCloseTo(s, 5);
   });
 });

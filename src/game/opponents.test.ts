@@ -4,7 +4,8 @@ import { DIFFICULTY, createBrain, think, type Difficulty } from './ai';
 import { BALL_REST_Y } from './ball';
 import { CREW_PROFILES, CREW_STATS, type CrewId } from './crew';
 import { NO_INTENT, NORMAL_HANDLING } from './player';
-import { opponentHandling, opponentProfile, opponentStats } from './opponents';
+import { opponentHandling, opponentProfile, opponentStats, trickSetup, type HumanOpponentId } from './opponents';
+import { DOG_TRICKS, TRICK_DIFFICULTY, TRICK_SCALE } from './tricks';
 import { SAM_HANDLING, SAM_PROFILES, SAM_STATS } from './sam';
 import { cleanStealOdds } from './steal';
 import { BASE_STATS } from './stats';
@@ -117,5 +118,32 @@ describe('the fair rules hold against Leo with no new code', () => {
       const held = think(brain, w, w.away, w.home, STEP);
       expect([held.moveX, held.moveZ], d).toEqual([0, 0]);
     }
+  });
+});
+
+describe('trickSetup', () => {
+  const IDS: HumanOpponentId[] = ['max', 'brick', 'leo', 'tia', 'pete', 'sam'];
+  const DS: Difficulty[] = ['easy', 'normal', 'hard'];
+
+  it("gives each human opponent the difficulty's window and times, scaled by their style", () => {
+    for (const id of IDS)
+      for (const d of DS) {
+        const setup = trickSetup(d, id);
+        expect(setup.profile, `${id} ${d}`).toBe(TRICK_DIFFICULTY[d]);
+        expect(setup.scale, `${id} ${d}`).toBe(TRICK_SCALE[opponentProfile(id, d).style]);
+      }
+  });
+
+  it('scales Brick, Tia and Pete their own way, and Max, Leo and Sam not at all', () => {
+    const scale = (id: HumanOpponentId) => trickSetup('normal', id).scale;
+    expect(scale('brick')).toEqual({ stepover: 0.3, flick: 1.2 });
+    expect(scale('tia')).toEqual({ stepover: 0.6, flick: 0.6 });
+    expect(scale('pete')).toEqual({ stepover: 1.5, flick: 1.5 });
+    for (const id of ['max', 'leo', 'sam'] as const) expect(scale(id)).toEqual({ stepover: 1, flick: 1 });
+  });
+
+  it("gives Biscuit the dog's own window and times, unscaled", () => {
+    for (const d of DS) expect(trickSetup(d, 'biscuit')).toEqual({ profile: DOG_TRICKS[d], scale: { stepover: 1, flick: 1 } });
+    expect(trickSetup('normal', 'biscuit').profile).toBe(DOG_TRICKS.normal);
   });
 });

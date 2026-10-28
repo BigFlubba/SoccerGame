@@ -56,7 +56,7 @@ export interface AiBrain {
   profile: AiProfile;
   nextDecisionS: number;
   intent: PlayerIntent;
-  plan: 'chase' | 'dribble' | 'charge' | 'defend' | 'jump' | 'faceWave' | 'backOff' | 'hesitate';
+  plan: 'chase' | 'dribble' | 'charge' | 'defend' | 'jump' | 'faceWave' | 'backOff' | 'hesitate' | 'fooled';
   /** Time left on the current charge before it releases the shot. */
   chargeLeftS: number;
   /** Time until it may slide again. */
@@ -483,6 +483,31 @@ function holdingKickoff(brain: AiBrain, w: World, them: Player, dt: number): boo
   return false;
 }
 
+/** How far off his sway spot a confused player stops steering to it, px. */
+const SWAY_STOP = 1;
+/** The pace he sways at. */
+const SWAY_PACE = 0.5;
+
+/**
+ * Fooled by Harrison's trick: confused, he sways a step in depth to his
+ * sway spot, then stands facing the ball; stumbling, he lets go of the
+ * stick and his own brakes carry him on. Either way he never slides, jumps
+ * or plays the ball, and decides afresh the moment it ends.
+ */
+function fooledTick(brain: AiBrain, w: World, me: Player): void {
+  const fooled = me.fooled!;
+  brain.plan = 'fooled';
+  brain.fake = null;
+  brain.nextDecisionS = 0;
+  if (fooled.kind === 'stumble') {
+    brain.intent = { ...NO_INTENT };
+    return;
+  }
+  const dz = fooled.swayZ - me.z;
+  const faceX = Math.sign(w.ball.x - me.x) >= 0 ? 1 : -1;
+  brain.intent = Math.abs(dz) > SWAY_STOP ? { ...NO_INTENT, moveZ: Math.sign(dz), pace: SWAY_PACE, faceX } : { ...NO_INTENT, faceX };
+}
+
 /**
  * The computer player's intent for this tick. It re-decides every
  * reactionS and holds its intent in between; a charged shot releases on
@@ -522,6 +547,8 @@ export function think(brain: AiBrain, w: World, me: Player, them: Player, dt: nu
   if (wave) {
     faceWave(brain, w, me, wave);
     brain.nextDecisionS = brain.profile.reactionS;
+  } else if (me.fooled) {
+    fooledTick(brain, w, me);
   } else if (backing && backing.inS <= 0) {
     // Committed: it re-aims every tick to keep its distance while he's powered up.
     backOff(brain, w, me, them, backing.gap);

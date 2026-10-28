@@ -295,6 +295,8 @@ export function stepWorld(w: World, homeIntent: PlayerIntent, awayIntent: Player
   if (steal === 'stole' || steal === 'poked' || steal === 'trapped') w.ball.touchedBy = 'home';
   stepDragBack(w, dt);
   const trick = { ...stepTrick(w, dt), started };
+  // Wrong-footed by a clean steal, he can't be fooled either: the world can't see his brain, so it's wise for that beat.
+  if (steal === 'stole') w.away.wiseS = Math.max(w.away.wiseS, w.maxProfile?.wrongFootedS ?? 0);
 
   const { braced, blown } = stepWave(w, dt);
   [power.braced, power.blown] = [braced, blown];
@@ -305,7 +307,8 @@ export function stepWorld(w: World, homeIntent: PlayerIntent, awayIntent: Player
   const squeeze = steal !== 'stole' && steal !== 'trapped';
   // In a drag-back his sole has the ball, and in a trick the trick has it: only the other player's contacts can take it.
   const contact = (p: Player, other: Player) => {
-    if (w.wave?.live || (p === home && (home.turnS > 0 || home.trick !== null))) return quietContact();
+    // A player fooled by a trick can't play the ball at all.
+    if (w.wave?.live || (p === home && (home.turnS > 0 || home.trick !== null)) || p.fooled) return quietContact();
     // Harrison, and a player on soft brakes who can't stop short of his own goal, never knock the ball at it near it.
     const guarded = p === home || p.handling.decel < DECEL;
     const ev = resolveContacts(p, other, w.ball, w.aimErrorDeg[p.team], w.rng, w.field, { trips: true, squeeze, clearUpfield: guarded, keepOut: guarded });

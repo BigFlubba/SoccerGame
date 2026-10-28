@@ -1,8 +1,9 @@
-import type { Difficulty } from './ai';
+import type { Difficulty, Style } from './ai';
 import { BALL_REST_Y } from './ball';
 import { KEEP_OUT_X, canPlace } from './contact';
 import { ballIsHis } from './dragBack';
-import type { PlayerIntent } from './player';
+import { PLAYER_R, type PlayerIntent } from './player';
+import { addMeter } from './power';
 import { FOOT_SPOT } from './steal';
 import type { World } from './world';
 
@@ -43,6 +44,32 @@ export const TRICK_DIFFICULTY: Record<Difficulty, TrickProfile> = {
   hard: { near: 16, far: 38, confusedS: 0.5, stumbleS: 0.5 },
 };
 
+/** Each style's reaction times as a share of the difficulty's: Pete bites hardest, Brick barely moves for a stepover. Mutable, for headless sweeps. */
+export const TRICK_SCALE: Record<Style, TrickScale> = {
+  allRound: { stepover: 1, flick: 1 },
+  blocker: { stepover: 0.3, flick: 1.2 },
+  shooter: { stepover: 1, flick: 1 },
+  dribbler: { stepover: 0.6, flick: 0.6 },
+  presser: { stepover: 1.5, flick: 1.5 },
+  speedster: { stepover: 1, flick: 1 },
+};
+
+/** Biscuit's own window and times. Mutable, for headless sweeps. */
+export const DOG_TRICKS: Record<Difficulty, TrickProfile> = {
+  easy: { ...TRICK_DIFFICULTY.easy },
+  normal: { ...TRICK_DIFFICULTY.normal },
+  hard: { ...TRICK_DIFFICULTY.hard },
+};
+
+/** A defender this far either side of Harrison's line, px, is in his lane. */
+export const TRICK_LANE = 14;
+/** A defender facing him from in front within this far sees a trick, px... */
+export const SEE_RANGE = 120;
+/** ...and, seeing one that doesn't fool him, or once a fooling ends, is wise to them for this long, s. */
+export const WISE_S = 3;
+/** The ball this close to the centre spot hasn't been played yet, px (as the brain's kickoff hold has it). */
+const ON_SPOT = 0.5;
+
 /** The stepover: its length and sell, s; his pace along his facing meanwhile; how far a confused defender sways, px. */
 export const STEPOVER = { durationS: 0.4, sellS: 0.2, pace: 0.5, swayPx: 8 };
 
@@ -70,6 +97,66 @@ export interface TrickEvents {
 }
 
 export const quietTricks = (): TrickEvents => ({ started: null, released: false, fooled: null });
+
+/** The gap from Harrison to the defender along his facing, px. */
+const gapAhead = (w: World): number => (w.away.x - w.home.x) * w.home.facing;
+
+/** On his feet, playing as normal, facing Harrison: the defender a trick can work on. */
+function facingHim(w: World): boolean {
+  const { home, away } = w;
+  return away.state === 'ground' && away.y === 0 && away.fooled === null && away.facing === -home.facing;
+}
+
+/**
+ * The defender is squared up to Harrison: in front of him inside the
+ * window, in his lane, facing him, on his feet and playing as normal, not
+ * wise to it, not backing off from a powered-up Harrison, and not holding
+ * his spot at Harrison's kickoff.
+ */
+export function squaredUp(w: World): boolean {
+  if (!w.tricks) return false;
+  const { home, away, ball, field } = w;
+  const { near, far } = w.tricks.profile;
+  const gap = gapAhead(w);
+  const kickoff = w.match.kickoffTeam === 'home' && Math.hypot(ball.x - field.width / 2, ball.z - field.depth / 2) <= ON_SPOT;
+  const powered = (w.power?.activeS ?? 0) > 0;
+  return gap >= near && gap <= far && Math.abs(away.z - home.z) <= TRICK_LANE && facingHim(w) && away.wiseS === 0 && !powered && !kickoff;
+}
+
+/** The defender saw a trick that didn't fool him: facing Harrison from in front within SEE_RANGE, but not squared up. */
+export function seesTrick(w: World): boolean {
+  const gap = gapAhead(w);
+  return gap > 0 && gap <= SEE_RANGE && facingHim(w) && !squaredUp(w);
+}
+
+/** The sell: a squared-up defender is fooled; one who only saw it is wise to it. */
+function sell(w: World, ev: TrickEvents): void {
+  const { away, field } = w;
+  const trick = w.home.trick!;
+  if (trick.onBall && squaredUp(w)) {
+    const { profile, scale } = w.tricks!;
+    const s = scale[trick.kind] * (trick.kind === 'stepover' ? profile.confusedS : profile.stumbleS);
+    const swayZ = Math.min(Math.max(away.z + trick.side * STEPOVER.swayPx, PLAYER_R), field.depth - PLAYER_R);
+    away.fooled = { kind: trick.kind === 'stepover' ? 'confused' : 'stumble', leftS: s, totalS: s, swayZ };
+    ev.fooled = trick.kind;
+    if (w.power) addMeter(w.power, 'trick');
+  } else if (seesTrick(w)) away.wiseS = WISE_S;
+}
+
+/** The defender's fooled and wise timers, while play is live. A fooling that ends leaves him wise. */
+function tickDefender(w: World, dt: number): void {
+  const away = w.away;
+  if (w.match.phase !== 'playing') return;
+  if (!away.fooled) {
+    away.wiseS = Math.max(0, away.wiseS - dt);
+    return;
+  }
+  away.fooled.leftS -= dt;
+  if (away.fooled.leftS <= 1e-9) {
+    away.fooled = null;
+    away.wiseS = WISE_S;
+  }
+}
 
 /** Facing his own goal inside the keep-out zone, where a flick could drop into his own net. */
 function facingOwnGoalNear(w: World): boolean {
@@ -107,7 +194,8 @@ function carry(w: World, x: number, y: number): void {
 }
 
 /**
- * One tick of the trick under way, and the cooldown. Play stopping or him
+ * One tick of the trick under way, the cooldown, and the defender's fooled
+ * and wise timers. Play stopping or him
  * leaving his feet ends it at once. Someone else playing the ball, the dog
  * taking it, or its spot being behind a fence, a post or a net leaves it
  * where it is, and the trick plays out without it.
@@ -120,6 +208,7 @@ export function stepTrick(w: World, dt: number): TrickEvents {
   const ev = quietTricks();
   const { home, ball } = w;
   home.trickCooldownS = Math.max(0, home.trickCooldownS - dt);
+  tickDefender(w, dt);
   const trick = home.trick;
   if (!trick) return ev;
   if (w.match.phase !== 'playing' || home.state !== 'ground') {
@@ -138,6 +227,7 @@ export function stepTrick(w: World, dt: number): TrickEvents {
   }
   if (selling) {
     trick.sold = true;
+    sell(w, ev);
     if (trick.kind === 'flick') {
       trick.pace = 1;
       if (trick.onBall) {
