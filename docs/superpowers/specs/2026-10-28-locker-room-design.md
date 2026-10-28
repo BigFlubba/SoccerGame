@@ -513,3 +513,44 @@ Headband at (16, 11), before the glasses:
   armband gold; the near sleeve's trim stripe takes the armband colour
   over the same stretch. Not on the far arm.
 - **New colours:** rim `silver`, glint `white`, armband `energyGold`.
+
+## As built (2026-10-28)
+
+Settled on the way; the code and its tests are the detail.
+
+- **The save:** profile v6. The loader reads the locker after the
+  career and keeps `bought`, `extras` and `seen` in catalogue order.
+  The code appends five fields after the difficulty; the longest code
+  is 151 characters (31 groups, still four small lines on SAVE CODE
+  and DELETE SAVE), so `MAX_ENTRY` is 153.
+- **The art:** `GameArt.dress(outfit)` switches his sprite sets and
+  portraits, baked the first time an outfit asks and kept
+  (`src/scenes/harrisonArt.ts`). An animated kit's frame is painted
+  live from its shader each draw; silhouettes and the aura use the
+  baked frames. `game.ts` dresses him whenever a save is stored or
+  another tab changes it, so the backdrop shows the default look until
+  a save is played.
+- **The effects:** in a match they draw just behind him in the depth
+  sort; in the Locker Room they draw in front of him, as the room study
+  did. Each match seeds its own `OutfitFx` from the match seed plus a
+  constant; the VS card and the backdrop have their own seeds. A
+  headless test plays 600 ticks with every item worn and without, and
+  the worlds and their next random numbers match.
+- **Numbers from the studies:** INFERNO gives off 28 embers a second
+  (the study's two tries a tick), not the 14 this document named; a
+  shine also crosses the socks ("every kit pixel"); LIGHTNING's crackle
+  bolts show while he sprints, and its two zaps on every step.
+- **The room:** opening the buy box plays `menuConfirm`, closing it
+  `menuBack`; the cheer has no cue of its own (a wear plays
+  `menuConfirm`, a buy `buy`). `BUY BLACK GOLD?` and `BUY WRISTBANDS?`
+  are too wide for big letters in the box, so they ask in small ones.
+  He sprints on the spot while the BOOTS tab is on a trail boot,
+  locked or not.
+- **The Hub:** NEW sits just right of LOCKER ROOM's text on its row.
+  No Help change.
+- **Results** keeps three foot lines; a gift line takes a later line's
+  place (a 10-star milestone with UPGRADE READY shows the armband's
+  line instead).
+- **Measured in the browser:** a match frame with INFERNO, FIRE and
+  every extra draws in about 0.4 ms (median); the first frame in a new
+  outfit bakes it, about 6 ms.
