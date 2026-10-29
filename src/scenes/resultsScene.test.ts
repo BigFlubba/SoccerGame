@@ -312,6 +312,11 @@ describe('results: unlocks and the skip grace', () => {
     expect(footLines(reward, tallyAt(reward, Infinity), true)).toEqual([careerLine(reward), 'ENERGY WAVE UNLOCKED IN THE SHOP!', 'UPGRADE READY IN THE SHOP!']);
   });
 
+  it('a gift line gives way to an unlock when both come in one match', () => {
+    const { reward } = after(WIN_3_0, grantRungStars({ ...newProfile(), ladderWins: 10, level: 2, xp: 140 }), boss);
+    expect(footLines(reward, tallyAt(reward, Infinity), false)).toEqual(['BISCUIT BEATEN! BACKYARD DONE!', '10 STARS! +300 COINS', 'ENERGY WAVE UNLOCKED IN THE SHOP!']);
+  });
+
   it('the skill moves and Golden Form are announced too, and all together still fit three lines', () => {
     const { reward } = after(WIN_3_0, { ...newProfile(), level: 2, xp: 790 });
     expect(unlockLines(reward)).toEqual(['ENERGY WAVE UNLOCKED IN THE SHOP!', 'NEW MOVES: STEPOVER + RAINBOW FLICK', 'GOLDEN FORM UNLOCKED!']);

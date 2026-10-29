@@ -117,10 +117,13 @@ export function unlockLines(reward: MatchReward): string[] {
 /**
  * The centred lines under the tally, in order: the career's news and any
  * milestones once it's done, the unlocks from the level-up on, then
- * UPGRADE READY if there's still room.
+ * UPGRADE READY if there's still room. A gift line gives way to an
+ * unlock: the Hub's NEW still points to the gift.
  */
 export function footLines(reward: MatchReward, tally: Tally, upgradeReady: boolean): string[] {
   const lines = [...(tally.done ? [careerLine(reward), ...milestoneLines(reward)] : []), ...(tally.levelUp ? unlockLines(reward) : [])];
+  const gifts = reward.career.milestones.map(m => giftLine(m.index));
+  for (let i = lines.length - 1; i >= 0 && lines.length > FOOT_LINES; i--) if (gifts.includes(lines[i]!)) lines.splice(i, 1);
   if (tally.done && upgradeReady) lines.push(UPGRADE_READY);
   return lines.slice(0, FOOT_LINES);
 }
