@@ -21,7 +21,8 @@ const isExtra = (id: LockerItemId): id is `extra:${ExtraId}` => id.startsWith('e
 
 /**
  * The Locker Room, off the Hub. Up/down pick a row and left/right a tab,
- * both wrapping; whatever the cursor is on, he's shown in at once. A
+ * both wrapping; whatever the cursor is on, he's shown in at once, except
+ * an extra he's just taken off, until the cursor moves. A
  * wears, takes off, or opens a box that buys with YES; nothing he hasn't
  * chosen is ever saved, and B, Esc or Start goes back.
  */
@@ -41,9 +42,11 @@ export function createLockerRoomScene(ctx: GameContext, back: () => Scene): Lock
   let burstOwed = false;
   let fx: OutfitFx | null = null;
   let fxKey = '';
+  /** The extra just taken off: he's shown without it until the cursor moves. */
+  let tookOff: LockerItemId | null = null;
 
   const current = (): LockerItemId => itemsIn(tab)[row]!.id;
-  const shown = (): Outfit => dressedIn(outfitOf(ctx.profile), current());
+  const shown = (): Outfit => (current() === tookOff ? outfitOf(ctx.profile) : dressedIn(outfitOf(ctx.profile), current()));
   const save = (p: Profile) => ctx.saveProfile(p);
   const cheer = () => {
     cheerS = CHEER_S;
@@ -73,6 +76,7 @@ export function createLockerRoomScene(ctx: GameContext, back: () => Scene): Lock
       const off = isExtra(id) ? takeOff(ctx.profile, id) : null;
       if (!off) return;
       save(off);
+      tookOff = id;
       ctx.audio.play('menuConfirm');
       return;
     }
@@ -162,6 +166,7 @@ export function createLockerRoomScene(ctx: GameContext, back: () => Scene): Lock
       }
       if (tab !== before.tab || row !== before.row) {
         message = null;
+        tookOff = null;
         ctx.audio.play('menuMove');
         see();
       }

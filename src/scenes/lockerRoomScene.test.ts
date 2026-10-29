@@ -183,6 +183,16 @@ describe('the locker room: A', () => {
     expect(s.view.cheerS).toBe(0);
     expect(ctx.savedProfiles).toHaveLength(2);
   });
+
+  it('taking an extra off shows him without it until the cursor moves', () => {
+    const { s } = open(save({ locker: { extras: ['glasses'] } }));
+    step(s, LEFT, A);
+    expect(s.view.shown.extras).toEqual([]);
+    expect(s.view.trying).toBe(false);
+    step(s, DOWN, UP);
+    expect(s.view.shown.extras).toEqual(['glasses']);
+    expect(s.view.trying).toBe(true);
+  });
 });
 
 describe('the locker room: NEW and leaving', () => {
