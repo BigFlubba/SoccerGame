@@ -574,3 +574,11 @@ Settled on the way; the code and its tests are the detail.
 - His per-outfit art caches never shrink in a session (bounded in
   practice).
 - No unit tests pin `HarrisonArt`'s cache keys or `dress`'s no-op.
+
+**Weighed by the parent (2026-10-28):** the first, third and last were
+fixed in a small pass after the Quick Match session. Results drops a
+gift line before an unlock line; an extra just taken off is shown off
+until the cursor moves; and tests now pin the caches' keys and
+`dress`'s no-op, under a canvas stub (`stubCanvases`). The trail
+during the cheer, the cheer's cue (left for whoever first listens to
+the sound) and the caches that never shrink stay as they are.
