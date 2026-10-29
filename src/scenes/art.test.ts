@@ -1,9 +1,11 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { HARRISON_BODY } from '../art/body/proportions';
 import { CREW_BODY, CREW_HEADS, crewLook } from '../art/opponents/crew';
 import { MAX_HEADS, maxLook } from '../art/opponents/max';
 import { SAM_HEADS, samLook } from '../art/opponents/sam';
-import { OPPONENT_LOOKS } from './art';
+import { DEFAULT_OUTFIT, type Outfit } from '../meta/locker';
+import { OPPONENT_LOOKS, loadGameArt } from './art';
+import { stubCanvases } from './testDraw';
 
 describe("each human opponent's art", () => {
   it('Sam wears his own heads and colours, not a stand-in', () => {
@@ -16,5 +18,30 @@ describe("each human opponent's art", () => {
   it('Max and the crew wear their own', () => {
     expect(OPPONENT_LOOKS.max).toEqual({ heads: MAX_HEADS, look: maxLook(), body: HARRISON_BODY });
     for (const id of ['brick', 'leo', 'tia', 'pete'] as const) expect(OPPONENT_LOOKS[id]).toEqual({ heads: CREW_HEADS[id], look: crewLook(id), body: CREW_BODY[id] });
+  });
+});
+
+describe('dress', () => {
+  beforeEach(stubCanvases);
+  afterEach(() => vi.unstubAllGlobals());
+  const HEADBAND: Outfit = { ...DEFAULT_OUTFIT, extras: ['headband'] };
+
+  it('an outfit equal to what he wears changes nothing: the backdrop keeps its effects', () => {
+    const art = loadGameArt();
+    art.dress(HEADBAND);
+    const fx = art.backdropFx;
+    art.dress({ kit: 'home', boots: 'volt', extras: ['headband'] });
+    expect(art.backdropFx).toBe(fx);
+    expect(art.outfit).toBe(HEADBAND);
+  });
+
+  it('a new outfit is worn, with the backdrop effects remade for it', () => {
+    const art = loadGameArt();
+    const fx = art.backdropFx;
+    const plain = art.home;
+    art.dress(HEADBAND);
+    expect(art.outfit).toEqual(HEADBAND);
+    expect(art.home).not.toBe(plain);
+    expect(art.backdropFx).not.toBe(fx);
   });
 });

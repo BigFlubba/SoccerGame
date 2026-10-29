@@ -1,3 +1,4 @@
+import { vi } from 'vitest';
 import type { GameArt } from './art';
 
 /** Every canvas of `fakeArt` is named by the path it was reached by, e.g. `art.opponents.brick.sprites.left.idle.0`, or `art.text(GOAL!,2,white,outline)`. */
@@ -30,6 +31,14 @@ export function fakeArt(path = 'art'): GameArt {
       return fakeArt(`${path}(${args.join(',')})`);
     },
   }) as unknown as GameArt;
+}
+
+/** Real art made under Node: every canvas `document` makes draws nowhere, and ImageData just holds its pixels. Undo with vi.unstubAllGlobals. */
+export function stubCanvases(): void {
+  vi.stubGlobal('document', { createElement: () => ({ width: 0, height: 0, getContext: () => recordingContext().g }) });
+  vi.stubGlobal('ImageData', class {
+    constructor(readonly data: Uint8ClampedArray, readonly width: number, readonly height: number) {}
+  });
 }
 
 /** A 2D context that does nothing but record the images drawn, by name, in order. */
