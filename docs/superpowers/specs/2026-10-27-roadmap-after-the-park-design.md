@@ -40,6 +40,8 @@ By the parent:
   designer, and the proposal below was accepted as is.
 - **The next plans, in order:** skill moves; save slots with a Stamina
   upgrade; the Locker Room's first round; Quick Match; then the venues.
+  *Amended 2026-10-28:* Quick Match is shelved (see section 4), so the
+  venues come straight after the Locker Room.
 
 ## The career, six venues
 
@@ -131,10 +133,22 @@ By the parent:
   approved likeness.
 - Balls, aura colours, celebrations and the Trophy Room stay in step 9.
 
-### 4. Quick Match
+### 4. Quick Match: shelved
 
-As the Park spec deferred it: built after the Park, before the next
-venue. Its design session decides the rest.
+**Shelved indefinitely by the parent on 2026-10-28,** in its design
+session, before anything was planned. Career replays already give
+Harrison what it would: from a venue screen he can replay any match he
+has beaten, against any opponent he has met, at full coins and XP, and a
+replay never takes anything away (stars only rise, ladder wins stay).
+What Quick Match alone would add is putting an opponent in another
+venue's scenery and playing without a bonus objective. Harrison hasn't
+asked for either, and it would take a second path through the VS card,
+the match and Results, a picker screen and a Hub item.
+
+Nothing is built for it. The Hub keeps its items, and the main spec's
+Quick Match section no longer stands. If it ever comes back, 2v2 (from
+the City Stadium) is the point where picking a partner and opponents
+would give him something replays can't.
 
 ### 5. Onward
 
@@ -144,15 +158,17 @@ spec's build order.
 
 ## Build order change
 
-The build order, as amended by Plans 3–7b and this document:
+The build order, as amended by Plans 3–7b and this document (updated
+2026-10-28: the three plans below 7b are done, and Quick Match is
+shelved):
 
 7. Career mode and what Harrison asked for after the Park:
    - 7a. The career spine (done)
    - 7b. The Park, four opponents and Speedy Sam (done)
-   - **Skill moves: the stepover and the rainbow flick**
-   - **Save slots and the Stamina upgrade**
-   - **The Locker Room, first round: kits, boots, accessories**
-   - Quick Match
+   - **Skill moves: the stepover and the rainbow flick** (done)
+   - **Save slots and the Stamina upgrade** (done)
+   - **The Locker Room, first round: kits, boots, accessories** (done)
+   - ~~Quick Match~~ (shelved indefinitely, see section 4)
    - 7c. Keepers and the School Field: **8 matches and Goalie Gus**
    - **The State Championship: 8 rounds and Showtime Shay** (new)
    - 7d. 2v2 and the City Stadium: **8 matches and the Twins**

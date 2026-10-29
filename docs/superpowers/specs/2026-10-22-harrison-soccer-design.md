@@ -223,6 +223,9 @@ uses the shared human body system.
 
 Pick any unlocked venue and opponent. Full coin and XP rewards, no stars.
 
+*Shelved indefinitely (2026-10-28):* career replays already cover it. See
+section 4 of `2026-10-27-roadmap-after-the-park-design.md`.
+
 ### Rewards
 
 The builder tunes the exact numbers to these targets. Starting points:
